@@ -6,8 +6,9 @@ Front web do Duora: encontros entre adultos por experiências e minijogos compar
 React 19, TypeScript 6 (`strict`), Vite 8 e Tailwind CSS 4. O backend é a
 [duora-api](https://github.com/BipoXDXD/duora-api) (Java 25 e Spring Boot 4).
 
-O projeto está no início. Por enquanto ele tem os dois layouts, o cliente HTTP compatível com o
-login da API e a primeira feature, a inscrição na **lista de espera**.
+O projeto está no início. Por enquanto ele tem os dois layouts, a base visual (tokens, tema escuro e
+contraste testado), o cliente HTTP compatível com o login da API e a primeira feature, a inscrição na
+**lista de espera**.
 
 ## Pré-requisitos
 
@@ -69,6 +70,31 @@ mudam. Assim, a experiência no celular pode divergir de verdade (barra inferior
 sem encher cada componente de classes condicionais. O custo é manter duas cascas. Dentro das
 features, ajustes pequenos continuam com as classes responsivas do Tailwind.
 
+## Base visual
+
+Os tokens ficam em `src/index.css`, a fonte única deles, em duas camadas:
+
+- **Tons crus**, definidos de antemão em OKLCH: `ink` (cinza frio no matiz da marca), `brand` (primária) e
+  `danger` (perigo), cada um de 50 a 950. Os componentes nunca usam um tom cru.
+- **Tokens semânticos**, que os componentes usam: `canvas`, `surface`, `fg`, `fg-muted`, `fg-accent`,
+  `primary`, `on-primary`, `danger`, `edge`, `focus` e outros, como em `bg-surface` ou `text-fg-muted`. A
+  paleta padrão do Tailwind foi removida (`--color-*: initial`), então só eles existem.
+
+O **tema escuro** segue `prefers-color-scheme` e só redefine os tokens semânticos. Nele a sombra some e a
+elevação vem da superfície mais clara que a página.
+
+`src/app/theme.test.ts` lê os tokens do `index.css` e mede, nos dois temas, cada par que os componentes
+usam: 4,5:1 para texto, 3:1 para texto grande, borda de componente e anel de foco. O teste também falha se um
+componente usar um tom cru ou se um token semântico novo não entrar em nenhum par. Para incluir uma cor:
+crie o token, use-o no componente e acrescente o par em `PAIRS`.
+
+Interação acessível:
+
+- um anel de foco único (`:focus-visible`, 3px na cor `focus`) para todo elemento focável;
+- alvo de toque de 44×44px (`min-h-11 min-w-11`) em todo link, botão e campo, conferido em teste;
+- `prefers-reduced-motion` desliga animações e transições;
+- todo campo tem label, também conferido em teste.
+
 ## Scripts
 
 | Comando | O que faz |
@@ -87,7 +113,8 @@ features, ajustes pequenos continuam com as classes responsivas do Tailwind.
 Vitest com jsdom e Testing Library. Os testes trocam o `fetch` global por um stub (`vi.stubGlobal`)
 e verificam o que vai para a API (caminho, método, corpo, header CSRF) e o que a tela mostra para
 cada resposta: 202, 400, 429 com e sem `Retry-After`, erro do servidor e falha de rede. O
-`matchMedia`, que o jsdom não tem, é simulado em `src/test/fakeMatchMedia.ts`.
+`matchMedia`, que o jsdom não tem, é simulado em `src/test/fakeMatchMedia.ts`. O contraste das cores é medido
+com o `culori` sobre os tokens lidos do `index.css` (veja [Base visual](#base-visual)).
 
 ## Estrutura
 
@@ -98,7 +125,8 @@ src/
     auth/              URL de login do BFF
     waitlist/          chamada a POST /api/waitlist e o formulário de inscrição
   shared/api/          cliente HTTP (mesma origem, CSRF, ApiError)
-  test/                setup do Vitest e fakes
+  test/                setup do Vitest, fakes e leitor dos tokens do tema
+  index.css            tokens visuais e estilos base (foco, movimento reduzido)
 ```
 
 O código fica organizado por feature, como os módulos da duora-api.

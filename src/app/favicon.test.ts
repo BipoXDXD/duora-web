@@ -6,6 +6,7 @@ import { readThemeTokens } from '../test/themeTokens.ts'
 
 const PUBLIC_SVGS = import.meta.glob<string>('../../public/*.svg', { query: '?raw', import: 'default', eager: true })
 const FAVICON = PUBLIC_SVGS['../../public/favicon.svg'] ?? ''
+const PUBLIC_PNGS = import.meta.glob<string>('../../public/*.png', { query: '?url', import: 'default', eager: true })
 
 describe('favicon', () => {
   it('is declared in index.html as an SVG icon', () => {
@@ -18,9 +19,15 @@ describe('favicon', () => {
 
   it('paints the lens from the logo with tones from index.css, converted to hex', () => {
     const { light } = readThemeTokens(css)
-    const toneHex = ['plum-950', 'apricot-400', 'rose-300'].map((tone) => formatHex(light.get(`--color-${tone}`) ?? 'invalid'))
+    // O damasco aparece duas vezes: o segundo traço é o trecho que passa por cima do rosa-chá.
+    const toneHex = ['plum-950', 'apricot-400', 'rose-300', 'apricot-400'].map((tone) => formatHex(light.get(`--color-${tone}`) ?? 'invalid'))
     const paints = [...FAVICON.matchAll(/(?:fill|stroke)="(#[0-9a-f]{6})"/g)].map(([, hex]) => hex)
 
     expect(paints).toEqual(toneHex)
+  })
+
+  it('has a PNG apple-touch-icon declared in index.html, since iOS ignores SVG icons', () => {
+    expect(indexHtml).toContain('<link rel="apple-touch-icon" href="/apple-touch-icon.png" />')
+    expect(Object.keys(PUBLIC_PNGS)).toContain('../../public/apple-touch-icon.png')
   })
 })

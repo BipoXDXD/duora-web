@@ -1,6 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- A lente do logo: dois anéis que se encontram. Hex de plum-950, apricot-400 e rose-300 (src/index.css). -->
+  <!-- A lente do logo: dois anéis entrelaçados. Hex de plum-950, apricot-400 e rose-300 (src/index.css). -->
+  <clipPath id="over"><rect x="12.5" y="16" width="9" height="9"/></clipPath>
   <rect width="32" height="32" rx="8" fill="#1a1019"/>
   <circle cx="12.5" cy="16" r="6.5" fill="none" stroke="#fb9d59" stroke-width="2.75"/>
   <circle cx="19.5" cy="16" r="6.5" fill="none" stroke="#f8acb7" stroke-width="2.75"/>
+  <circle cx="12.5" cy="16" r="6.5" fill="none" stroke="#fb9d59" stroke-width="2.75" clip-path="url(#over)"/>
 </svg>

@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { stubMatchMedia } from '../test/fakeMatchMedia.ts'
 import { App } from './App.tsx'
 
+function hasTouchTargetSize(element: Element): boolean {
+  return element.classList.contains('min-h-11') && element.classList.contains('min-w-11')
+}
+
 describe('App', () => {
   it('shows the desktop layout on a wide screen', () => {
     stubMatchMedia(true)
@@ -50,15 +54,15 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Entrar na lista' })).toBeInTheDocument()
   })
 
-  /** 44px (`min-h-11`), o alvo de toque da WCAG 2.5.5. O jsdom não faz layout, então o teste lê a classe. */
-  it.each([true, false])('gives every link, button and field a 44px touch target (desktop: %s)', (isDesktop) => {
+  /** 44×44px (`min-h-11 min-w-11`), o alvo de toque da WCAG 2.5.5. O jsdom não faz layout, então o teste lê as classes. */
+  it.each([true, false])('gives every link, button and field a 44×44px touch target (desktop: %s)', (isDesktop) => {
     stubMatchMedia(isDesktop)
 
     const { container } = render(<App />)
 
     const interactive = [...container.querySelectorAll('a, button, input, select, textarea')]
     expect(interactive.length).toBeGreaterThan(0)
-    expect(interactive.filter((element) => !element.classList.contains('min-h-11')).map((element) => element.outerHTML)).toEqual([])
+    expect(interactive.filter((element) => !hasTouchTargetSize(element)).map((element) => element.outerHTML)).toEqual([])
   })
 
   it.each([true, false])('labels every form field (desktop: %s)', (isDesktop) => {

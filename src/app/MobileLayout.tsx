@@ -6,14 +6,14 @@ interface MobileLayoutProps {
 }
 
 const TAB_CLASS =
-  'flex min-h-11 flex-1 items-center justify-center rounded-lg text-sm font-semibold'
+  'flex min-h-11 min-w-11 flex-1 items-center justify-center rounded-lg text-sm font-semibold'
 
 export function MobileLayout({ children }: MobileLayoutProps) {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="border-b border-divider bg-surface px-4 pt-[env(safe-area-inset-top)]">
         <div className="flex h-12 items-center">
-          <a href="/" className="inline-flex min-h-11 items-center rounded text-lg font-semibold tracking-tight text-fg-accent">
+          <a href="/" className="inline-flex min-h-11 min-w-11 items-center rounded text-lg font-semibold tracking-tight text-fg-accent">
             Duora
           </a>
         </div>

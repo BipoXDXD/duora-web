@@ -59,7 +59,7 @@ export function JoinWaitlistForm() {
         onChange={(event) => setEmail(event.currentTarget.value)}
         aria-invalid={isEmailRejected}
         aria-describedby={problem === null ? undefined : problemId}
-        className="min-h-11 rounded-lg border border-edge bg-surface px-3 text-fg shadow-raised aria-invalid:border-danger"
+        className="min-h-11 min-w-11 rounded-lg border border-edge bg-surface px-3 text-fg shadow-raised aria-invalid:border-danger"
       />
       {problem !== null && (
         <p id={problemId} role="alert" className="text-sm font-semibold text-danger">
@@ -69,7 +69,7 @@ export function JoinWaitlistForm() {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="min-h-11 rounded-lg bg-primary px-4 font-semibold text-on-primary shadow-raised hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-disabled disabled:text-on-disabled"
+        className="min-h-11 min-w-11 rounded-lg bg-primary px-4 font-semibold text-on-primary shadow-raised hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-disabled disabled:text-on-disabled"
       >
         {isSubmitting ? 'Enviando…' : 'Entrar na lista'}
       </button>

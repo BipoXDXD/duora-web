@@ -52,6 +52,14 @@ describe('joinWaitlist', () => {
     await expect(joinWaitlist('ana@example.com')).resolves.toEqual({ kind: 'failed' })
   })
 
+  it('does not hide a TypeError from our own code as a network failure', async () => {
+    const response = new Response(null, { status: 400 })
+    Object.defineProperty(response, 'headers', { value: undefined })
+    fetchMock.mockResolvedValue(response)
+
+    await expect(joinWaitlist('ana@example.com')).rejects.toBeInstanceOf(TypeError)
+  })
+
   it('does not hide errors that are not from the network or the API', async () => {
     const bug = new RangeError('bug')
     fetchMock.mockRejectedValue(bug)

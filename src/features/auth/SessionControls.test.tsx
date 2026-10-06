@@ -227,6 +227,22 @@ describe.each([
     expect(await screen.findByText('o app caiu')).toBeInTheDocument()
   })
 
+  it('does not hide a TypeError from our own code as a network failure', async () => {
+    silenceReactErrorLog()
+    stubMatchMedia(isDesktop)
+    const response = new Response(null, { status: 500 })
+    Object.defineProperty(response, 'headers', { value: undefined })
+    stubApi({ '/api/me': () => Promise.resolve(response) })
+
+    render(
+      <CrashBoundary>
+        <App />
+      </CrashBoundary>,
+    )
+
+    expect(await screen.findByText('o app caiu')).toBeInTheDocument()
+  })
+
   it('does not hide a bug in the logout as a failed logout', async () => {
     silenceReactErrorLog()
     stubMatchMedia(isDesktop)

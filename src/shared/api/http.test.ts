@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod/mini'
-import { ApiError, InvalidResponseError, isApiFailure, readJsonBody, sendApiRequest } from './http.ts'
+import { ApiError, InvalidResponseError, isApiFailure, NetworkError, readJsonBody, sendApiRequest } from './http.ts'
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -131,11 +131,29 @@ describe('sendApiRequest', () => {
     },
   )
 
-  it('lets a network failure propagate', async () => {
+  it('turns a fetch rejection into a NetworkError that keeps the cause', async () => {
     const failure = new TypeError('Failed to fetch')
     fetchMock.mockRejectedValue(failure)
 
-    await expect(sendApiRequest({ method: 'GET', path: '/api/things' })).rejects.toBe(failure)
+    const error = await sendApiRequest({ method: 'GET', path: '/api/things' }).catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(NetworkError)
+    expect(error).toMatchObject({ cause: failure })
+  })
+
+  it('lets a rejection that is not from the network propagate unchanged', async () => {
+    const bug = new RangeError('bug')
+    fetchMock.mockRejectedValue(bug)
+
+    await expect(sendApiRequest({ method: 'GET', path: '/api/things' })).rejects.toBe(bug)
+  })
+
+  it('lets a TypeError from our own code after the fetch propagate unchanged', async () => {
+    const response = new Response(null, { status: 500 })
+    Object.defineProperty(response, 'headers', { value: undefined })
+    fetchMock.mockResolvedValue(response)
+
+    await expect(sendApiRequest({ method: 'GET', path: '/api/things' })).rejects.toBeInstanceOf(TypeError)
   })
 })
 
@@ -165,6 +183,13 @@ describe('readJsonBody', () => {
     await expect(readJsonBody(jsonResponse('<html>'), greetingSchema)).rejects.toBeInstanceOf(InvalidResponseError)
   })
 
+  it('lets a TypeError from reading the body propagate, since it is not a body out of the contract', async () => {
+    const response = jsonResponse('{"greeting":"oi"}')
+    await response.text()
+
+    await expect(readJsonBody(response, greetingSchema)).rejects.toBeInstanceOf(TypeError)
+  })
+
   it('rejects an empty body as an invalid response', async () => {
     await expect(readJsonBody(new Response(null, { status: 200 }), greetingSchema)).rejects.toBeInstanceOf(
       InvalidResponseError,
@@ -175,7 +200,7 @@ describe('readJsonBody', () => {
 describe('isApiFailure', () => {
   it.each([
     ['an error status', new ApiError(500, null)],
-    ['a network failure', new TypeError('Failed to fetch')],
+    ['a network failure', new NetworkError({ cause: new TypeError('Failed to fetch') })],
     ['a body out of the contract', new InvalidResponseError()],
   ])('counts %s as a failure of the API call', (_case, error) => {
     expect(isApiFailure(error)).toBe(true)
@@ -183,6 +208,7 @@ describe('isApiFailure', () => {
 
   it.each([
     ['a bug', new RangeError('bug')],
+    ['a TypeError from our own code', new TypeError('Cannot read properties of undefined')],
     ['something that is not an error', 'oops'],
   ])('does not count %s, so it is not hidden as a failed call', (_case, error) => {
     expect(isApiFailure(error)).toBe(false)

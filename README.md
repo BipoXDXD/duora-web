@@ -62,8 +62,9 @@ Firefox, que tratam `localhost` como contexto seguro. O Safari não aceita: use 
 - Os dois cabeçalhos mostram "Entrar", o nome e "Sair", ou "Tentar de novo" quando a API não respondeu. No celular,
   "Sair" fica na barra inferior. Falha no logout aparece como alerta (`role="alert"`).
 - Todo corpo de resposta passa por um schema Zod (`zod/mini`, mais leve) em `readJsonBody`, no cliente HTTP; nada
-  usa `as` sobre `res.json()`. Falhas esperadas (status, rede, corpo fora do contrato) viram estado na tela; qualquer
-  outro erro é tratado como bug e sobe para o React.
+  usa `as` sobre `res.json()`. Falhas esperadas viram estado na tela: `ApiError` (status), `NetworkError` (o `fetch`
+  rejeitou, encapsulado só em `sendApiRequest`) e `InvalidResponseError` (corpo fora do contrato). Qualquer outro
+  erro, inclusive um `TypeError` do nosso código, é tratado como bug e sobe para o React.
 
 ## Duas interfaces: desktop e smartphone
 

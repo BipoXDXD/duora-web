@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, InvalidResponseError } from '../../shared/api/http.ts'
+import { ApiError, InvalidResponseError, NetworkError } from '../../shared/api/http.ts'
 import { fetchSession, logOut } from './session.ts'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -87,11 +87,10 @@ describe('fetchSession', () => {
     await expect(fetchSession()).rejects.toBeInstanceOf(InvalidResponseError)
   })
 
-  it('lets a network failure propagate', async () => {
-    const failure = new TypeError('Failed to fetch')
-    fetchMock.mockRejectedValue(failure)
+  it('fails with a NetworkError when the network is down', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
 
-    await expect(fetchSession()).rejects.toBe(failure)
+    await expect(fetchSession()).rejects.toBeInstanceOf(NetworkError)
   })
 })
 

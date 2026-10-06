@@ -39,7 +39,13 @@ export function Logo({ className }: LogoProps) {
       </defs>
       <path d={LETTERS} fill="currentColor" />
       <g className={MOVES_LEFT}>
-        <circle cx={RING.firstX} cy={RING.centerY} r={RING.radius} strokeWidth={RING.stroke} className={`${RING_CLASS} stroke-primary`} />
+        <circle
+          cx={RING.firstX}
+          cy={RING.centerY}
+          r={RING.radius}
+          strokeWidth={RING.stroke}
+          className={`${RING_CLASS} stroke-primary`}
+        />
       </g>
       <circle
         cx={RING.secondX}

@@ -1,12 +1,12 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
 /** Exemplos de partida, não o catálogo final; a FAQ diz isso. */
-const GAMES = ['adivinha o desenho', 'quiz a dois', 'palavra secreta', 'duas verdades e uma mentira'] as const
+const GAMES = ['adivinha o desenho', 'quiz a dois', 'palavra secreta', 'duas verdades, uma mentira'] as const
 const PEOPLE = [
   'quem você ainda não conhece',
   'alguém da sua cidade',
   'quem ri das mesmas coisas',
-  'alguém tão curioso quanto você',
+  'alguém curioso como você',
 ] as const
 
 const ROTATION_MS = 3500
@@ -63,7 +63,7 @@ export function HeroInvitation({ titleId }: HeroInvitationProps) {
     <div className="flex flex-col gap-6">
       <h1
         id={titleId}
-        className="max-w-3xl font-display text-5xl leading-tight font-medium tracking-tight text-balance text-fg md:text-7xl"
+        className="max-w-4xl font-display text-4xl leading-tight font-medium tracking-tight text-balance text-fg min-h-45 sm:text-5xl md:min-h-68 md:text-7xl"
       >
         vamos jogar{' '}
         <span key={`game-${index}`} className={`${SLOT_CLASS} text-primary decoration-primary`}>
@@ -100,7 +100,11 @@ const CONTROL_CLASS =
 function ShuffleIcon() {
   return (
     <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 7h3.5c4 0 6.5 10 11 10H21M18 14l3 3-3 3M3 17h3.5c1.6 0 2.9-1.6 4-3.5M18 4l3 3-3 3M21 7h-3.5c-1.6 0-2.9 1.6-4 3.5" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 7h3.5c4 0 6.5 10 11 10H21M18 14l3 3-3 3M3 17h3.5c1.6 0 2.9-1.6 4-3.5M18 4l3 3-3 3M21 7h-3.5c-1.6 0-2.9 1.6-4 3.5"
+      />
     </svg>
   )
 }

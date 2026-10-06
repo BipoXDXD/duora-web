@@ -12,7 +12,14 @@ export function ThemeToggle() {
       aria-label={isDark ? 'Usar tema claro' : 'Usar tema escuro'}
       className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-fg-muted hover:text-fg"
     >
-      <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+      <svg
+        viewBox="0 0 24 24"
+        className="size-6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        aria-hidden="true"
+      >
         {isDark ? <SunPaths /> : <MoonPath />}
       </svg>
     </button>

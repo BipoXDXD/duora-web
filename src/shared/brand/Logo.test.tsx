@@ -27,7 +27,9 @@ describe('Logo', () => {
   it('moves the rings on hover only when the visitor allows motion', () => {
     const { container } = render(<Logo />)
 
-    const moving = [...container.querySelectorAll('[class*="translate"]')].map((ring) => ring.getAttribute('class') ?? '')
+    const moving = [...container.querySelectorAll('[class*="translate"]')].map(
+      (ring) => ring.getAttribute('class') ?? '',
+    )
     const classes = moving.flatMap((ring) => ring.split(/\s+/)).filter((name) => name.includes('translate'))
     expect(classes).toContain('motion-safe:group-hover:-translate-x-1')
     expect(classes).toContain('motion-safe:group-hover:translate-x-1')

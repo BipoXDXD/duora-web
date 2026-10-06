@@ -32,7 +32,7 @@ export function JoinWaitlistForm() {
 
   if (state.kind === 'joined') {
     return (
-      <p role="status" className="rounded-lg bg-primary-subtle p-4 font-semibold text-on-primary-subtle">
+      <p role="status" className="max-w-lg rounded-lg bg-primary-subtle p-4 font-semibold text-on-primary-subtle">
         Pronto! Vamos avisar você por e-mail quando o Duora abrir.
       </p>
     )
@@ -43,36 +43,38 @@ export function JoinWaitlistForm() {
   const isEmailRejected = problem?.kind === 'blankEmail' || problem?.kind === 'invalidEmail'
 
   return (
-    <form noValidate onSubmit={(event) => void submit(event)} className="flex max-w-md flex-col gap-3">
+    <form noValidate onSubmit={(event) => void submit(event)} className="flex w-full max-w-lg flex-col gap-2">
       <label htmlFor={emailId} className="font-semibold text-fg">
         E-mail
       </label>
-      <input
-        id={emailId}
-        type="email"
-        name="email"
-        autoComplete="email"
-        inputMode="email"
-        maxLength={EMAIL_MAX_LENGTH}
-        required
-        value={email}
-        onChange={(event) => setEmail(event.currentTarget.value)}
-        aria-invalid={isEmailRejected}
-        aria-describedby={problem === null ? undefined : problemId}
-        className="min-h-11 min-w-11 rounded-lg border border-edge bg-surface px-3 text-fg shadow-raised aria-invalid:border-danger"
-      />
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <input
+          id={emailId}
+          type="email"
+          name="email"
+          autoComplete="email"
+          inputMode="email"
+          maxLength={EMAIL_MAX_LENGTH}
+          required
+          value={email}
+          onChange={(event) => setEmail(event.currentTarget.value)}
+          aria-invalid={isEmailRejected}
+          aria-describedby={problem === null ? undefined : problemId}
+          className="min-h-12 min-w-11 flex-1 rounded-lg border border-edge bg-surface px-4 text-base text-fg shadow-raised aria-invalid:border-danger"
+        />
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="min-h-12 min-w-11 rounded-lg bg-primary px-6 font-semibold text-on-primary shadow-raised hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-disabled disabled:text-on-disabled"
+        >
+          {isSubmitting ? 'Enviando…' : 'Entrar na lista'}
+        </button>
+      </div>
       {problem !== null && (
         <p id={problemId} role="alert" className="text-sm font-semibold text-danger">
           {messageFor(problem)}
         </p>
       )}
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="min-h-11 min-w-11 rounded-lg bg-primary px-4 font-semibold text-on-primary shadow-raised hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-disabled disabled:text-on-disabled"
-      >
-        {isSubmitting ? 'Enviando…' : 'Entrar na lista'}
-      </button>
     </form>
   )
 }

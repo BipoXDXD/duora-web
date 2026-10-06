@@ -39,6 +39,7 @@ const PAIRS: readonly ColorPair[] = [
   { foreground: 'on-primary-subtle', background: 'primary-subtle', kind: 'text', usage: 'confirmação da inscrição' },
   { foreground: 'on-disabled', background: 'disabled', kind: 'text', usage: 'botão desabilitado ("Enviando…")' },
   { foreground: 'danger', background: 'canvas', kind: 'text', usage: 'mensagem de erro' },
+  { foreground: 'danger', background: 'surface', kind: 'text', usage: 'alerta de logout sobre a barra inferior' },
   { foreground: 'primary', background: 'canvas', kind: 'ui', usage: 'limite do botão primário e anel damasco do logo' },
   { foreground: 'primary', background: 'surface', kind: 'ui', usage: 'limite do botão sobre painel' },
   { foreground: 'primary', background: 'primary-subtle', kind: 'ui', usage: 'borda do selo "em breve"' },

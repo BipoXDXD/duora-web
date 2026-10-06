@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Roda o CI à mão; o gitleaks então varre o histórico inteiro. Também cobre o primeiro push do
+  # repositório, que o gitleaks-action não consegue varrer (o commit raiz não tem pai).
+  workflow_dispatch:
 
 permissions:
   contents: read

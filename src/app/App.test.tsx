@@ -41,4 +41,12 @@ describe('App', () => {
 
     expect(screen.getByRole('link', { name: 'Entrar' })).toHaveAttribute('href', '/oauth2/authorization/entra')
   })
+
+  it.each([true, false])('offers the waitlist sign-up (desktop: %s)', (isDesktop) => {
+    stubMatchMedia(isDesktop)
+
+    render(<App />)
+
+    expect(screen.getByRole('button', { name: 'Entrar na lista' })).toBeInTheDocument()
+  })
 })

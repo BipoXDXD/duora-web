@@ -1,0 +1,99 @@
+import { useId, useState, type FormEvent } from 'react'
+import { joinWaitlist, type JoinWaitlistResult } from './joinWaitlist.ts'
+
+type FormState =
+  | { readonly kind: 'editing' }
+  | { readonly kind: 'blankEmail' }
+  | { readonly kind: 'submitting' }
+  | JoinWaitlistResult
+
+type ProblemState = Exclude<FormState, { kind: 'editing' | 'submitting' | 'joined' }>
+
+/** Mesmo limite do EmailAddress da duora-api (RFC 5321). O formato quem decide é a API. */
+const EMAIL_MAX_LENGTH = 254
+const SECONDS_PER_MINUTE = 60
+
+export function JoinWaitlistForm() {
+  const [email, setEmail] = useState('')
+  const [state, setState] = useState<FormState>({ kind: 'editing' })
+  const emailId = useId()
+  const problemId = useId()
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const typed = email.trim()
+    if (typed === '') {
+      setState({ kind: 'blankEmail' })
+      return
+    }
+    setState({ kind: 'submitting' })
+    setState(await joinWaitlist(typed))
+  }
+
+  if (state.kind === 'joined') {
+    return (
+      <p role="status" className="rounded-lg bg-brand-50 p-4 font-semibold text-brand-900">
+        Pronto! Vamos avisar você por e-mail quando o Duora abrir.
+      </p>
+    )
+  }
+
+  const isSubmitting = state.kind === 'submitting'
+  const problem = state.kind === 'editing' || state.kind === 'submitting' ? null : state
+  const isEmailRejected = problem?.kind === 'blankEmail' || problem?.kind === 'invalidEmail'
+
+  return (
+    <form noValidate onSubmit={(event) => void submit(event)} className="flex max-w-md flex-col gap-3">
+      <label htmlFor={emailId} className="font-semibold text-stone-800">
+        E-mail
+      </label>
+      <input
+        id={emailId}
+        type="email"
+        name="email"
+        autoComplete="email"
+        inputMode="email"
+        maxLength={EMAIL_MAX_LENGTH}
+        required
+        value={email}
+        onChange={(event) => setEmail(event.currentTarget.value)}
+        aria-invalid={isEmailRejected}
+        aria-describedby={problem === null ? undefined : problemId}
+        className="min-h-11 rounded-lg border border-stone-300 bg-white px-3 text-stone-900 shadow-sm focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand-500 aria-invalid:border-red-600"
+      />
+      {problem !== null && (
+        <p id={problemId} role="alert" className="text-sm font-semibold text-red-700">
+          {messageFor(problem)}
+        </p>
+      )}
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        className="min-h-11 rounded-lg bg-brand-600 px-4 font-semibold text-white shadow-sm hover:bg-brand-700 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:bg-stone-400"
+      >
+        {isSubmitting ? 'Enviando…' : 'Entrar na lista'}
+      </button>
+    </form>
+  )
+}
+
+function messageFor(problem: ProblemState): string {
+  switch (problem.kind) {
+    case 'blankEmail':
+      return 'Informe seu e-mail.'
+    case 'invalidEmail':
+      return 'Confira o e-mail: ele não parece válido.'
+    case 'tooManyAttempts':
+      return `Muitas tentativas. Tente de novo ${waitText(problem.retryAfterSeconds)}.`
+    case 'failed':
+      return 'Não foi possível enviar agora. Tente de novo em instantes.'
+  }
+}
+
+function waitText(retryAfterSeconds: number | null): string {
+  if (retryAfterSeconds === null) {
+    return 'mais tarde'
+  }
+  const minutes = Math.max(1, Math.ceil(retryAfterSeconds / SECONDS_PER_MINUTE))
+  return minutes === 1 ? 'em 1 minuto' : `em ${minutes} minutos`
+}

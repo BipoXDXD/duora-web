@@ -1,3 +1,4 @@
+import { NightBackdrop } from './NightBackdrop.tsx'
 import { CONTAINER, SECTION_SPACING, SECTION_TITLE } from './sectionStyles.ts'
 
 const QUESTIONS = [
@@ -25,29 +26,26 @@ const QUESTIONS = [
   },
 ] as const
 
-const FAQ_IMAGE_SIZE = { width: 1920, height: 1080 } as const
-
 export const FAQ_ANCHOR = 'perguntas'
 
+/** Noturna: as cartas de pergunta ficam à esquerda da foto, as respostas à direita, sobre o véu mais forte. */
 export function FaqSection() {
   return (
-    <section id={FAQ_ANCHOR} aria-labelledby="faq-title" className={`${SECTION_SPACING} scroll-mt-16`}>
+    <section
+      id={FAQ_ANCHOR}
+      aria-labelledby="faq-title"
+      className={`${SECTION_SPACING} candlelight relative isolate scroll-mt-16 overflow-hidden scheme-dark`}
+    >
+      <NightBackdrop
+        wideSrc="/backgrounds/faq.webp"
+        isAboveTheFold={false}
+        imageClassName="object-left"
+        scrimClassName="bg-canvas/70 md:bg-linear-to-l md:from-canvas/70 md:via-canvas/65 md:to-canvas/40"
+      />
       <div className={`${CONTAINER} grid gap-12 md:grid-cols-3 md:gap-16`}>
-        <div className="flex flex-col gap-8">
-          <h2 id="faq-title" className={SECTION_TITLE}>
-            Perguntas
-          </h2>
-          {/* Só no desktop, onde a coluna do título sobra; decorativa, por isso alt vazio. */}
-          <img
-            src="/backgrounds/faq.webp"
-            alt=""
-            width={FAQ_IMAGE_SIZE.width}
-            height={FAQ_IMAGE_SIZE.height}
-            loading="lazy"
-            decoding="async"
-            className="hidden aspect-4/5 w-full rounded-lg bg-surface object-cover object-right md:block"
-          />
-        </div>
+        <h2 id="faq-title" className={SECTION_TITLE}>
+          Perguntas
+        </h2>
         <div className="border-t border-divider md:col-span-2">
           {QUESTIONS.map(({ question, answer }) => (
             <details key={question} className="group border-b border-divider">

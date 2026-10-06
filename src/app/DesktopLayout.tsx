@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { LOGIN_URL } from '../features/auth/loginUrl.ts'
+import { HeaderSessionControls } from '../features/auth/SessionControls.tsx'
 import { FAQ_ANCHOR } from '../features/landing/FaqSection.tsx'
 import { HOW_IT_WORKS_ANCHOR } from '../features/landing/HowItWorksSection.tsx'
 import { SAFETY_ANCHOR } from '../features/landing/SafetySection.tsx'
@@ -35,13 +35,8 @@ export function DesktopLayout({ children }: DesktopLayoutProps) {
                   {link.label}
                 </a>
               ))}
-              <a
-                href={LOGIN_URL}
-                className="inline-flex min-h-11 min-w-11 items-center rounded-lg border border-edge px-4 font-semibold text-fg hover:border-fg"
-              >
-                Entrar
-              </a>
             </nav>
+            <HeaderSessionControls />
             <ThemeToggle />
           </div>
         </div>

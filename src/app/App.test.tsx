@@ -1,13 +1,14 @@
 import { act, render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { ANONYMOUS_SESSION, stubApi } from '../test/fakeApi.ts'
 import { stubMatchMedia } from '../test/fakeMatchMedia.ts'
+import { elementsWithoutTouchTarget } from '../test/touchTarget.ts'
 import { App } from './App.tsx'
 
-/** `min-h-12` (48px) também vale: é o campo e o botão maiores do hero. */
-function hasTouchTargetSize(element: Element): boolean {
-  const isTallEnough = element.classList.contains('min-h-11') || element.classList.contains('min-h-12')
-  return isTallEnough && element.classList.contains('min-w-11')
-}
+/** Os estados da sessão têm testes próprios (SessionControls.test.tsx); aqui a visita é anônima. */
+beforeEach(() => {
+  stubApi(ANONYMOUS_SESSION)
+})
 
 describe('App', () => {
   it('shows the desktop layout on a wide screen', () => {
@@ -40,14 +41,6 @@ describe('App', () => {
     expect(screen.queryByRole('navigation', { name: 'Atalhos' })).not.toBeInTheDocument()
   })
 
-  it.each([true, false])('links "Entrar" to the BFF login (desktop: %s)', (isDesktop) => {
-    stubMatchMedia(isDesktop)
-
-    render(<App />)
-
-    expect(screen.getByRole('link', { name: 'Entrar' })).toHaveAttribute('href', '/oauth2/authorization/entra')
-  })
-
   it.each([true, false])('offers the waitlist sign-up (desktop: %s)', (isDesktop) => {
     stubMatchMedia(isDesktop)
 
@@ -56,18 +49,18 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: 'Entrar na lista' })).toBeInTheDocument()
   })
 
-  /** 44×44px (`min-h-11 min-w-11`), o alvo de toque da WCAG 2.5.5. O jsdom não faz layout, então o teste lê as classes. */
-  it.each([true, false])('gives every link, button and field a 44×44px touch target (desktop: %s)', (isDesktop) => {
-    stubMatchMedia(isDesktop)
+  it.each([true, false])(
+    'gives every link, button and field a 44×44px touch target (desktop: %s)',
+    async (isDesktop) => {
+      stubMatchMedia(isDesktop)
 
-    const { container } = render(<App />)
+      const { container } = render(<App />)
 
-    const interactive = [...container.querySelectorAll('a, button, input, select, textarea')]
-    expect(interactive.length).toBeGreaterThan(0)
-    expect(interactive.filter((element) => !hasTouchTargetSize(element)).map((element) => element.outerHTML)).toEqual(
-      [],
-    )
-  })
+      await screen.findByRole('link', { name: 'Entrar' })
+      expect(container.querySelectorAll('a, button, input').length).toBeGreaterThan(0)
+      expect(elementsWithoutTouchTarget(container)).toEqual([])
+    },
+  )
 
   it.each([true, false])('labels every form field (desktop: %s)', (isDesktop) => {
     stubMatchMedia(isDesktop)

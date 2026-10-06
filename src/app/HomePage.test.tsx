@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { ANONYMOUS_SESSION, stubApi } from '../test/fakeApi.ts'
 import { stubMatchMedia } from '../test/fakeMatchMedia.ts'
 import { App } from './App.tsx'
 import { HomePage } from './HomePage.tsx'
@@ -46,6 +47,7 @@ describe('HomePage', () => {
 
   it('points every desktop section link to a section on the page', () => {
     stubMatchMedia(true)
+    stubApi(ANONYMOUS_SESSION)
     const { container } = render(<App />)
 
     const links = within(screen.getByRole('navigation', { name: 'Principal' }))

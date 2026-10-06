@@ -1,3 +1,5 @@
+import type { z } from 'zod/mini'
+
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export interface ApiRequest {
@@ -20,16 +22,32 @@ export class ApiError extends Error {
   }
 }
 
+/** A requisição não chegou à API: o `fetch` rejeitou (rede fora do ar, DNS, conexão recusada). */
+export class NetworkError extends Error {
+  constructor(options?: ErrorOptions) {
+    super('Não foi possível falar com a API', options)
+    this.name = 'NetworkError'
+  }
+}
+
+/** Resposta 2xx cujo corpo não segue o contrato: não é JSON ou não tem a forma combinada com a API. */
+export class InvalidResponseError extends Error {
+  constructor(options?: ErrorOptions) {
+    super('A resposta da API não segue o contrato', options)
+    this.name = 'InvalidResponseError'
+  }
+}
+
 const CSRF_COOKIE = 'XSRF-TOKEN'
 const CSRF_HEADER = 'X-XSRF-TOKEN'
 const SAFE_METHODS: ReadonlySet<HttpMethod> = new Set(['GET'])
 
 /**
  * Único ponto de saída para a API. Mutações levam o token CSRF que o Spring deixa no cookie
- * XSRF-TOKEN (docs/adr/0002 da duora-api). Falha de rede propaga a rejeição do `fetch`.
+ * XSRF-TOKEN (docs/adr/0002 da duora-api). Falha de rede vira NetworkError.
  */
 export async function sendApiRequest(request: ApiRequest): Promise<Response> {
-  const response = await fetch(request.path, {
+  const response = await fetchOrNetworkError(request.path, {
     method: request.method,
     headers: headersFor(request),
     body: request.body === undefined ? undefined : JSON.stringify(request.body),
@@ -39,6 +57,21 @@ export async function sendApiRequest(request: ApiRequest): Promise<Response> {
     throw new ApiError(response.status, parseRetryAfterSeconds(response.headers.get('Retry-After')))
   }
   return response
+}
+
+/**
+ * O `fetch` rejeita com TypeError quando a rede falha. Só essa rejeição vira NetworkError, aqui e em
+ * nenhum outro lugar: um TypeError do nosso código continua sendo bug e propaga como está.
+ */
+async function fetchOrNetworkError(path: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(path, init)
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new NetworkError({ cause: error })
+    }
+    throw error
+  }
 }
 
 function headersFor(request: ApiRequest): Headers {
@@ -65,4 +98,33 @@ function parseRetryAfterSeconds(header: string | null): number | null {
     return null
   }
   return Number(header)
+}
+
+/**
+ * Lê o corpo JSON e o converte pelo schema, a única porta de dado da API para dentro do app. Campos
+ * que o schema não declara são descartados (tolerant reader).
+ */
+export async function readJsonBody<T>(response: Response, schema: z.ZodMiniType<T>): Promise<T> {
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch (error) {
+    // SyntaxError é corpo que não é JSON (inclusive vazio). Outro erro, como ler o corpo duas vezes, é bug.
+    if (error instanceof SyntaxError) {
+      throw new InvalidResponseError({ cause: error })
+    }
+    throw error
+  }
+  const parsed = schema.safeParse(body)
+  if (!parsed.success) {
+    throw new InvalidResponseError({ cause: parsed.error })
+  }
+  return parsed.data
+}
+
+/**
+ * Falhas esperadas de uma chamada: status fora de 2xx, rede fora do ar ou corpo fora do contrato. Qualquer outra coisa é defeito e não deve virar mensagem.
+ */
+export function isApiFailure(error: unknown): boolean {
+  return error instanceof ApiError || error instanceof NetworkError || error instanceof InvalidResponseError
 }

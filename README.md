@@ -7,8 +7,8 @@ React 19, TypeScript 6 (`strict`), Vite 8 e Tailwind CSS 4. O backend é a
 [duora-api](https://github.com/BipoXDXD/duora-api) (Java 25 e Spring Boot 4).
 
 O projeto está no início. Por enquanto ele tem os dois layouts, a identidade visual "Mesa posta" (tokens,
-dois temas e contraste testado), o cliente HTTP compatível com o login da API e a landing com a primeira
-feature, a inscrição na **lista de espera**.
+dois temas e contraste testado), o cliente HTTP compatível com o login da API, o estado de sessão (entrar e
+sair) e a landing com a primeira feature, a inscrição na **lista de espera**.
 
 ## Pré-requisitos
 
@@ -51,15 +51,28 @@ O login é por BFF (ADR 0002 da duora-api). O navegador nunca vê um token:
 Em desenvolvimento, um cookie `__Host-` com `Secure` funciona em `http://localhost` no Chrome e no
 Firefox, que tratam `localhost` como contexto seguro. O Safari não aceita: use outro navegador.
 
-Ainda não dá para saber quem está logado nem sair pelo front. Veja [Pendências](#pendências).
+### Sessão no front
+
+- `GET /api/me` diz quem está logado: 200 com `{"displayName": "..." | null}` ou 401 para quem não entrou. O
+  hook `useSession` (`src/features/auth/useSession.ts`) guarda a resposta no TanStack Query e devolve uma união:
+  `loading`, `anonymous`, `authenticated` (com o usuário) ou `error` (com `retry`). Sem retry automático; ao voltar
+  para a aba, a sessão é checada de novo, e se essa nova checagem falhar continua valendo a última conhecida.
+- **Sair** faz `POST /logout` (com o header CSRF), recebe `{"logoutUrl": "..."}` e navega até essa URL, que encerra
+  a sessão também no Entra. Só URL `https:` é aceita, porque o front navega para ela.
+- Os dois cabeçalhos mostram "Entrar", o nome e "Sair", ou "Tentar de novo" quando a API não respondeu. No celular,
+  "Sair" fica na barra inferior. Falha no logout aparece como alerta (`role="alert"`).
+- Todo corpo de resposta passa por um schema Zod (`zod/mini`, mais leve) em `readJsonBody`, no cliente HTTP; nada
+  usa `as` sobre `res.json()`. Falhas esperadas viram estado na tela: `ApiError` (status), `NetworkError` (o `fetch`
+  rejeitou, encapsulado só em `sendApiRequest`) e `InvalidResponseError` (corpo fora do contrato). Qualquer outro
+  erro, inclusive um `TypeError` do nosso código, é tratado como bug e sobe para o React.
 
 ## Duas interfaces: desktop e smartphone
 
 O app tem **duas cascas**, e não uma única página responsiva:
 
-- **Desktop** (`DesktopLayout`): cabeçalho com a marca, a navegação e o botão "Entrar".
-- **Smartphone** (`MobileLayout`): cabeçalho compacto e barra de navegação inferior, ao alcance do
-  polegar e respeitando a safe area do aparelho.
+- **Desktop** (`DesktopLayout`): cabeçalho com a marca, a navegação e a sessão ("Entrar" ou o nome e "Sair").
+- **Smartphone** (`MobileLayout`): cabeçalho compacto (com o nome de quem entrou) e barra de navegação
+  inferior com "Entrar" ou "Sair", ao alcance do polegar e respeitando a safe area do aparelho.
 
 A escolha usa um único breakpoint, `48rem` (768px, o `md` do Tailwind), definido em
 `src/app/useIsDesktop.ts`. O hook lê `matchMedia` com `useSyncExternalStore`, e o layout troca na
@@ -153,9 +166,12 @@ navegador o contraste do texto sobre ela com o véu aplicado (a ADR descreve com
 
 ## Testes
 
-Vitest com jsdom e Testing Library. Os testes trocam o `fetch` global por um stub (`vi.stubGlobal`)
-e verificam o que vai para a API (caminho, método, corpo, header CSRF) e o que a tela mostra para
-cada resposta: 202, 400, 429 com e sem `Retry-After`, erro do servidor e falha de rede. O
+Vitest com jsdom e Testing Library. Os testes trocam o `fetch` global por um stub (`vi.stubGlobal`, ou
+`stubApi` em `src/test/fakeApi.ts`, que responde por caminho) e verificam o que vai para a API (caminho,
+método, corpo, header CSRF) e o que a tela mostra para cada resposta: 202, 400, 429 com e sem `Retry-After`,
+401 (visitante anônimo), erro do servidor, corpo fora do contrato e falha de rede. A navegação de página
+inteira (`src/shared/browser/navigateTo.ts`) é trocada por um dublê nos testes de componente, porque o jsdom
+não navega. O
 `matchMedia`, que o jsdom não tem, é simulado em `src/test/fakeMatchMedia.ts`. O contraste das cores é medido
 com o `culori` sobre os tokens lidos do `index.css` (veja [Tokens e temas](#tokens-e-temas)).
 
@@ -166,11 +182,12 @@ src/
   app/                 casca: App, os dois layouts, o breakpoint, a página inicial e o tema
     theme/             escolha de tema (data-theme + localStorage) e o botão
   features/
-    auth/              URL de login do BFF
+    auth/              sessão (GET /api/me), logout, URL de login e os controles dos cabeçalhos
     landing/           seções da landing: hero com a frase interativa, como funciona, minijogo, segurança, FAQ
     waitlist/          chamada a POST /api/waitlist e o formulário de inscrição
   shared/
-    api/               cliente HTTP (mesma origem, CSRF, ApiError)
+    api/               cliente HTTP (mesma origem, CSRF, ApiError, corpo validado por schema)
+    browser/           navegação de página inteira
     brand/             logo em SVG
     ui/                imagem de fundo decorativa (BackdropImage)
   test/                setup do Vitest, fakes e leitor dos tokens do tema
@@ -189,9 +206,6 @@ e build. Também roda o gitleaks sobre todo o histórico. As actions ficam fixad
 
 ## Pendências
 
-Estas dependem de mudanças na duora-api:
-
-- `GET /api/me`, para o front saber se há sessão e mostrar "Sair" no lugar de "Entrar".
-- Logout pelo front: hoje `POST /logout` responde 302 para o Entra, e o `fetch` não segue esse
-  redirect entre origens. A API precisa responder 200 com a URL de logout, para o front navegar
-  até ela.
+- Os tipos de `GET /api/me` e `POST /logout` estão escritos à mão em Zod, a partir dos testes da duora-api.
+  Quando a API publicar a spec OpenAPI, os tipos e schemas passam a ser gerados dela.
+- O app ainda não tem um error boundary: um bug que sobe para o React desmonta a página inteira.

@@ -1,4 +1,4 @@
-import { ApiError, sendApiRequest } from '../../shared/api/http.ts'
+import { ApiError, NetworkError, sendApiRequest } from '../../shared/api/http.ts'
 
 /** A API responde igual para e-mail novo ou repetido, então não existe um resultado "já inscrito". */
 export type JoinWaitlistResult =
@@ -18,8 +18,8 @@ export async function joinWaitlist(email: string): Promise<JoinWaitlistResult> {
     if (error instanceof ApiError) {
       return resultOf(error)
     }
-    // O fetch rejeita com TypeError quando a rede falha; qualquer outra coisa é defeito e propaga.
-    if (error instanceof TypeError) {
+    // Fora a API e a rede, qualquer outra coisa é defeito e propaga.
+    if (error instanceof NetworkError) {
       return { kind: 'failed' }
     }
     throw error

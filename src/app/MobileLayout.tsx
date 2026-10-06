@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { LOGIN_URL } from '../features/auth/loginUrl.ts'
+import { HeaderGreeting, SessionTab } from '../features/auth/SessionControls.tsx'
 import { Logo } from '../shared/brand/Logo.tsx'
 import { ThemeToggle } from './theme/ThemeToggle.tsx'
 
@@ -13,10 +13,11 @@ export function MobileLayout({ children }: MobileLayoutProps) {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="border-b border-divider bg-canvas px-4 pt-[env(safe-area-inset-top)]">
-        <div className="flex h-14 items-center justify-between">
+        <div className="flex h-14 items-center justify-between gap-3">
           <a href="/" className="group inline-flex min-h-11 min-w-11 items-center rounded-lg text-fg">
             <Logo className="h-7 w-auto" />
           </a>
+          <HeaderGreeting />
           <ThemeToggle />
         </div>
       </header>
@@ -28,9 +29,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
         <a href="/" aria-current="page" className={`${TAB_CLASS} text-fg-accent`}>
           Início
         </a>
-        <a href={LOGIN_URL} className={`${TAB_CLASS} border border-edge text-fg`}>
-          Entrar
-        </a>
+        <SessionTab tabClassName={TAB_CLASS} />
       </nav>
     </div>
   )

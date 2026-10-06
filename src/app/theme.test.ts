@@ -119,4 +119,9 @@ describe('theme tokens', () => {
     expect(css).toMatch(rule)
   })
 
+  it('turns off animations and transitions when the visitor asks for reduced motion', () => {
+    const block = /@media \(prefers-reduced-motion: reduce\)\s*\{[^}]*\{[^}]*animation-duration:\s*0\.01ms !important;[^}]*transition-duration:\s*0\.01ms !important;/
+
+    expect(css).toMatch(block)
+  })
 })

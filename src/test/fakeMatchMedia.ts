@@ -1,17 +1,23 @@
 import { vi } from 'vitest'
 
-/** O jsdom não implementa matchMedia. Este fake responde a uma única query e permite trocar o resultado. */
+/**
+ * O jsdom não implementa matchMedia. Este fake responde `initiallyMatches` a qualquer query, valor que o
+ * teste pode trocar depois, exceto as queries de `fixedAnswers`, que respondem sempre o valor dado.
+ */
 export interface FakeMediaQuery {
   setMatches(matches: boolean): void
 }
 
-export function stubMatchMedia(initiallyMatches: boolean): FakeMediaQuery {
+export function stubMatchMedia(
+  initiallyMatches: boolean,
+  fixedAnswers: Readonly<Record<string, boolean>> = {},
+): FakeMediaQuery {
   let matches = initiallyMatches
   const listeners = new Set<() => void>()
 
   vi.stubGlobal('matchMedia', (query: string) => ({
     get matches() {
-      return matches
+      return fixedAnswers[query] ?? matches
     },
     media: query,
     addEventListener: (_type: 'change', listener: () => void) => listeners.add(listener),

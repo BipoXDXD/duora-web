@@ -13,7 +13,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
     <div className="flex min-h-dvh flex-col">
       <header className="border-b border-divider bg-surface px-4 pt-[env(safe-area-inset-top)]">
         <div className="flex h-12 items-center">
-          <a href="/" className="rounded text-lg font-semibold tracking-tight text-fg-accent">
+          <a href="/" className="inline-flex min-h-11 items-center rounded text-lg font-semibold tracking-tight text-fg-accent">
             Duora
           </a>
         </div>

@@ -49,4 +49,25 @@ describe('App', () => {
 
     expect(screen.getByRole('button', { name: 'Entrar na lista' })).toBeInTheDocument()
   })
+
+  /** 44px (`min-h-11`), o alvo de toque da WCAG 2.5.5. O jsdom não faz layout, então o teste lê a classe. */
+  it.each([true, false])('gives every link, button and field a 44px touch target (desktop: %s)', (isDesktop) => {
+    stubMatchMedia(isDesktop)
+
+    const { container } = render(<App />)
+
+    const interactive = [...container.querySelectorAll('a, button, input, select, textarea')]
+    expect(interactive.length).toBeGreaterThan(0)
+    expect(interactive.filter((element) => !element.classList.contains('min-h-11')).map((element) => element.outerHTML)).toEqual([])
+  })
+
+  it.each([true, false])('labels every form field (desktop: %s)', (isDesktop) => {
+    stubMatchMedia(isDesktop)
+
+    const { container } = render(<App />)
+
+    const fields = [...container.querySelectorAll<HTMLInputElement>('input, select, textarea')]
+    expect(fields.length).toBeGreaterThan(0)
+    expect(fields.filter((field) => (field.labels?.length ?? 0) === 0).map((field) => field.outerHTML)).toEqual([])
+  })
 })

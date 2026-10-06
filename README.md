@@ -99,8 +99,8 @@ pelo `color-scheme` de cada elemento:
 - a raiz usa `color-scheme: dark light`, ou seja, segue a preferência do sistema, com o escuro primeiro;
 - o botão de tema fixa `data-theme="light"` ou `"dark"` na raiz e guarda a escolha no `localStorage` (com `try/catch`:
   se o armazenamento estiver bloqueado, o tema troca, mas não é lembrado);
-- as **seções noturnas** (hero, minijogo, segurança e chamada final) usam `scheme-dark` e ficam escuras também no tema
-  claro.
+- as **seções noturnas** (hero, cartões do minijogo e da segurança, perguntas e chamada final) usam `scheme-dark` e
+  ficam escuras também no tema claro.
 
 O `@theme inline` não é detalhe: no build, o Lightning CSS troca `light-dark()` por variáveis para navegadores sem suporte
 (Safari 16.4+), e isso só respeita as seções noturnas se cada classe carregar o próprio `light-dark()`. Veja a ADR.
@@ -120,17 +120,17 @@ Interação acessível:
 
 ### Imagens
 
-Natureza-morta gerada por IA, sem pessoas e sem texto, pela API do Tripo (text-to-image). Hero, segurança e minijogo
-vieram do GPT Image 2.5 (`chat_image_2.5_flare`); a mesa com os cavalos, os passos e a FAQ, do Nano Banana Pro
-(`banana_pro`). Todas em WebP:
+Natureza-morta gerada por IA, sem pessoas e sem texto, pela API do Tripo (text-to-image). Hero, segurança, minijogo,
+FAQ e chamada final vieram do GPT Image 2.5 (`chat_image_2.5_flare`); os três passos, do Nano Banana Pro (`banana_pro`).
+Todas em WebP:
 
 | Arquivo | Tamanho | Onde |
 |---|---|---|
 | `public/backgrounds/hero.webp` / `hero-mobile.webp` | 1920×1080 / 1080×1350 | hero (único carregamento antecipado, `fetchpriority="high"`) |
-| `public/backgrounds/table.webp` / `table-mobile.webp` | 1920×1080 / 1080×1350 | chamada final |
+| `public/backgrounds/candle.webp` | 1920×1080 | chamada final (mesa para dois num wine bar) |
 | `public/backgrounds/minigame.webp` | 1920×1080 | bloco "em breve" do minijogo |
 | `public/backgrounds/safety.webp` | 1920×1080 | bloco de segurança |
-| `public/backgrounds/faq.webp` | 1920×1080 | ao lado das perguntas, só no desktop |
+| `public/backgrounds/faq.webp` | 1920×1080 | fundo das perguntas |
 | `public/images/step1-match.webp`, `step2-play.webp`, `step3-talk.webp` | 800×1000 | passos de "como funciona", com `alt` |
 
 Uma imagem nova de fundo segue o mesmo formato: 1920×1080 e, quando o recorte no celular perder o assunto, uma versão

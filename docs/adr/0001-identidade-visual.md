@@ -31,17 +31,19 @@ Adotamos a **direção A, "Mesa posta"**:
 - **Cor:** tons crus em OKLCH (`plum`, `cream`, `apricot`, `rose`, `danger`) e tokens semânticos com os dois temas em
   `light-dark(claro, escuro)`, dentro de `@theme inline`. Escuro primeiro (`color-scheme: dark light`), seguindo a
   preferência do sistema; um botão fixa o tema em `data-theme` e o guarda no `localStorage`.
-- **Seções noturnas:** hero, bloco do minijogo, segurança e chamada final forçam `scheme-dark` nos dois temas, com foto,
-  véu de ameixa entre 40 e 70% e grão de filme. Sem a foto, fica o gradiente `candlelight`.
+- **Seções noturnas:** hero, perguntas e chamada final (de página inteira) e os cartões do minijogo e da segurança
+  forçam `scheme-dark` nos dois temas, com foto, véu de ameixa entre 40 e 70% e grão de filme. Sem a foto, fica o
+  gradiente `candlelight`. No tema claro, os dois cartões ficam dentro da faixa clara para as seções escuras não se
+  emendarem.
 - **Logo:** wordmark "duora" em minúsculas, com as letras do Fraunces (600, opsz 144, SOFT 50) convertidas em contorno
   SVG, e o "o" como dois anéis entrelaçados em lente, damasco e rosa-chá: duas pessoas que se encontram. O favicon e o
   `apple-touch-icon` são só a lente. No hover, os anéis se afastam e voltam, só com `prefers-reduced-motion:
   no-preference`.
 - **Tom:** íntimo e seco, frases curtas, minúsculas no título. Nada de número de lista nem depoimento inventado; o
   minijogo de 20 s aparece como "em breve".
-- **Imagens:** natureza-morta gerada por IA, sem pessoas e sem texto, pela API do Tripo (text-to-image). Hero, segurança
-  e minijogo vieram do GPT Image 2.5 (`chat_image_2.5_flare`); mesa com os cavalos, passos de "como funciona" e FAQ, do
-  Nano Banana Pro (`banana_pro`).
+- **Imagens:** natureza-morta gerada por IA, sem pessoas e sem texto, pela API do Tripo (text-to-image). Hero,
+  segurança, minijogo, FAQ e chamada final vieram do GPT Image 2.5 (`chat_image_2.5_flare`); os passos de "como
+  funciona", do Nano Banana Pro (`banana_pro`).
 
 Por quê: o público é adulto e o risco é confiança, então a estética passa segurança e o lúdico entra pelo conteúdo (a
 frase interativa do hero e, depois, o minijogo). A paleta diferencia o Duora do roxo e magenta de jogo, e as imagens sem
@@ -57,7 +59,7 @@ rosto são baratas de manter consistentes.
   Tailwind troca a função por variáveis (`--lightningcss-light/dark`) para os navegadores-alvo do Tailwind (Safari 16.4+).
   Esse polyfill só funciona porque os tokens estão em `@theme inline`: cada classe recebe o próprio `light-dark()` e o
   resolve no elemento. Voltar os tokens para `@theme` comum quebraria as seções noturnas no tema claro.
-- **Peso:** duas fontes variáveis (~100 KB em latin) e cerca de 580 KB de imagens WebP; só a do hero carrega cedo
+- **Peso:** duas fontes variáveis (~100 KB em latin) e cerca de 510 KB de imagens WebP; só a do hero carrega cedo
   (`fetchpriority="high"`), o resto é `loading="lazy"`.
 - **Depois:** a paleta C pode virar o tema das salas de jogo dentro do app, onde o clima de fliperama ajuda.
 

@@ -21,6 +21,9 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // Sem isto o Vitest troca todo CSS por string vazia, inclusive no `?raw`. O teste de contraste lê os
+    // tokens do index.css, a fonte única deles.
+    css: { include: [/src\/index\.css/] },
     setupFiles: ['./src/test/setup.ts'],
     restoreMocks: true,
     unstubGlobals: true,

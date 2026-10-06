@@ -32,7 +32,7 @@ export function JoinWaitlistForm() {
 
   if (state.kind === 'joined') {
     return (
-      <p role="status" className="rounded-lg bg-brand-50 p-4 font-semibold text-brand-900">
+      <p role="status" className="rounded-lg bg-primary-subtle p-4 font-semibold text-on-primary-subtle">
         Pronto! Vamos avisar você por e-mail quando o Duora abrir.
       </p>
     )
@@ -44,7 +44,7 @@ export function JoinWaitlistForm() {
 
   return (
     <form noValidate onSubmit={(event) => void submit(event)} className="flex max-w-md flex-col gap-3">
-      <label htmlFor={emailId} className="font-semibold text-stone-800">
+      <label htmlFor={emailId} className="font-semibold text-fg">
         E-mail
       </label>
       <input
@@ -59,17 +59,17 @@ export function JoinWaitlistForm() {
         onChange={(event) => setEmail(event.currentTarget.value)}
         aria-invalid={isEmailRejected}
         aria-describedby={problem === null ? undefined : problemId}
-        className="min-h-11 rounded-lg border border-stone-300 bg-white px-3 text-stone-900 shadow-sm focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand-500 aria-invalid:border-red-600"
+        className="min-h-11 min-w-11 rounded-lg border border-edge bg-surface px-3 text-fg shadow-raised aria-invalid:border-danger"
       />
       {problem !== null && (
-        <p id={problemId} role="alert" className="text-sm font-semibold text-red-700">
+        <p id={problemId} role="alert" className="text-sm font-semibold text-danger">
           {messageFor(problem)}
         </p>
       )}
       <button
         type="submit"
         disabled={isSubmitting}
-        className="min-h-11 rounded-lg bg-brand-600 px-4 font-semibold text-white shadow-sm hover:bg-brand-700 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:bg-stone-400"
+        className="min-h-11 min-w-11 rounded-lg bg-primary px-4 font-semibold text-on-primary shadow-raised hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-disabled disabled:text-on-disabled"
       >
         {isSubmitting ? 'Enviando…' : 'Entrar na lista'}
       </button>

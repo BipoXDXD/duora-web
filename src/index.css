@@ -1,17 +1,134 @@
 @import "tailwindcss";
 
+/*
+ * Fonte única dos tokens visuais. O teste src/app/theme.test.ts lê este arquivo e mede o contraste de
+ * cada par usado pelos componentes, nos dois temas.
+ *
+ * Duas camadas:
+ * - tons crus (ink, brand, danger), definidos de antemão em OKLCH e nunca usados direto nos componentes;
+ * - tokens semânticos (canvas, fg, primary...), que os componentes usam e o tema escuro redefine.
+ */
 @theme {
   --font-sans: system-ui, "Segoe UI", Roboto, sans-serif;
 
-  --color-brand-50: oklch(0.97 0.02 265);
-  --color-brand-100: oklch(0.93 0.04 265);
-  --color-brand-300: oklch(0.78 0.11 265);
+  /* Sem a paleta padrão do Tailwind: só existem as cores abaixo. */
+  --color-*: initial;
+
+  /* Cinza frio, no matiz da marca, com croma maior nos extremos. */
+  --color-ink-0: oklch(1 0 0);
+  --color-ink-50: oklch(0.985 0.004 265);
+  --color-ink-100: oklch(0.96 0.008 265);
+  --color-ink-200: oklch(0.92 0.012 265);
+  --color-ink-300: oklch(0.85 0.016 265);
+  --color-ink-400: oklch(0.71 0.02 265);
+  --color-ink-500: oklch(0.56 0.022 265);
+  --color-ink-600: oklch(0.46 0.024 265);
+  --color-ink-700: oklch(0.37 0.026 265);
+  --color-ink-800: oklch(0.28 0.026 265);
+  --color-ink-900: oklch(0.21 0.028 265);
+  --color-ink-950: oklch(0.16 0.03 265);
+
+  /* Primária. Os tons claros têm croma limitado para caber no sRGB. */
+  --color-brand-50: oklch(0.97 0.014 265);
+  --color-brand-100: oklch(0.93 0.032 265);
+  --color-brand-200: oklch(0.87 0.06 265);
+  --color-brand-300: oklch(0.78 0.105 265);
+  --color-brand-400: oklch(0.68 0.16 265);
   --color-brand-500: oklch(0.58 0.19 265);
   --color-brand-600: oklch(0.51 0.2 265);
   --color-brand-700: oklch(0.44 0.18 265);
+  --color-brand-800: oklch(0.37 0.15 265);
   --color-brand-900: oklch(0.3 0.12 265);
+  --color-brand-950: oklch(0.22 0.09 265);
+
+  /* Perigo: erros e ações destrutivas. */
+  --color-danger-50: oklch(0.97 0.013 25);
+  --color-danger-100: oklch(0.93 0.034 25);
+  --color-danger-200: oklch(0.87 0.066 25);
+  --color-danger-300: oklch(0.79 0.12 25);
+  --color-danger-400: oklch(0.7 0.17 25);
+  --color-danger-500: oklch(0.62 0.21 27);
+  --color-danger-600: oklch(0.55 0.21 27);
+  --color-danger-700: oklch(0.48 0.19 27);
+  --color-danger-800: oklch(0.4 0.16 27);
+  --color-danger-900: oklch(0.32 0.12 27);
+  --color-danger-950: oklch(0.24 0.08 27);
+
+  /* Semânticos, tema claro. */
+  --color-canvas: var(--color-ink-50);
+  --color-surface: var(--color-ink-0);
+  --color-fg: var(--color-ink-900);
+  --color-fg-muted: var(--color-ink-600);
+  --color-fg-accent: var(--color-brand-700);
+  --color-primary: var(--color-brand-600);
+  --color-primary-hover: var(--color-brand-700);
+  --color-on-primary: var(--color-brand-50);
+  --color-primary-subtle: var(--color-brand-100);
+  --color-on-primary-subtle: var(--color-brand-900);
+  --color-disabled: var(--color-ink-200);
+  --color-on-disabled: var(--color-ink-600);
+  --color-danger: var(--color-danger-700);
+  --color-edge: var(--color-ink-500);
+  --color-divider: var(--color-ink-200);
+  --color-focus: var(--color-brand-500);
+
+  /*
+   * Sombra de nível 1 em duas partes (Refactoring UI, cap. 6). O Tailwind copia o valor de --shadow-*
+   * para dentro da classe, então o tema escuro troca a --elevation-raised, que a classe referencia.
+   */
+  --elevation-raised: 0 1px 3px oklch(0 0 0 / 0.12), 0 1px 2px oklch(0 0 0 / 0.24);
+  --shadow-raised: var(--elevation-raised);
 }
 
-body {
-  @apply bg-stone-50 text-stone-900 antialiased;
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
+  /* No escuro a sombra some no fundo: a elevação vem da superfície mais clara que a página. */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-canvas: var(--color-ink-950);
+      --color-surface: var(--color-ink-900);
+      --color-fg: var(--color-ink-50);
+      --color-fg-muted: var(--color-ink-400);
+      --color-fg-accent: var(--color-brand-300);
+      --color-primary: var(--color-brand-400);
+      --color-primary-hover: var(--color-brand-300);
+      --color-on-primary: var(--color-brand-950);
+      --color-primary-subtle: var(--color-brand-900);
+      --color-on-primary-subtle: var(--color-brand-100);
+      --color-disabled: var(--color-ink-800);
+      --color-on-disabled: var(--color-ink-300);
+      --color-danger: var(--color-danger-300);
+      --color-edge: var(--color-ink-500);
+      --color-divider: var(--color-ink-800);
+      --color-focus: var(--color-brand-400);
+
+      /* Sombra vazia, não `none`: a classe junta este valor numa lista de sombras. */
+      --elevation-raised: 0 0 #0000;
+    }
+  }
+
+  body {
+    @apply bg-canvas text-fg antialiased;
+  }
+
+  /* Um anel só para todo elemento focável, com o contraste medido no teste do tema. */
+  :focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* Quem pede menos movimento não vê animação nem transição; o estado final aparece na hora. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }

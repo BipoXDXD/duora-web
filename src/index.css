@@ -74,8 +74,15 @@
   --color-danger-800: oklch(0.4 0.16 27);
   --color-danger-900: oklch(0.32 0.12 27);
   --color-danger-950: oklch(0.24 0.08 27);
+}
 
-  /* Semânticos: light-dark(tema claro, tema escuro). */
+/*
+ * Semânticos: light-dark(tema claro, tema escuro). Ficam em `@theme inline` para cada classe copiar o
+ * light-dark() para o próprio elemento: assim o lado é escolhido pelo color-scheme dele, e não só pelo da
+ * raiz. É o que deixa uma seção noturna (`scheme-dark`) escura também no tema claro, inclusive no build,
+ * em que o Lightning CSS troca light-dark() por variáveis para os navegadores sem suporte.
+ */
+@theme inline {
   --color-canvas: light-dark(var(--color-cream-100), var(--color-plum-950));
   --color-surface: light-dark(var(--color-cream-50), var(--color-plum-900));
   --color-fg: light-dark(var(--color-plum-900), var(--color-cream-200));
@@ -98,13 +105,11 @@
 
   /*
    * Sombra de nível 1 em duas partes (Refactoring UI, cap. 6), tingida de ameixa. No escuro ela fica
-   * transparente: a elevação vem da superfície mais clara que a página. O Tailwind copia o valor de
-   * --shadow-* para dentro da classe, por isso a classe referencia a --elevation-raised.
+   * transparente: a elevação vem da superfície mais clara que a página.
    */
-  --elevation-raised:
+  --shadow-raised:
     0 1px 3px light-dark(oklch(0.19 0.025 330 / 0.12), transparent),
     0 1px 2px light-dark(oklch(0.19 0.025 330 / 0.24), transparent);
-  --shadow-raised: var(--elevation-raised);
 }
 
 /*
@@ -117,10 +122,10 @@
 
 /* Fundo das seções noturnas enquanto a foto não carrega, ou se ela não existir: luz de vela sobre ameixa. */
 @utility candlelight {
-  background-color: var(--color-canvas);
+  background-color: --theme(--color-canvas inline);
   background-image:
-    radial-gradient(55% 65% at 80% 30%, var(--color-glow), transparent 70%),
-    radial-gradient(45% 55% at 5% 100%, var(--color-glow), transparent 70%);
+    radial-gradient(55% 65% at 80% 30%, --theme(--color-glow inline), transparent 70%),
+    radial-gradient(45% 55% at 5% 100%, --theme(--color-glow inline), transparent 70%);
 }
 
 @layer base {
@@ -143,7 +148,7 @@
 
   /* Um anel só para todo elemento focável, com o contraste medido no teste do tema. */
   :focus-visible {
-    outline: 3px solid var(--color-focus);
+    outline: 3px solid --theme(--color-focus inline);
     outline-offset: 2px;
   }
 

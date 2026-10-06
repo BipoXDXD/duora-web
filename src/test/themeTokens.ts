@@ -1,7 +1,8 @@
 /**
  * Lê os tokens do tema direto do `index.css`, a fonte única deles, para os testes não repetirem valores.
- * Entende só o formato que o arquivo usa: declarações no bloco `@theme`, em que um token que muda com o
- * tema escreve os dois valores em `light-dark(claro, escuro)`. O resultado já vem com `var()` resolvido.
+ * Entende só o formato que o arquivo usa: declarações nos blocos `@theme` e `@theme inline`, em que um
+ * token que muda com o tema escreve os dois valores em `light-dark(claro, escuro)`. O resultado já vem
+ * com `var()` resolvido.
  */
 export interface ThemeTokens {
   readonly light: ReadonlyMap<string, string>
@@ -16,11 +17,13 @@ const LIGHT_DARK = 'light-dark('
 
 export function readThemeTokens(css: string): ThemeTokens {
   const source = css.replaceAll(/\/\*[\s\S]*?\*\//g, '')
-  const theme = blockAfter(source, '@theme')
-  if (theme === undefined) {
+  const themes = blocksAfter(source, '@theme')
+  if (themes.length === 0) {
     throw new Error('bloco @theme não encontrado')
   }
-  const declarations = new Map([...theme.matchAll(DECLARATION)].map(([, name = '', value = '']) => [name, value.trim()]))
+  const declarations = new Map(
+    themes.flatMap((block) => [...block.matchAll(DECLARATION)]).map(([, name = '', value = '']) => [name, value.trim()]),
+  )
 
   return {
     light: resolveAll(declarations, 'light'),
@@ -28,18 +31,18 @@ export function readThemeTokens(css: string): ThemeTokens {
   }
 }
 
-/** Conteúdo entre as chaves do primeiro bloco que começa em `opener`, ou `undefined` se não houver. */
-function blockAfter(source: string, opener: string): string | undefined {
+/** Conteúdo entre as chaves de cada bloco que começa em `opener` (`@theme` e `@theme inline`). */
+function blocksAfter(source: string, opener: string): string[] {
   const start = source.indexOf(opener)
   const open = start === -1 ? -1 : source.indexOf('{', start)
   if (open === -1) {
-    return undefined
+    return []
   }
   const close = matchingClose(source, open, '{', '}')
   if (close === undefined) {
     throw new Error(`bloco ${opener} sem fechamento`)
   }
-  return source.slice(open + 1, close)
+  return [source.slice(open + 1, close), ...blocksAfter(source.slice(close + 1), opener)]
 }
 
 function resolveAll(declarations: ReadonlyMap<string, string>, theme: Theme): Map<string, string> {

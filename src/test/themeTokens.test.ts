@@ -48,6 +48,19 @@ describe('readThemeTokens', () => {
     expect(tokens.dark.get('--elevation-raised')).toBe('0 1px 3px transparent, 0 1px 2px oklch(0.98 0.01 330)')
   })
 
+  it('reads the tokens of every @theme block, including @theme inline', () => {
+    const split = `
+      @theme { --color-ink-50: oklch(0.98 0.01 330); }
+      @utility grain { --color-fake: red; }
+      @theme inline { --color-canvas: var(--color-ink-50); }
+    `
+
+    const tokens = readThemeTokens(split)
+
+    expect(tokens.dark.get('--color-canvas')).toBe('oklch(0.98 0.01 330)')
+    expect(tokens.dark.has('--color-fake')).toBe(false)
+  })
+
   it('ignores comments and the reset of the default palette', () => {
     const tokens = readThemeTokens(CSS)
 

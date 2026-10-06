@@ -129,7 +129,7 @@ describe('theme tokens', () => {
     const lightness = (name: string) => oklch(THEMES.dark.get(colorToken(name)) ?? 'invalid')?.l ?? Number.NaN
 
     expect(lightness('surface')).toBeGreaterThan(lightness('canvas'))
-    expect(THEMES.dark.get('--elevation-raised')?.replaceAll('transparent', '')).not.toMatch(/oklch|rgb|#/)
+    expect(THEMES.dark.get('--shadow-raised')?.replaceAll('transparent', '')).not.toMatch(/oklch|rgb|#/)
   })
 
   it('follows the visitor color scheme, dark first, unless a theme was picked by hand', () => {
@@ -139,7 +139,7 @@ describe('theme tokens', () => {
   })
 
   it('draws one focus ring for every focusable element, from the focus token', () => {
-    const rule = /:focus-visible\s*\{\s*outline:\s*3px solid var\(--color-focus\);\s*outline-offset:\s*2px;/
+    const rule = /:focus-visible\s*\{\s*outline:\s*3px solid --theme\(--color-focus inline\);\s*outline-offset:\s*2px;/
 
     expect(css).toMatch(rule)
   })

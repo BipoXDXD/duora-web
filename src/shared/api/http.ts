@@ -1,4 +1,4 @@
-import type { z } from 'zod'
+import type { z } from 'zod/mini'
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
@@ -81,7 +81,7 @@ function parseRetryAfterSeconds(header: string | null): number | null {
  * Lê o corpo JSON e o converte pelo schema, a única porta de dado da API para dentro do app. Campos
  * que o schema não declara são descartados (tolerant reader).
  */
-export async function readJsonBody<T>(response: Response, schema: z.ZodType<T>): Promise<T> {
+export async function readJsonBody<T>(response: Response, schema: z.ZodMiniType<T>): Promise<T> {
   let body: unknown
   try {
     body = await response.json()

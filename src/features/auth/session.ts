@@ -1,15 +1,15 @@
-import { z } from 'zod'
+import { z } from 'zod/mini'
 import { ApiError, readJsonBody, sendApiRequest } from '../../shared/api/http.ts'
 
 /** Corpo de GET /api/me (CurrentUserResponse da duora-api). Nome em branco conta como sem nome. */
 const currentUserSchema = z.object({
-  displayName: z
-    .string()
-    .nullable()
-    .transform((name) => {
+  displayName: z.pipe(
+    z.nullable(z.string()),
+    z.transform((name) => {
       const trimmed = name?.trim() ?? ''
       return trimmed === '' ? null : trimmed
     }),
+  ),
 })
 
 /** Corpo de POST /logout. Só HTTPS: o front navega para essa URL, então `javascript:` nunca passa. */

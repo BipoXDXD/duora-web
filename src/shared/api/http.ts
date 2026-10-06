@@ -1,3 +1,5 @@
+import type { z } from 'zod'
+
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export interface ApiRequest {
@@ -17,6 +19,14 @@ export class ApiError extends Error {
     this.name = 'ApiError'
     this.status = status
     this.retryAfterSeconds = retryAfterSeconds
+  }
+}
+
+/** Resposta 2xx cujo corpo não segue o contrato: não é JSON ou não tem a forma combinada com a API. */
+export class InvalidResponseError extends Error {
+  constructor(options?: ErrorOptions) {
+    super('A resposta da API não segue o contrato', options)
+    this.name = 'InvalidResponseError'
   }
 }
 
@@ -65,4 +75,30 @@ function parseRetryAfterSeconds(header: string | null): number | null {
     return null
   }
   return Number(header)
+}
+
+/**
+ * Lê o corpo JSON e o converte pelo schema, a única porta de dado da API para dentro do app. Campos
+ * que o schema não declara são descartados (tolerant reader).
+ */
+export async function readJsonBody<T>(response: Response, schema: z.ZodType<T>): Promise<T> {
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch (error) {
+    throw new InvalidResponseError({ cause: error })
+  }
+  const parsed = schema.safeParse(body)
+  if (!parsed.success) {
+    throw new InvalidResponseError({ cause: parsed.error })
+  }
+  return parsed.data
+}
+
+/**
+ * Falhas esperadas de uma chamada: status fora de 2xx, rede fora do ar (o `fetch` rejeita com
+ * TypeError) ou corpo fora do contrato. Qualquer outra coisa é defeito e não deve virar mensagem.
+ */
+export function isApiFailure(error: unknown): boolean {
+  return error instanceof ApiError || error instanceof TypeError || error instanceof InvalidResponseError
 }

@@ -113,4 +113,10 @@
   body {
     @apply bg-canvas text-fg antialiased;
   }
+
+  /* Um anel só para todo elemento focável, com o contraste medido no teste do tema. */
+  :focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
 }

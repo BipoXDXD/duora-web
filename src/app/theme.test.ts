@@ -112,4 +112,11 @@ describe('theme tokens', () => {
     expect(lightness('surface')).toBeGreaterThan(lightness('canvas'))
     expect(THEMES.dark.get('--shadow-raised')).toBe(NO_SHADOW)
   })
+
+  it('draws one focus ring for every focusable element, from the focus token', () => {
+    const rule = /:focus-visible\s*\{\s*outline:\s*3px solid var\(--color-focus\);\s*outline-offset:\s*2px;/
+
+    expect(css).toMatch(rule)
+  })
+
 })

@@ -16,11 +16,11 @@ describe('favicon', () => {
     expect(FAVICON).toMatch(/^<svg [^>]*xmlns="http:\/\/www\.w3\.org\/2000\/svg"/)
   })
 
-  it('paints only brand tones from index.css, converted to hex', () => {
+  it('paints the lens from the logo with tones from index.css, converted to hex', () => {
     const { light } = readThemeTokens(css)
-    const brandHex = ['600', '300', '50'].map((tone) => formatHex(light.get(`--color-brand-${tone}`) ?? 'invalid'))
-    const fills = [...FAVICON.matchAll(/fill="(#[0-9a-f]{6})"/g)].map(([, hex]) => hex)
+    const toneHex = ['plum-950', 'apricot-400', 'rose-300'].map((tone) => formatHex(light.get(`--color-${tone}`) ?? 'invalid'))
+    const paints = [...FAVICON.matchAll(/(?:fill|stroke)="(#[0-9a-f]{6})"/g)].map(([, hex]) => hex)
 
-    expect(fills).toEqual(brandHex)
+    expect(paints).toEqual(toneHex)
   })
 })

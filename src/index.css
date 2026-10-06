@@ -2,44 +2,65 @@
 
 /*
  * Fonte única dos tokens visuais. O teste src/app/theme.test.ts lê este arquivo e mede o contraste de
- * cada par usado pelos componentes, nos dois temas.
+ * cada par usado pelos componentes, nos dois temas. Identidade "Mesa posta": docs/adr/0001-identidade-visual.md.
  *
  * Duas camadas:
- * - tons crus (ink, brand, danger), definidos de antemão em OKLCH e nunca usados direto nos componentes;
- * - tokens semânticos (canvas, fg, primary...), que os componentes usam e o tema escuro redefine.
+ * - tons crus (plum, cream, apricot, rose, danger), definidos de antemão em OKLCH e nunca usados direto
+ *   nos componentes;
+ * - tokens semânticos (canvas, fg, primary...), que os componentes usam. Cada um escreve os dois temas em
+ *   `light-dark(claro, escuro)`, e quem escolhe o lado é o `color-scheme` do elemento (veja @layer base).
  */
 @theme {
-  --font-sans: system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Hanken Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces Variable", ui-serif, Georgia, serif;
 
   /* Sem a paleta padrão do Tailwind: só existem as cores abaixo. */
   --color-*: initial;
 
-  /* Cinza frio, no matiz da marca, com croma maior nos extremos. */
-  --color-ink-0: oklch(1 0 0);
-  --color-ink-50: oklch(0.985 0.004 265);
-  --color-ink-100: oklch(0.96 0.008 265);
-  --color-ink-200: oklch(0.92 0.012 265);
-  --color-ink-300: oklch(0.85 0.016 265);
-  --color-ink-400: oklch(0.71 0.02 265);
-  --color-ink-500: oklch(0.56 0.022 265);
-  --color-ink-600: oklch(0.46 0.024 265);
-  --color-ink-700: oklch(0.37 0.026 265);
-  --color-ink-800: oklch(0.28 0.026 265);
-  --color-ink-900: oklch(0.21 0.028 265);
-  --color-ink-950: oklch(0.16 0.03 265);
+  /* Ameixa: neutros do tema escuro e texto do claro. */
+  --color-plum-50: oklch(0.975 0.008 330);
+  --color-plum-100: oklch(0.94 0.014 330);
+  --color-plum-200: oklch(0.88 0.02 330);
+  --color-plum-300: oklch(0.8 0.028 330);
+  --color-plum-400: oklch(0.68 0.035 330);
+  --color-plum-500: oklch(0.55 0.04 330);
+  --color-plum-600: oklch(0.46 0.04 330);
+  --color-plum-700: oklch(0.37 0.04 330);
+  --color-plum-800: oklch(0.28 0.035 330);
+  --color-plum-900: oklch(0.23 0.03 330);
+  --color-plum-950: oklch(0.19 0.025 330);
 
-  /* Primária. Os tons claros têm croma limitado para caber no sRGB. */
-  --color-brand-50: oklch(0.97 0.014 265);
-  --color-brand-100: oklch(0.93 0.032 265);
-  --color-brand-200: oklch(0.87 0.06 265);
-  --color-brand-300: oklch(0.78 0.105 265);
-  --color-brand-400: oklch(0.68 0.16 265);
-  --color-brand-500: oklch(0.58 0.19 265);
-  --color-brand-600: oklch(0.51 0.2 265);
-  --color-brand-700: oklch(0.44 0.18 265);
-  --color-brand-800: oklch(0.37 0.15 265);
-  --color-brand-900: oklch(0.3 0.12 265);
-  --color-brand-950: oklch(0.22 0.09 265);
+  /* Creme: fundo do tema claro e texto do escuro. O matiz desce de 85 a 55 para esquentar os tons médios. */
+  --color-cream-50: oklch(0.99 0.006 85);
+  --color-cream-100: oklch(0.97 0.012 85);
+  --color-cream-200: oklch(0.96 0.02 85);
+  --color-cream-300: oklch(0.9 0.03 75);
+  --color-cream-400: oklch(0.76 0.03 60);
+  --color-cream-500: oklch(0.62 0.03 55);
+
+  /* Damasco: primária, CTA e foco. */
+  --color-apricot-100: oklch(0.95 0.03 65);
+  --color-apricot-200: oklch(0.9 0.06 62);
+  --color-apricot-300: oklch(0.84 0.1 58);
+  --color-apricot-400: oklch(0.78 0.14 55);
+  --color-apricot-500: oklch(0.69 0.15 50);
+  --color-apricot-600: oklch(0.6 0.15 48);
+  --color-apricot-700: oklch(0.52 0.13 48);
+  --color-apricot-800: oklch(0.45 0.12 45);
+  --color-apricot-900: oklch(0.36 0.09 45);
+  --color-apricot-950: oklch(0.26 0.06 45);
+
+  /* Rosa-chá: acento, a segunda pessoa do logo e da frase do hero. O 950 é o brilho de vela da noite. */
+  --color-rose-100: oklch(0.95 0.025 10);
+  --color-rose-200: oklch(0.9 0.05 10);
+  --color-rose-300: oklch(0.82 0.09 10);
+  --color-rose-400: oklch(0.72 0.12 10);
+  --color-rose-500: oklch(0.62 0.14 10);
+  --color-rose-600: oklch(0.53 0.14 10);
+  --color-rose-700: oklch(0.46 0.13 10);
+  --color-rose-800: oklch(0.38 0.1 10);
+  --color-rose-900: oklch(0.3 0.07 10);
+  --color-rose-950: oklch(0.26 0.05 18);
 
   /* Perigo: erros e ações destrutivas. */
   --color-danger-50: oklch(0.97 0.013 25);
@@ -54,64 +75,70 @@
   --color-danger-900: oklch(0.32 0.12 27);
   --color-danger-950: oklch(0.24 0.08 27);
 
-  /* Semânticos, tema claro. */
-  --color-canvas: var(--color-ink-50);
-  --color-surface: var(--color-ink-0);
-  --color-fg: var(--color-ink-900);
-  --color-fg-muted: var(--color-ink-600);
-  --color-fg-accent: var(--color-brand-700);
-  --color-primary: var(--color-brand-600);
-  --color-primary-hover: var(--color-brand-700);
-  --color-on-primary: var(--color-brand-50);
-  --color-primary-subtle: var(--color-brand-100);
-  --color-on-primary-subtle: var(--color-brand-900);
-  --color-disabled: var(--color-ink-200);
-  --color-on-disabled: var(--color-ink-600);
-  --color-danger: var(--color-danger-700);
-  --color-edge: var(--color-ink-500);
-  --color-divider: var(--color-ink-200);
-  --color-focus: var(--color-brand-500);
+  /* Semânticos: light-dark(tema claro, tema escuro). */
+  --color-canvas: light-dark(var(--color-cream-100), var(--color-plum-950));
+  --color-surface: light-dark(var(--color-cream-50), var(--color-plum-900));
+  --color-fg: light-dark(var(--color-plum-900), var(--color-cream-200));
+  --color-fg-muted: light-dark(var(--color-plum-600), var(--color-cream-400));
+  --color-fg-accent: light-dark(var(--color-apricot-800), var(--color-apricot-300));
+  --color-primary: light-dark(var(--color-apricot-700), var(--color-apricot-400));
+  --color-primary-hover: light-dark(var(--color-apricot-800), var(--color-apricot-300));
+  --color-on-primary: light-dark(var(--color-cream-50), var(--color-plum-950));
+  --color-primary-subtle: light-dark(var(--color-apricot-100), var(--color-apricot-950));
+  --color-on-primary-subtle: light-dark(var(--color-apricot-900), var(--color-apricot-100));
+  --color-accent: light-dark(var(--color-rose-600), var(--color-rose-300));
+  --color-disabled: light-dark(var(--color-cream-300), var(--color-plum-800));
+  --color-on-disabled: light-dark(var(--color-plum-600), var(--color-cream-400));
+  --color-danger: light-dark(var(--color-danger-700), var(--color-danger-300));
+  --color-edge: var(--color-plum-500);
+  --color-divider: light-dark(var(--color-cream-300), var(--color-plum-800));
+  --color-focus: light-dark(var(--color-apricot-700), var(--color-apricot-400));
+  /* Só as seções noturnas (sempre escuras) usam o brilho; o lado claro existe para o token ser completo. */
+  --color-glow: light-dark(var(--color-apricot-100), var(--color-rose-950));
 
   /*
-   * Sombra de nível 1 em duas partes (Refactoring UI, cap. 6). O Tailwind copia o valor de --shadow-*
-   * para dentro da classe, então o tema escuro troca a --elevation-raised, que a classe referencia.
+   * Sombra de nível 1 em duas partes (Refactoring UI, cap. 6), tingida de ameixa. No escuro ela fica
+   * transparente: a elevação vem da superfície mais clara que a página. O Tailwind copia o valor de
+   * --shadow-* para dentro da classe, por isso a classe referencia a --elevation-raised.
    */
-  --elevation-raised: 0 1px 3px oklch(0 0 0 / 0.12), 0 1px 2px oklch(0 0 0 / 0.24);
+  --elevation-raised:
+    0 1px 3px light-dark(oklch(0.19 0.025 330 / 0.12), transparent),
+    0 1px 2px light-dark(oklch(0.19 0.025 330 / 0.24), transparent);
   --shadow-raised: var(--elevation-raised);
 }
 
+/*
+ * Grão de filme em SVG (feTurbulence) por cima do gradiente e das fotos das seções noturnas. É branco com
+ * alfa de 9%, então mexe pouco no contraste medido do texto.
+ */
+@utility grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+/* Fundo das seções noturnas enquanto a foto não carrega, ou se ela não existir: luz de vela sobre ameixa. */
+@utility candlelight {
+  background-color: var(--color-canvas);
+  background-image:
+    radial-gradient(55% 65% at 80% 30%, var(--color-glow), transparent 70%),
+    radial-gradient(45% 55% at 5% 100%, var(--color-glow), transparent 70%);
+}
+
 @layer base {
+  /* Escuro primeiro; o navegador segue a preferência do visitante, a não ser que ele escolha no botão. */
   :root {
-    color-scheme: light dark;
+    color-scheme: dark light;
   }
 
-  /* No escuro a sombra some no fundo: a elevação vem da superfície mais clara que a página. */
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --color-canvas: var(--color-ink-950);
-      --color-surface: var(--color-ink-900);
-      --color-fg: var(--color-ink-50);
-      --color-fg-muted: var(--color-ink-400);
-      --color-fg-accent: var(--color-brand-300);
-      --color-primary: var(--color-brand-400);
-      --color-primary-hover: var(--color-brand-300);
-      --color-on-primary: var(--color-brand-950);
-      --color-primary-subtle: var(--color-brand-900);
-      --color-on-primary-subtle: var(--color-brand-100);
-      --color-disabled: var(--color-ink-800);
-      --color-on-disabled: var(--color-ink-300);
-      --color-danger: var(--color-danger-300);
-      --color-edge: var(--color-ink-500);
-      --color-divider: var(--color-ink-800);
-      --color-focus: var(--color-brand-400);
+  :root[data-theme="light"] {
+    color-scheme: light;
+  }
 
-      /* Sombra vazia, não `none`: a classe junta este valor numa lista de sombras. */
-      --elevation-raised: 0 0 #0000;
-    }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
   }
 
   body {
-    @apply bg-canvas text-fg antialiased;
+    @apply bg-canvas font-sans text-fg antialiased;
   }
 
   /* Um anel só para todo elemento focável, com o contraste medido no teste do tema. */

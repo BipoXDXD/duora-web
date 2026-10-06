@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { stubMatchMedia } from '../test/fakeMatchMedia.ts'
 import { App } from './App.tsx'
 
+/** `min-h-12` (48px) também vale: é o campo e o botão maiores do hero. */
 function hasTouchTargetSize(element: Element): boolean {
-  return element.classList.contains('min-h-11') && element.classList.contains('min-w-11')
+  const isTallEnough = element.classList.contains('min-h-11') || element.classList.contains('min-h-12')
+  return isTallEnough && element.classList.contains('min-w-11')
 }
 
 describe('App', () => {
@@ -62,7 +64,9 @@ describe('App', () => {
 
     const interactive = [...container.querySelectorAll('a, button, input, select, textarea')]
     expect(interactive.length).toBeGreaterThan(0)
-    expect(interactive.filter((element) => !hasTouchTargetSize(element)).map((element) => element.outerHTML)).toEqual([])
+    expect(interactive.filter((element) => !hasTouchTargetSize(element)).map((element) => element.outerHTML)).toEqual(
+      [],
+    )
   })
 
   it.each([true, false])('labels every form field (desktop: %s)', (isDesktop) => {

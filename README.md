@@ -6,9 +6,9 @@ Front web do Duora: encontros entre adultos por experiências e minijogos compar
 React 19, TypeScript 6 (`strict`), Vite 8 e Tailwind CSS 4. O backend é a
 [duora-api](https://github.com/BipoXDXD/duora-api) (Java 25 e Spring Boot 4).
 
-O projeto está no início. Por enquanto ele tem os dois layouts, a base visual (tokens, tema escuro e
-contraste testado), o cliente HTTP compatível com o login da API e a primeira feature, a inscrição na
-**lista de espera**.
+O projeto está no início. Por enquanto ele tem os dois layouts, a identidade visual "Mesa posta" (tokens,
+dois temas e contraste testado), o cliente HTTP compatível com o login da API e a landing com a primeira
+feature, a inscrição na **lista de espera**.
 
 ## Pré-requisitos
 
@@ -70,30 +70,73 @@ mudam. Assim, a experiência no celular pode divergir de verdade (barra inferior
 sem encher cada componente de classes condicionais. O custo é manter duas cascas. Dentro das
 features, ajustes pequenos continuam com as classes responsivas do Tailwind.
 
-## Base visual
+## Identidade visual
+
+A direção é a "Mesa posta": um convite para uma noite a dois, à luz de vela. A escolha, as alternativas e os
+trade-offs estão na [ADR 0001](docs/adr/0001-identidade-visual.md); a pesquisa que a embasa, em
+[`docs/design-research.md`](docs/design-research.md).
+
+- **Fontes:** Fraunces (títulos, eixo `opsz`) e Hanken Grotesk (texto e UI), variáveis e servidas pelo próprio site
+  com `@fontsource-variable/*`.
+- **Logo:** `src/shared/brand/Logo.tsx`. As letras são contornos do Fraunces em SVG, então o logo não depende da fonte
+  carregada; o "o" são dois anéis entrelaçados (damasco e rosa-chá) que se afastam no hover, só para quem não pediu menos
+  movimento. O favicon (`public/favicon.svg`) e o `public/apple-touch-icon.png` (180×180) usam só a lente. O PNG foi
+  renderizado a partir do mesmo desenho do favicon; se a lente mudar, gere-o de novo.
+
+### Tokens e temas
 
 Os tokens ficam em `src/index.css`, a fonte única deles, em duas camadas:
 
-- **Tons crus**, definidos de antemão em OKLCH: `ink` (cinza frio no matiz da marca), `brand` (primária) e
-  `danger` (perigo), cada um de 50 a 950. Os componentes nunca usam um tom cru.
-- **Tokens semânticos**, que os componentes usam: `canvas`, `surface`, `fg`, `fg-muted`, `fg-accent`,
-  `primary`, `on-primary`, `danger`, `edge`, `focus` e outros, como em `bg-surface` ou `text-fg-muted`. A
-  paleta padrão do Tailwind foi removida (`--color-*: initial`), então só eles existem.
+- **Tons crus**, definidos de antemão em OKLCH: `plum` (ameixa), `cream` (creme), `apricot` (damasco, a primária),
+  `rose` (rosa-chá, o acento) e `danger`. Os componentes nunca usam um tom cru.
+- **Tokens semânticos**, que os componentes usam: `canvas`, `surface`, `fg`, `fg-muted`, `fg-accent`, `primary`,
+  `accent`, `on-primary`, `danger`, `edge`, `focus`, `glow` e outros, como em `bg-surface` ou `text-fg-muted`. A paleta
+  padrão do Tailwind foi removida (`--color-*: initial`).
 
-O **tema escuro** segue `prefers-color-scheme` e só redefine os tokens semânticos. Nele a sombra some e a
-elevação vem da superfície mais clara que a página.
+Cada token semântico guarda os dois temas em `light-dark(claro, escuro)`, dentro de `@theme inline`. O lado é escolhido
+pelo `color-scheme` de cada elemento:
 
-`src/app/theme.test.ts` lê os tokens do `index.css` e mede, nos dois temas, cada par que os componentes
-usam: 4,5:1 para texto, 3:1 para texto grande, borda de componente e anel de foco. O teste também falha se um
-componente usar um tom cru ou se um token semântico novo não entrar em nenhum par. Para incluir uma cor:
-crie o token, use-o no componente e acrescente o par em `PAIRS`.
+- a raiz usa `color-scheme: dark light`, ou seja, segue a preferência do sistema, com o escuro primeiro;
+- o botão de tema fixa `data-theme="light"` ou `"dark"` na raiz e guarda a escolha no `localStorage` (com `try/catch`:
+  se o armazenamento estiver bloqueado, o tema troca, mas não é lembrado);
+- as **seções noturnas** (hero, cartões do minijogo e da segurança, perguntas e chamada final) usam `scheme-dark` e
+  ficam escuras também no tema claro.
+
+O `@theme inline` não é detalhe: no build, o Lightning CSS troca `light-dark()` por variáveis para navegadores sem suporte
+(Safari 16.4+), e isso só respeita as seções noturnas se cada classe carregar o próprio `light-dark()`. Veja a ADR.
+
+`src/app/theme.test.ts` lê os tokens do `index.css` e mede, nos dois temas, cada par que os componentes usam: 4,5:1 para
+texto, 3:1 para texto grande, borda de componente e anel de foco. O teste também falha se um componente usar um tom cru
+ou se um token semântico novo não entrar em nenhum par. Para incluir uma cor: crie o token, use-o no componente e
+acrescente o par em `PAIRS`.
 
 Interação acessível:
 
 - um anel de foco único (`:focus-visible`, 3px na cor `focus`) para todo elemento focável;
-- alvo de toque de 44×44px (`min-h-11 min-w-11`) em todo link, botão e campo, conferido em teste;
-- `prefers-reduced-motion` desliga animações e transições;
+- alvo de toque de 44×44px (`min-h-11 min-w-11`, ou `min-h-12` no formulário do hero) em todo link, botão e campo,
+  conferido em teste;
+- `prefers-reduced-motion` desliga animações e transições; a frase do hero começa parada e tem botão de pausa;
 - todo campo tem label, também conferido em teste.
+
+### Imagens
+
+Natureza-morta gerada por IA, sem pessoas e sem texto, pela API do Tripo (text-to-image). Hero, segurança, minijogo,
+FAQ e chamada final vieram do GPT Image 2.5 (`chat_image_2.5_flare`); os três passos, do Nano Banana Pro (`banana_pro`).
+Todas em WebP:
+
+| Arquivo | Tamanho | Onde |
+|---|---|---|
+| `public/backgrounds/hero.webp` / `hero-mobile.webp` | 1920×1080 / 1080×1350 | hero (único carregamento antecipado, `fetchpriority="high"`) |
+| `public/backgrounds/candle.webp` | 1920×1080 | chamada final (mesa para dois num wine bar) |
+| `public/backgrounds/minigame.webp` | 1920×1080 | bloco "em breve" do minijogo |
+| `public/backgrounds/safety.webp` | 1920×1080 | bloco de segurança |
+| `public/backgrounds/faq.webp` | 1920×1080 | fundo das perguntas |
+| `public/images/step1-match.webp`, `step2-play.webp`, `step3-talk.webp` | 800×1000 | passos de "como funciona", com `alt` |
+
+Uma imagem nova de fundo segue o mesmo formato: 1920×1080 e, quando o recorte no celular perder o assunto, uma versão
+retrato de 1080×1350 com o sufixo `-mobile`. O componente `BackdropImage` serve a retrato abaixo de 48rem e a larga acima.
+Se o arquivo faltar, ele se remove e aparece o gradiente `candlelight` com grão. Ao trocar uma imagem, confira no
+navegador o contraste do texto sobre ela com o véu aplicado (a ADR descreve como foi medido).
 
 ## Scripts
 
@@ -114,19 +157,27 @@ Vitest com jsdom e Testing Library. Os testes trocam o `fetch` global por um stu
 e verificam o que vai para a API (caminho, método, corpo, header CSRF) e o que a tela mostra para
 cada resposta: 202, 400, 429 com e sem `Retry-After`, erro do servidor e falha de rede. O
 `matchMedia`, que o jsdom não tem, é simulado em `src/test/fakeMatchMedia.ts`. O contraste das cores é medido
-com o `culori` sobre os tokens lidos do `index.css` (veja [Base visual](#base-visual)).
+com o `culori` sobre os tokens lidos do `index.css` (veja [Tokens e temas](#tokens-e-temas)).
 
 ## Estrutura
 
 ```
 src/
-  app/                 casca: App, os dois layouts, o breakpoint e a página inicial
+  app/                 casca: App, os dois layouts, o breakpoint, a página inicial e o tema
+    theme/             escolha de tema (data-theme + localStorage) e o botão
   features/
     auth/              URL de login do BFF
+    landing/           seções da landing: hero com a frase interativa, como funciona, minijogo, segurança, FAQ
     waitlist/          chamada a POST /api/waitlist e o formulário de inscrição
-  shared/api/          cliente HTTP (mesma origem, CSRF, ApiError)
+  shared/
+    api/               cliente HTTP (mesma origem, CSRF, ApiError)
+    brand/             logo em SVG
+    ui/                imagem de fundo decorativa (BackdropImage)
   test/                setup do Vitest, fakes e leitor dos tokens do tema
-  index.css            tokens visuais e estilos base (foco, movimento reduzido)
+  index.css            tokens visuais e estilos base (foco, movimento reduzido, grão, gradiente)
+docs/
+  adr/                 decisões do front (0001: identidade visual)
+  design-research.md   pesquisa de referências e as três direções
 ```
 
 O código fica organizado por feature, como os módulos da duora-api.

@@ -1,7 +1,11 @@
 import { z } from 'zod/mini'
 import { ApiError, readJsonBody, sendApiRequest } from '../../shared/api/http.ts'
 
-/** Corpo de GET /api/me (CurrentUserResponse da duora-api). Nome em branco conta como sem nome. */
+/**
+ * Corpo de GET /api/me (CurrentUserResponse da duora-api). Nome em branco conta como sem nome. O
+ * schema lê só o que o front usa; `session.test.ts` confere que esses campos batem com o tipo gerado
+ * da spec, que é a fonte do contrato.
+ */
 const currentUserSchema = z.object({
   displayName: z.pipe(
     z.nullable(z.string()),
@@ -12,8 +16,14 @@ const currentUserSchema = z.object({
   ),
 })
 
-/** Corpo de POST /logout. Só HTTPS: o front navega para essa URL, então `javascript:` nunca passa. */
+/**
+ * Corpo de POST /logout. Essa rota é do Spring Security e não está na spec, então aqui o schema é a fonte
+ * do contrato. Só HTTPS: o front navega para essa URL, então `javascript:` nunca passa.
+ */
 const logoutResponseSchema = z.object({ logoutUrl: z.url({ protocol: /^https$/ }) })
+
+/** O que o schema aceita da API (antes de normalizar o nome); o teste compara com o tipo gerado da spec. */
+export type CurrentUserWire = z.input<typeof currentUserSchema>
 
 export type CurrentUser = Readonly<z.output<typeof currentUserSchema>>
 

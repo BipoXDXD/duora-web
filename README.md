@@ -174,11 +174,11 @@ Os tipos dos DTOs vêm da spec OpenAPI da duora-api, nunca escritos à mão:
 - `npm run api:types` roda o `openapi-typescript` e escreve `src/shared/api/schema.d.ts`. Não edite esse
   arquivo; o CI regenera e falha se ele divergir do que está no commit.
 - `src/shared/api/contract.ts` dá nomes curtos aos DTOs usados (`CurrentUserResponse`,
-  `JoinWaitlistRequest`). O corpo enviado ao `POST /api/waitlist` é tipado com `JoinWaitlistRequest`.
+  `JoinWaitlistRequest`, `LogoutResponse`). O corpo enviado ao `POST /api/waitlist` é tipado com `JoinWaitlistRequest`.
 - A validação em runtime continua em Zod (`readJsonBody`), porque o tipo não valida nada. O schema de
-  `GET /api/me` lê só os campos que o front usa, e um teste de tipo (`expectTypeOf` em `session.test.ts`)
-  falha na compilação se eles deixarem de bater com o tipo gerado. `POST /logout` é uma rota do Spring Security
-  que não está na spec, então o schema Zod dela é a única fonte.
+  `GET /api/me` e de `POST /logout` leem só os campos que o front usa, e testes de tipo (`expectTypeOf` em
+  `session.test.ts`) falham na compilação se eles deixarem de bater com o tipo gerado. O do logout aceita só
+  URL HTTPS, uma restrição a mais que a spec.
 
 Para atualizar quando a API mudar o contrato (o repositório da API é privado, então use o `gh`):
 
@@ -236,4 +236,3 @@ gerados da spec, testes com cobertura e build. Também roda o gitleaks sobre tod
 
 - A cópia da spec em `api/openapi.json` é atualizada à mão; o CI não a compara com a da duora-api, que é um
   repositório privado. Quando o contrato mudar na API, rode a atualização acima.
-- `POST /logout` não está na spec da API; se ela passar a documentá-lo, o schema Zod dele cede lugar ao tipo gerado.

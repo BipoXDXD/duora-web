@@ -1,10 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { z } from 'zod/mini'
+import type { FieldErrorWire } from './contract.ts'
 import {
   ApiError,
+  FIELD_ERROR_CODES,
+  type FieldError,
   InvalidResponseError,
   isApiFailure,
   isBug,
+  type KnownFieldErrorCode,
   NetworkError,
   readJsonBody,
   sendApiRequest,
@@ -173,6 +177,82 @@ describe('sendApiRequest', () => {
     expect(error).toMatchObject({ status: 400, problemDetail: null })
   })
 
+  it('keeps the field errors of a validation problem, in the order the API sent them', async () => {
+    const body = {
+      title: 'Bad Request',
+      status: 400,
+      errors: [
+        { field: 'bio', code: 'TOO_LONG' },
+        { field: 'displayName', code: 'FORBIDDEN_CHARACTER' },
+      ],
+    }
+    fetchMock.mockResolvedValue(problemResponse(400, JSON.stringify(body)))
+
+    const error = await sendApiRequest({ method: 'PATCH', path: '/api/me/profile' }).catch((e: unknown) => e)
+
+    expect(error).toMatchObject({
+      status: 400,
+      fieldErrors: [
+        { field: 'bio', code: 'TOO_LONG' },
+        { field: 'displayName', code: 'FORBIDDEN_CHARACTER' },
+      ],
+    })
+  })
+
+  it('reads an error without a field as an error of the whole body', async () => {
+    fetchMock.mockResolvedValue(problemResponse(400, '{"errors":[{"code":"MALFORMED_BODY"}]}'))
+
+    const error = await sendApiRequest({ method: 'PATCH', path: '/api/me/profile' }).catch((e: unknown) => e)
+
+    expect(error).toMatchObject({ fieldErrors: [{ field: null, code: 'MALFORMED_BODY' }] })
+  })
+
+  it('reads a code the front does not know as UNRECOGNIZED, keeping the other errors', async () => {
+    const body = '{"errors":[{"field":"bio","code":"TOO_SPICY"},{"field":"region","code":"UNSUPPORTED_VALUE"}]}'
+    fetchMock.mockResolvedValue(problemResponse(400, body))
+
+    const error = await sendApiRequest({ method: 'PATCH', path: '/api/me/profile' }).catch((e: unknown) => e)
+
+    expect(error).toMatchObject({
+      fieldErrors: [
+        { field: 'bio', code: 'UNRECOGNIZED' },
+        { field: 'region', code: 'UNSUPPORTED_VALUE' },
+      ],
+    })
+  })
+
+  it.each([
+    ['without a body', null],
+    ['with a body that is not JSON', '<html>erro</html>'],
+    ['without errors', '{"title":"Bad Request","status":400}'],
+    ['with an empty errors list', '{"errors":[]}'],
+    ['with errors that is not a list', '{"errors":"bio"}'],
+    ['with errors that is null', '{"errors":null}'],
+    ['with an error that has no code', '{"errors":[{"field":"bio"}]}'],
+    ['with a code that is not text', '{"errors":[{"field":"bio","code":7}]}'],
+    ['with a field that is not text', '{"errors":[{"field":7,"code":"TOO_LONG"}]}'],
+    ['with an item that is not an object', '{"errors":["bio"]}'],
+  ])('has no field errors for an error %s', async (_case, body) => {
+    fetchMock.mockResolvedValue(problemResponse(400, body))
+
+    const error = await sendApiRequest({ method: 'PATCH', path: '/api/me/profile' }).catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error).toMatchObject({ status: 400, fieldErrors: [] })
+  })
+
+  it('keeps the detail when the errors are out of the format', async () => {
+    fetchMock.mockResolvedValue(problemResponse(400, '{"detail":"bio is too long","errors":"bio"}'))
+
+    const error = await sendApiRequest({ method: 'PATCH', path: '/api/me/profile' }).catch((e: unknown) => e)
+
+    expect(error).toMatchObject({ problemDetail: 'bio is too long', fieldErrors: [] })
+  })
+
+  it('has no field errors when the error has no problem body at all', () => {
+    expect(new ApiError(500, null).fieldErrors).toEqual([])
+  })
+
   it('turns a fetch rejection into a NetworkError that keeps the cause', async () => {
     const failure = new TypeError('Failed to fetch')
     fetchMock.mockRejectedValue(failure)
@@ -268,5 +348,18 @@ describe('isBug', () => {
 
   it('counts any other error as a bug, so it reaches the React error boundary', () => {
     expect(isBug(new RangeError('bug'))).toBe(true)
+  })
+})
+
+describe('contract with the generated API types', () => {
+  // Só compila se os `code` que o front conhece forem exatamente os da spec. Se a API acrescentar ou tirar
+  // um, `npm run api:types` muda `schema.d.ts` e este teste deixa de compilar.
+  it('knows the same field error codes the spec declares', () => {
+    expectTypeOf<KnownFieldErrorCode>().toEqualTypeOf<FieldErrorWire['code']>()
+    expect(new Set(FIELD_ERROR_CODES).size).toBe(FIELD_ERROR_CODES.length)
+  })
+
+  it('names the field the way the spec does, with null instead of absent', () => {
+    expectTypeOf<FieldError['field']>().toEqualTypeOf<NonNullable<FieldErrorWire['field']> | null>()
   })
 })

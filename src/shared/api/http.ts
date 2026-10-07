@@ -11,22 +11,59 @@ export interface ApiRequest {
   readonly ifMatch?: string
 }
 
+/** Os `code` que a spec da API declara para um campo recusado (`FieldError.code`); o teste confere com ela. */
+export const FIELD_ERROR_CODES = [
+  'REQUIRED',
+  'TOO_SHORT',
+  'TOO_LONG',
+  'BELOW_MINIMUM',
+  'ABOVE_MAXIMUM',
+  'INVALID_FORMAT',
+  'UNSUPPORTED_VALUE',
+  'FORBIDDEN_CHARACTER',
+  'SELF_REFERENCE',
+  'UNKNOWN_FIELD',
+  'MALFORMED_BODY',
+] as const
+
+export type KnownFieldErrorCode = (typeof FIELD_ERROR_CODES)[number]
+
+/** A API pode acrescentar `code` à lista: o que este front não conhece chega como `UNRECOGNIZED`. */
+export type FieldErrorCode = KnownFieldErrorCode | 'UNRECOGNIZED'
+
+/** Um campo que a API recusou num 400. `field` é `null` quando o erro é do corpo inteiro. */
+export interface FieldError {
+  readonly field: string | null
+  readonly code: FieldErrorCode
+}
+
+/** O que o ProblemDetail de um erro trouxe, já lido: o que não veio ou veio fora do formato fica vazio. */
+export interface ProblemBody {
+  readonly detail: string | null
+  readonly fieldErrors: readonly FieldError[]
+}
+
+const NO_PROBLEM_BODY: ProblemBody = { detail: null, fieldErrors: [] }
+
 /**
  * Resposta fora de 2xx. `retryAfterSeconds` é `null` quando a API não disse quando tentar de novo.
  * `problemDetail` é o `detail` do ProblemDetail (RFC 9457), em inglês e para o desenvolvedor: nunca vai
- * direto para a tela. `null` quando o corpo não o trouxe.
+ * direto para a tela. `null` quando o corpo não o trouxe. `fieldErrors` é o membro `errors` dos 400 de
+ * validação (ADR 0018 da duora-api): é o que diz qual campo errou e por quê. Vazio quando não veio.
  */
 export class ApiError extends Error {
   readonly status: number
   readonly retryAfterSeconds: number | null
   readonly problemDetail: string | null
+  readonly fieldErrors: readonly FieldError[]
 
-  constructor(status: number, retryAfterSeconds: number | null, problemDetail: string | null = null) {
+  constructor(status: number, retryAfterSeconds: number | null, problem: ProblemBody = NO_PROBLEM_BODY) {
     super(`A API respondeu ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.retryAfterSeconds = retryAfterSeconds
-    this.problemDetail = problemDetail
+    this.problemDetail = problem.detail
+    this.fieldErrors = problem.fieldErrors
   }
 }
 
@@ -63,7 +100,7 @@ export async function sendApiRequest(request: ApiRequest): Promise<Response> {
   })
   if (!response.ok) {
     const retryAfterSeconds = parseRetryAfterSeconds(response.headers.get('Retry-After'))
-    throw new ApiError(response.status, retryAfterSeconds, await readProblemDetail(response))
+    throw new ApiError(response.status, retryAfterSeconds, await readProblemBody(response))
   }
   return response
 }
@@ -112,24 +149,42 @@ function parseRetryAfterSeconds(header: string | null): number | null {
   return Number(header)
 }
 
-const problemDetailSchema = z.object({ detail: z.optional(z.string()) })
+const detailSchema = z.object({ detail: z.optional(z.string()) })
+
+const fieldErrorsSchema = z.object({
+  errors: z.array(z.object({ field: z.optional(z.string()), code: z.string() })),
+})
 
 /**
  * O corpo de erro é informação extra: sem ele, ou fora do formato, o erro continua sendo o status. Por
- * isso aqui corpo inválido vira `null`, e não InvalidResponseError.
+ * isso aqui corpo inválido vira vazio, e não InvalidResponseError. `detail` e `errors` são lidos cada um
+ * por si: um `errors` malformado não leva o `detail` junto.
  */
-async function readProblemDetail(response: Response): Promise<string | null> {
+async function readProblemBody(response: Response): Promise<ProblemBody> {
   let body: unknown
   try {
     body = await response.json()
   } catch (error) {
     if (error instanceof SyntaxError) {
-      return null
+      return NO_PROBLEM_BODY
     }
     throw error
   }
-  const parsed = problemDetailSchema.safeParse(body)
-  return parsed.success ? (parsed.data.detail ?? null) : null
+  const detail = detailSchema.safeParse(body)
+  const errors = fieldErrorsSchema.safeParse(body)
+  return {
+    detail: detail.success ? (detail.data.detail ?? null) : null,
+    fieldErrors: errors.success ? errors.data.errors.map(fieldErrorOf) : [],
+  }
+}
+
+function fieldErrorOf(wire: { readonly field?: string | undefined; readonly code: string }): FieldError {
+  return { field: wire.field ?? null, code: isKnownFieldErrorCode(wire.code) ? wire.code : 'UNRECOGNIZED' }
+}
+
+function isKnownFieldErrorCode(code: string): code is KnownFieldErrorCode {
+  const known: readonly string[] = FIELD_ERROR_CODES
+  return known.includes(code)
 }
 
 /**

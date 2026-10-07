@@ -27,11 +27,14 @@ export function jsonAnswer(body: unknown, status = 200, headers: Readonly<Record
     )
 }
 
-/** Erro no formato ProblemDetail (RFC 9457), como a duora-api responde. */
-export function problemAnswer(status: number, detail?: string): FakeRoute {
+/**
+ * Erro no formato ProblemDetail (RFC 9457), como a duora-api responde. `errors` é o membro dos 400 de
+ * validação de corpo (`ValidationProblemDetail`).
+ */
+export function problemAnswer(status: number, detail?: string, errors?: unknown): FakeRoute {
   return () =>
     Promise.resolve(
-      new Response(JSON.stringify({ title: 'Erro', status, detail }), {
+      new Response(JSON.stringify({ title: 'Erro', status, detail, errors }), {
         status,
         headers: { 'Content-Type': 'application/problem+json' },
       }),

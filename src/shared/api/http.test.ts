@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod/mini'
-import { ApiError, InvalidResponseError, isApiFailure, NetworkError, readJsonBody, sendApiRequest } from './http.ts'
+import {
+  ApiError,
+  InvalidResponseError,
+  isApiFailure,
+  isBug,
+  NetworkError,
+  readJsonBody,
+  sendApiRequest,
+} from './http.ts'
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -96,6 +104,18 @@ describe('sendApiRequest', () => {
     expect(sentHeaders().has('Content-Type')).toBe(false)
   })
 
+  it('sends If-Match when the request carries the version it read', async () => {
+    await sendApiRequest({ method: 'PATCH', path: '/api/me/profile', ifMatch: '"3"', body: {} })
+
+    expect(sentHeaders().get('If-Match')).toBe('"3"')
+  })
+
+  it('sends no If-Match when the request has no version', async () => {
+    await sendApiRequest({ method: 'PATCH', path: '/api/me/profile', body: {} })
+
+    expect(sentHeaders().has('If-Match')).toBe(false)
+  })
+
   it('returns the response when the status is 2xx', async () => {
     const response = new Response(null, { status: 202 })
     fetchMock.mockResolvedValue(response)
@@ -131,6 +151,28 @@ describe('sendApiRequest', () => {
     },
   )
 
+  it('keeps the detail of a ProblemDetail error body', async () => {
+    fetchMock.mockResolvedValue(problemResponse(400, '{"title":"Bad Request","status":400,"detail":"bio is too long"}'))
+
+    const error = await sendApiRequest({ method: 'PATCH', path: '/api/me/profile' }).catch((e: unknown) => e)
+
+    expect(error).toMatchObject({ status: 400, problemDetail: 'bio is too long' })
+  })
+
+  it.each([
+    ['without a body', null],
+    ['with a body that is not JSON', '<html>erro</html>'],
+    ['without a detail', '{"title":"Bad Request","status":400}'],
+    ['with a detail that is not text', '{"title":"Bad Request","status":400,"detail":42}'],
+  ])('has no detail for an error %s', async (_case, body) => {
+    fetchMock.mockResolvedValue(problemResponse(400, body))
+
+    const error = await sendApiRequest({ method: 'PATCH', path: '/api/me/profile' }).catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error).toMatchObject({ status: 400, problemDetail: null })
+  })
+
   it('turns a fetch rejection into a NetworkError that keeps the cause', async () => {
     const failure = new TypeError('Failed to fetch')
     fetchMock.mockRejectedValue(failure)
@@ -156,6 +198,10 @@ describe('sendApiRequest', () => {
     await expect(sendApiRequest({ method: 'GET', path: '/api/things' })).rejects.toBeInstanceOf(TypeError)
   })
 })
+
+function problemResponse(status: number, body: string | null): Response {
+  return new Response(body, { status, headers: { 'Content-Type': 'application/problem+json' } })
+}
 
 const greetingSchema = z.object({ greeting: z.string() })
 
@@ -212,5 +258,15 @@ describe('isApiFailure', () => {
     ['something that is not an error', 'oops'],
   ])('does not count %s, so it is not hidden as a failed call', (_case, error) => {
     expect(isApiFailure(error)).toBe(false)
+  })
+})
+
+describe('isBug', () => {
+  it('does not count a failed API call as a bug, so it becomes a state on the screen', () => {
+    expect(isBug(new ApiError(503, null))).toBe(false)
+  })
+
+  it('counts any other error as a bug, so it reaches the React error boundary', () => {
+    expect(isBug(new RangeError('bug'))).toBe(true)
   })
 })

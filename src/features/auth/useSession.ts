@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { isApiFailure } from '../../shared/api/http.ts'
+import { isBug } from '../../shared/api/http.ts'
 import { navigateTo } from '../../shared/browser/navigateTo.ts'
 import { fetchSession, logOut, type Session } from './session.ts'
 
@@ -11,11 +11,6 @@ export type SessionState =
 export type LogoutState = 'idle' | 'loggingOut' | 'failed'
 
 const SESSION_QUERY_KEY = ['session'] as const
-
-/** Falha esperada vira estado na tela; bug sobe para o React e não se disfarça de "API fora do ar". */
-function isBug(error: Error): boolean {
-  return !isApiFailure(error)
-}
 
 /**
  * A sessão de quem visita, compartilhada por todos os componentes que a leem. Sem retry automático: a

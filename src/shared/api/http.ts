@@ -1,4 +1,4 @@
-import type { z } from 'zod/mini'
+import { z } from 'zod/mini'
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
@@ -7,18 +7,26 @@ export interface ApiRequest {
   /** Caminho na mesma origem, como `/api/waitlist`: a sessão vai no cookie, nunca para outro site. */
   readonly path: string
   readonly body?: unknown
+  /** O ETag da última leitura, para a API recusar com 412 uma edição sobre versão desatualizada. */
+  readonly ifMatch?: string
 }
 
-/** Resposta fora de 2xx. `retryAfterSeconds` é `null` quando a API não disse quando tentar de novo. */
+/**
+ * Resposta fora de 2xx. `retryAfterSeconds` é `null` quando a API não disse quando tentar de novo.
+ * `problemDetail` é o `detail` do ProblemDetail (RFC 9457), em inglês e para o desenvolvedor: nunca vai
+ * direto para a tela. `null` quando o corpo não o trouxe.
+ */
 export class ApiError extends Error {
   readonly status: number
   readonly retryAfterSeconds: number | null
+  readonly problemDetail: string | null
 
-  constructor(status: number, retryAfterSeconds: number | null) {
+  constructor(status: number, retryAfterSeconds: number | null, problemDetail: string | null = null) {
     super(`A API respondeu ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.retryAfterSeconds = retryAfterSeconds
+    this.problemDetail = problemDetail
   }
 }
 
@@ -54,7 +62,8 @@ export async function sendApiRequest(request: ApiRequest): Promise<Response> {
     credentials: 'same-origin',
   })
   if (!response.ok) {
-    throw new ApiError(response.status, parseRetryAfterSeconds(response.headers.get('Retry-After')))
+    const retryAfterSeconds = parseRetryAfterSeconds(response.headers.get('Retry-After'))
+    throw new ApiError(response.status, retryAfterSeconds, await readProblemDetail(response))
   }
   return response
 }
@@ -79,6 +88,9 @@ function headersFor(request: ApiRequest): Headers {
   if (request.body !== undefined) {
     headers.set('Content-Type', 'application/json')
   }
+  if (request.ifMatch !== undefined) {
+    headers.set('If-Match', request.ifMatch)
+  }
   const csrfToken = SAFE_METHODS.has(request.method) ? null : readCookie(CSRF_COOKIE)
   if (csrfToken !== null) {
     headers.set(CSRF_HEADER, csrfToken)
@@ -98,6 +110,26 @@ function parseRetryAfterSeconds(header: string | null): number | null {
     return null
   }
   return Number(header)
+}
+
+const problemDetailSchema = z.object({ detail: z.optional(z.string()) })
+
+/**
+ * O corpo de erro é informação extra: sem ele, ou fora do formato, o erro continua sendo o status. Por
+ * isso aqui corpo inválido vira `null`, e não InvalidResponseError.
+ */
+async function readProblemDetail(response: Response): Promise<string | null> {
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return null
+    }
+    throw error
+  }
+  const parsed = problemDetailSchema.safeParse(body)
+  return parsed.success ? (parsed.data.detail ?? null) : null
 }
 
 /**
@@ -127,4 +159,9 @@ export async function readJsonBody<T>(response: Response, schema: z.ZodMiniType<
  */
 export function isApiFailure(error: unknown): boolean {
   return error instanceof ApiError || error instanceof NetworkError || error instanceof InvalidResponseError
+}
+
+/** Para o `throwOnError` do TanStack Query: falha esperada vira estado na tela; bug sobe para o React. */
+export function isBug(error: Error): boolean {
+  return !isApiFailure(error)
 }

@@ -1,3 +1,5 @@
+import { AppLink } from '../../shared/routing/AppLink.tsx'
+import { PATHS } from '../../shared/routing/routes.ts'
 import { LOGIN_URL } from './loginUrl.ts'
 import type { CurrentUser } from './session.ts'
 import { useLogout, useSession } from './useSession.ts'
@@ -52,6 +54,26 @@ export function HeaderGreeting() {
     return null
   }
   return <UserGreeting user={session.user} className="ml-auto max-w-40 truncate text-sm text-fg-muted" />
+}
+
+interface ProfileLinkProps {
+  readonly label: string
+  readonly className: string
+  /** Se a página aberta é o perfil ou uma página dele, como as contas bloqueadas. */
+  readonly isCurrent: boolean
+}
+
+/** Link para "Meu perfil", só para quem entrou. */
+export function ProfileLink({ label, className, isCurrent }: ProfileLinkProps) {
+  const session = useSession()
+  if (session.kind !== 'authenticated') {
+    return null
+  }
+  return (
+    <AppLink to={PATHS.profile} className={className} aria-current={isCurrent ? 'page' : undefined}>
+      {label}
+    </AppLink>
+  )
 }
 
 interface SessionTabProps {

@@ -8,3 +8,6 @@ import type { components } from './schema.ts'
 export type CurrentUserResponse = components['schemas']['CurrentUserResponse']
 export type JoinWaitlistRequest = components['schemas']['JoinWaitlistRequest']
 export type LogoutResponse = components['schemas']['LogoutResponse']
+export type ProfileResponse = components['schemas']['ProfileResponse']
+export type EditProfileRequest = components['schemas']['EditProfileRequest']
+export type BlockedAccountsResponse = components['schemas']['BlockedAccountsResponse']

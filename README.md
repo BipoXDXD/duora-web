@@ -8,7 +8,7 @@ React 19, TypeScript 6 (`strict`), Vite 8 e Tailwind CSS 4. O backend é a
 
 O projeto está no início. Por enquanto ele tem os dois layouts, a identidade visual "Mesa posta" (tokens,
 dois temas e contraste testado), o cliente HTTP compatível com o login da API, o estado de sessão (entrar e
-sair) e a landing com a primeira feature, a inscrição na **lista de espera**.
+sair), a landing com a inscrição na **lista de espera**, e as telas de **Meu perfil** e **Contas bloqueadas**.
 
 ## Pré-requisitos
 
@@ -65,6 +65,50 @@ Firefox, que tratam `localhost` como contexto seguro. O Safari não aceita: use 
   usa `as` sobre `res.json()`. Falhas esperadas viram estado na tela: `ApiError` (status), `NetworkError` (o `fetch`
   rejeitou, encapsulado só em `sendApiRequest`) e `InvalidResponseError` (corpo fora do contrato). Qualquer outro
   erro, inclusive um `TypeError` do nosso código, é tratado como bug e sobe para o React.
+
+## Páginas e navegação
+
+| Caminho | Página | Quem vê |
+|---|---|---|
+| `/` | Landing e lista de espera | Todos |
+| `/perfil` | Meu perfil: ver e editar | Quem entrou |
+| `/perfil/bloqueios` | Contas bloqueadas: listar e desbloquear | Quem entrou |
+| outro | Página não encontrada | Todos |
+
+O roteamento é um módulo pequeno em `src/shared/routing/`, sem biblioteca: `routeOf` transforma o caminho numa
+união de rotas, `usePathname` o lê com `useSyncExternalStore` (como o `useIsDesktop` lê o `matchMedia`) e o
+`AppLink` troca de página com `pushState`, sem recarregar. O `AppLink` é um `<a>` de verdade, então Ctrl/Cmd+clique
+e o botão do meio abrem nova aba. Ao abrir uma página, o título (`h1`) recebe o foco, para o leitor de tela
+perceber a troca. Se as rotas passarem a precisar de parâmetros, loaders ou aninhamento, vale trocar por uma
+biblioteca de roteamento.
+
+O link para o perfil só aparece para quem entrou: "Meu perfil" no cabeçalho do desktop e a aba "Perfil" na barra
+inferior do celular. As páginas do perfil mostram "Entre para ver…" a quem não entrou, sem chamar a API.
+
+Em produção, o servidor de arquivos estáticos precisa devolver o `index.html` para `/perfil` e
+`/perfil/bloqueios` (SPA fallback), para o recarregar e o link direto funcionarem. O `vite dev` e o `vite
+preview` já fazem isso.
+
+### Meu perfil
+
+- `GET /api/me/profile` traz o perfil e o `ETag`; os dois ficam juntos no cache do TanStack Query.
+- O formulário confere as regras da API antes de enviar (nome de 1 a 50 caracteres, apresentação até 300, data de
+  nascimento de maior de 18 e no máximo 120 anos, informada uma vez só) e manda no `PATCH` só os campos que
+  mudaram, com `If-Match`. Campo apagado vira `null`; a data de nascimento já informada aparece como texto.
+- **412** (o perfil mudou em outra aba ou aparelho): o front lê o perfil de novo, mantém os campos que a pessoa
+  editou, mostra a versão nova dos outros e pede para conferir e salvar de novo. **409** faz o mesmo, explicando
+  que a data de nascimento já tinha sido informada.
+- **400**: a mensagem vai para o campo que a API citou no começo do `detail` do ProblemDetail ("bio must…"). Isso
+  não está na spec; se o `detail` não citar um campo, o erro aparece no formulário inteiro.
+- **401** pede para entrar de novo; falha de rede ou 5xx mantém o que foi digitado e oferece tentar de novo.
+
+### Contas bloqueadas
+
+- `GET /api/me/blocked-accounts` paginado por cursor, com "Carregar mais" até `nextPageToken` ser `null`.
+- "Desbloquear" pede confirmação na própria linha ("Sim, desbloquear" ou "Cancelar") e chama
+  `POST /api/accounts/{id}:unblock`. A conta sai das páginas em cache, sem recarregar a lista.
+- A API não manda o nome de quem foi bloqueado, só o id e a data. Cada linha mostra a data e os últimos 8
+  caracteres do id (a parte aleatória do UUIDv7).
 
 ## Duas interfaces: desktop e smartphone
 
@@ -194,7 +238,8 @@ Comite a spec e o `schema.d.ts` juntos. O `openapi-typescript` declara suporte s
 ## Testes
 
 Vitest com jsdom e Testing Library. Os testes trocam o `fetch` global por um stub (`vi.stubGlobal`, ou
-`stubApi` em `src/test/fakeApi.ts`, que responde por caminho) e verificam o que vai para a API (caminho,
+`stubApi` em `src/test/fakeApi.ts`, que responde por caminho, e com `byMethod` e `inSequence` por método e em
+sequência) e verificam o que vai para a API (caminho,
 método, corpo, header CSRF) e o que a tela mostra para cada resposta: 202, 400, 429 com e sem `Retry-After`,
 401 (visitante anônimo), erro do servidor, corpo fora do contrato e falha de rede. A navegação de página
 inteira (`src/shared/browser/navigateTo.ts`) é trocada por um dublê nos testes de componente, porque o jsdom
@@ -209,14 +254,17 @@ src/
   app/                 casca: App, os dois layouts, o breakpoint, a página inicial e o tema
     theme/             escolha de tema (data-theme + localStorage) e o botão
   features/
-    auth/              sessão (GET /api/me), logout, URL de login e os controles dos cabeçalhos
+    auth/              sessão (GET /api/me), logout, URL de login, os controles dos cabeçalhos e o RequireSession
+    blocks/            contas bloqueadas: listagem paginada e desbloqueio
+    profile/           meu perfil: leitura e edição com ETag, regras do formulário e as telas
     landing/           seções da landing: hero com a frase interativa, como funciona, minijogo, segurança, FAQ
     waitlist/          chamada a POST /api/waitlist e o formulário de inscrição
   shared/
     api/               cliente HTTP (mesma origem, CSRF, ApiError, corpo validado por schema) e tipos gerados da spec
     browser/           navegação de página inteira
     brand/             logo em SVG
-    ui/                imagem de fundo decorativa (BackdropImage)
+    routing/           rotas, caminho atual e AppLink (pushState)
+    ui/                moldura das páginas, classes dos controles, falha de leitura e imagem de fundo
   test/                setup do Vitest, fakes e leitor dos tokens do tema
   index.css            tokens visuais e estilos base (foco, movimento reduzido, grão, gradiente)
 api/                   cópia versionada da spec OpenAPI da duora-api (fonte dos tipos gerados)
@@ -236,3 +284,7 @@ gerados da spec, testes com cobertura e build. Também roda o gitleaks sobre tod
 
 - A cópia da spec em `api/openapi.json` é atualizada à mão; o CI não a compara com a da duora-api, que é um
   repositório privado. Quando o contrato mudar na API, rode a atualização acima.
+- O SPA fallback (`index.html` para `/perfil` e `/perfil/bloqueios`) precisa existir onde o front for publicado.
+- O campo do 400 do perfil vem do texto do `detail`; um campo estruturado no ProblemDetail (por exemplo
+  `field` ou uma lista `errors`) na spec da API tornaria isso um contrato.
+- A lista de bloqueios não tem o nome nem a foto de quem foi bloqueado, porque a API não os manda.

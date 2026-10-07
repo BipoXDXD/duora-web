@@ -34,6 +34,12 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Os tipos da API são gerados de api/openapi.json; o arquivo commitado tem de ser o que o gerador produz.
+      - name: Tipos da API sem drift
+        run: |
+          npm run api:types
+          git diff --exit-code -- src/shared/api/schema.d.ts
+
       # O Vite só transpila; a checagem de tipos é um passo próprio.
       - name: Tipos
         run: npm run typecheck

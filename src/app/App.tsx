@@ -32,13 +32,16 @@ function Shell() {
 }
 
 function Page({ route }: { readonly route: Route }) {
-  switch (route) {
+  switch (route.page) {
     case 'home':
       return <HomePage />
     case 'profile':
       return <ProfilePage />
     case 'blockedAccounts':
       return <BlockedAccountsPage />
+    case 'events':
+    case 'event':
+    case 'registrations':
     case 'notFound':
       return <NotFoundPage />
   }

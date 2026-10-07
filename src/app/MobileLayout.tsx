@@ -30,7 +30,7 @@ export function MobileLayout({ route, children }: MobileLayoutProps) {
         aria-label="Atalhos"
         className="sticky bottom-0 z-10 flex gap-2 border-t border-divider bg-surface px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
       >
-        <AppLink to={PATHS.home} className={TAB_CLASS} aria-current={route === 'home' ? 'page' : undefined}>
+        <AppLink to={PATHS.home} className={TAB_CLASS} aria-current={route.page === 'home' ? 'page' : undefined}>
           Início
         </AppLink>
         <ProfileLink label="Perfil" className={TAB_CLASS} isCurrent={isProfileRoute(route)} />

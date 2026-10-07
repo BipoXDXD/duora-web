@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
+import type { CurrentUserResponse } from '../../shared/api/contract.ts'
 import { ApiError, InvalidResponseError, NetworkError } from '../../shared/api/http.ts'
-import { fetchSession, logOut } from './session.ts'
+import { type CurrentUserWire, fetchSession, logOut } from './session.ts'
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -139,5 +140,14 @@ describe('logOut', () => {
     fetchMock.mockResolvedValue(json('{}'))
 
     await expect(logOut()).rejects.toBeInstanceOf(InvalidResponseError)
+  })
+})
+
+describe('contract with the generated API types', () => {
+  // Só compila se o schema ler exatamente os campos que o tipo gerado da spec manda para o front. Se a spec
+  // renomear, tornar opcional ou mudar o tipo de `displayName`, `npm run api:types` muda `schema.d.ts` e este
+  // teste deixa de compilar, em vez de o parse falhar só em runtime.
+  it('reads displayName the way the spec declares it', () => {
+    expectTypeOf<CurrentUserWire>().toEqualTypeOf<Pick<CurrentUserResponse, 'displayName'>>()
   })
 })

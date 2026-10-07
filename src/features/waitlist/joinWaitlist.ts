@@ -1,3 +1,4 @@
+import type { JoinWaitlistRequest } from '../../shared/api/contract.ts'
 import { ApiError, NetworkError, sendApiRequest } from '../../shared/api/http.ts'
 
 /** A API responde igual para e-mail novo ou repetido, então não existe um resultado "já inscrito". */
@@ -11,8 +12,9 @@ const BAD_REQUEST = 400
 const TOO_MANY_REQUESTS = 429
 
 export async function joinWaitlist(email: string): Promise<JoinWaitlistResult> {
+  const body: JoinWaitlistRequest = { email }
   try {
-    await sendApiRequest({ method: 'POST', path: '/api/waitlist', body: { email } })
+    await sendApiRequest({ method: 'POST', path: '/api/waitlist', body })
     return { kind: 'joined' }
   } catch (error) {
     if (error instanceof ApiError) {

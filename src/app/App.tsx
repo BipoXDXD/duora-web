@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
+import { BlockedAccountsPage } from '../features/blocks/BlockedAccountsPage.tsx'
 import { ProfilePage } from '../features/profile/ProfilePage.tsx'
 import { usePathname } from '../shared/routing/history.ts'
 import { routeOf, type Route } from '../shared/routing/routes.ts'
@@ -37,6 +38,7 @@ function Page({ route }: { readonly route: Route }) {
     case 'profile':
       return <ProfilePage />
     case 'blockedAccounts':
+      return <BlockedAccountsPage />
     case 'notFound':
       return <NotFoundPage />
   }

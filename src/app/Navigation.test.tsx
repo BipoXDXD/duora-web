@@ -6,7 +6,7 @@ import { stubMatchMedia } from '../test/fakeMatchMedia.ts'
 import { App } from './App.tsx'
 
 const SESSION = { '/api/me': jsonAnswer({ displayName: 'Ana Souza', profileComplete: true }) }
-const PAGES = { '/api/me/profile': neverAnswer() }
+const PAGES = { '/api/me/profile': neverAnswer(), '/api/me/blocked-accounts': neverAnswer() }
 
 afterEach(() => {
   window.history.replaceState(null, '', '/')
@@ -34,11 +34,29 @@ describe.each([
     expect(within(navigation).getByRole('link', { name: profileLinkName })).toHaveAttribute('aria-current', 'page')
   })
 
+  it('marks the profile as the current page also on the blocked accounts', async () => {
+    const { navigation } = renderAt('/perfil/bloqueios')
+
+    expect(await within(navigation).findByRole('link', { name: profileLinkName })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+  })
+
   it('offers no profile link to a visitor who is not logged in', async () => {
     const { navigation } = renderAt('/', ANONYMOUS_SESSION)
 
     await screen.findAllByRole('link', { name: 'Entrar' })
     expect(within(navigation).queryByRole('link', { name: profileLinkName })).not.toBeInTheDocument()
+  })
+
+  it('goes from the profile to the blocked accounts', async () => {
+    const { user } = renderAt('/perfil')
+
+    await user.click(await screen.findByRole('link', { name: 'Contas bloqueadas' }))
+
+    expect(window.location.pathname).toBe('/perfil/bloqueios')
+    expect(screen.getByRole('heading', { level: 1, name: 'Contas bloqueadas' })).toBeInTheDocument()
   })
 
   it('shows a not found page for an unknown address, with the way back home', async () => {

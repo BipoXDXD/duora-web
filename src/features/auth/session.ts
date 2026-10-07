@@ -17,13 +17,16 @@ const currentUserSchema = z.object({
 })
 
 /**
- * Corpo de POST /logout. Essa rota é do Spring Security e não está na spec, então aqui o schema é a fonte
- * do contrato. Só HTTPS: o front navega para essa URL, então `javascript:` nunca passa.
+ * Corpo de POST /logout (LogoutResponse da duora-api). Além do que a spec diz, só aceita HTTPS: o front
+ * navega para essa URL, então `javascript:` nunca passa. `session.test.ts` confere o campo contra o tipo gerado.
  */
 const logoutResponseSchema = z.object({ logoutUrl: z.url({ protocol: /^https$/ }) })
 
 /** O que o schema aceita da API (antes de normalizar o nome); o teste compara com o tipo gerado da spec. */
 export type CurrentUserWire = z.input<typeof currentUserSchema>
+
+/** O que o schema aceita do logout; o teste compara com o tipo gerado da spec. */
+export type LogoutResponseWire = z.input<typeof logoutResponseSchema>
 
 export type CurrentUser = Readonly<z.output<typeof currentUserSchema>>
 

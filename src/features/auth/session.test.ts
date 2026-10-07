@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
-import type { CurrentUserResponse } from '../../shared/api/contract.ts'
+import type { CurrentUserResponse, LogoutResponse } from '../../shared/api/contract.ts'
 import { ApiError, InvalidResponseError, NetworkError } from '../../shared/api/http.ts'
-import { type CurrentUserWire, fetchSession, logOut } from './session.ts'
+import { type CurrentUserWire, fetchSession, type LogoutResponseWire, logOut } from './session.ts'
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -149,5 +149,9 @@ describe('contract with the generated API types', () => {
   // teste deixa de compilar, em vez de o parse falhar só em runtime.
   it('reads displayName the way the spec declares it', () => {
     expectTypeOf<CurrentUserWire>().toEqualTypeOf<Pick<CurrentUserResponse, 'displayName'>>()
+  })
+
+  it('reads logoutUrl the way the spec declares it', () => {
+    expectTypeOf<LogoutResponseWire>().toEqualTypeOf<LogoutResponse>()
   })
 })

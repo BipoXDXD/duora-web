@@ -159,10 +159,37 @@ navegador o contraste do texto sobre ela com o véu aplicado (a ADR descreve com
 | `npm run build` | Checa tipos e gera o build de produção em `dist/` |
 | `npm run preview` | Serve o build localmente |
 | `npm run lint` | oxlint; avisos também falham |
+| `npm run api:types` | Gera `src/shared/api/schema.d.ts` a partir de `api/openapi.json` (veja [Tipos da API](#tipos-da-api)) |
 | `npm run typecheck` | `tsc -b`, separado do build porque o Vite só transpila |
 | `npm test` | Testes com Vitest |
 | `npm run test:watch` | Testes em modo watch |
 | `npm run coverage` | Testes com cobertura (relatório em `coverage/`) |
+
+## Tipos da API
+
+Os tipos dos DTOs vêm da spec OpenAPI da duora-api, nunca escritos à mão:
+
+- `api/openapi.json` é uma cópia versionada da spec (`docs/openapi.json` da duora-api). Ela deixa a geração
+  reproduzível e sem rede, e a mudança de contrato aparece no diff do PR.
+- `npm run api:types` roda o `openapi-typescript` e escreve `src/shared/api/schema.d.ts`. Não edite esse
+  arquivo; o CI regenera e falha se ele divergir do que está no commit.
+- `src/shared/api/contract.ts` dá nomes curtos aos DTOs usados (`CurrentUserResponse`,
+  `JoinWaitlistRequest`). O corpo enviado ao `POST /api/waitlist` é tipado com `JoinWaitlistRequest`.
+- A validação em runtime continua em Zod (`readJsonBody`), porque o tipo não valida nada. O schema de
+  `GET /api/me` lê só os campos que o front usa, e um teste de tipo (`expectTypeOf` em `session.test.ts`)
+  falha na compilação se eles deixarem de bater com o tipo gerado. `POST /logout` é uma rota do Spring Security
+  que não está na spec, então o schema Zod dela é a única fonte.
+
+Para atualizar quando a API mudar o contrato (o repositório da API é privado, então use o `gh`):
+
+```bash
+gh api repos/BipoXDXD/duora-api/contents/docs/openapi.json -H 'Accept: application/vnd.github.raw' > api/openapi.json
+npm run api:types
+npm run typecheck
+```
+
+Comite a spec e o `schema.d.ts` juntos. O `openapi-typescript` declara suporte só ao TypeScript 5; um
+`overrides` no `package.json` o deixa usar o TypeScript 6 do projeto.
 
 ## Testes
 
@@ -186,12 +213,13 @@ src/
     landing/           seções da landing: hero com a frase interativa, como funciona, minijogo, segurança, FAQ
     waitlist/          chamada a POST /api/waitlist e o formulário de inscrição
   shared/
-    api/               cliente HTTP (mesma origem, CSRF, ApiError, corpo validado por schema)
+    api/               cliente HTTP (mesma origem, CSRF, ApiError, corpo validado por schema) e tipos gerados da spec
     browser/           navegação de página inteira
     brand/             logo em SVG
     ui/                imagem de fundo decorativa (BackdropImage)
   test/                setup do Vitest, fakes e leitor dos tokens do tema
   index.css            tokens visuais e estilos base (foco, movimento reduzido, grão, gradiente)
+api/                   cópia versionada da spec OpenAPI da duora-api (fonte dos tipos gerados)
 docs/
   adr/                 decisões do front (0001: identidade visual)
   design-research.md   pesquisa de referências e as três direções
@@ -201,11 +229,11 @@ O código fica organizado por feature, como os módulos da duora-api.
 
 ## CI
 
-O GitHub Actions (`.github/workflows/ci.yml`) roda lint, checagem de tipos, testes com cobertura
-e build. Também roda o gitleaks sobre todo o histórico. As actions ficam fixadas por SHA.
+O GitHub Actions (`.github/workflows/ci.yml`) roda lint, checagem de tipos, a checagem de drift dos tipos
+gerados da spec, testes com cobertura e build. Também roda o gitleaks sobre todo o histórico. As actions ficam fixadas por SHA.
 
 ## Pendências
 
-- Os tipos de `GET /api/me` e `POST /logout` estão escritos à mão em Zod, a partir dos testes da duora-api.
-  Quando a API publicar a spec OpenAPI, os tipos e schemas passam a ser gerados dela.
-- O app ainda não tem um error boundary: um bug que sobe para o React desmonta a página inteira.
+- A cópia da spec em `api/openapi.json` é atualizada à mão; o CI não a compara com a da duora-api, que é um
+  repositório privado. Quando o contrato mudar na API, rode a atualização acima.
+- `POST /logout` não está na spec da API; se ela passar a documentá-lo, o schema Zod dele cede lugar ao tipo gerado.

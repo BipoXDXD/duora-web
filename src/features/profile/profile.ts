@@ -5,13 +5,18 @@ import { ApiError, InvalidResponseError, isApiFailure, readJsonBody, sendApiRequ
 const PROFILE_PATH = '/api/me/profile'
 
 /** Estados e Distrito Federal pelo código ISO 3166-2, como a API os aceita; o teste confere com a spec. */
-const REGION_CODES = [
+export const REGION_CODES = [
   'BR-AC', 'BR-AL', 'BR-AP', 'BR-AM', 'BR-BA', 'BR-CE', 'BR-DF', 'BR-ES', 'BR-GO', 'BR-MA', 'BR-MT', 'BR-MS', 'BR-MG',
   'BR-PA', 'BR-PB', 'BR-PR', 'BR-PE', 'BR-PI', 'BR-RJ', 'BR-RN', 'BR-RS', 'BR-RO', 'BR-RR', 'BR-SC', 'BR-SP', 'BR-SE',
   'BR-TO',
 ] as const
 
 export type Region = (typeof REGION_CODES)[number]
+
+export function isRegion(value: string): value is Region {
+  const codes: readonly string[] = REGION_CODES
+  return codes.includes(value)
+}
 
 /** O nome de cada região, para a tela; o Record falha na compilação se faltar uma. */
 export const REGION_NAMES: Readonly<Record<Region, string>> = {

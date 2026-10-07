@@ -21,3 +21,8 @@ export function routeOf(pathname: string): Route {
   const path = pathname.replace(TRAILING_SLASH, '')
   return PAGE_ROUTES.find((route) => PATHS[route] === path) ?? 'notFound'
 }
+
+/** O perfil e as páginas dentro dele, para a navegação marcar "Meu perfil" como a página atual. */
+export function isProfileRoute(route: Route): boolean {
+  return route === 'profile' || route === 'blockedAccounts'
+}

@@ -44,6 +44,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cria um evento em rascunho
+         * @description O rascunho só aparece para o ADMIN até ser publicado. Sem Idempotency-Key: repetir a criação gera outro rascunho, que o ADMIN cancela (docs/adr/0016).
+         */
+        post: operations["createEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/events/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lê um evento, inclusive rascunho
+         * @description Traz o estado guardado e quantas pessoas se inscreveram, nunca quem.
+         */
+        get: operations["getAdminEvent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/events/{id}:cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancela um evento
+         * @description Vale para rascunho ou publicado que ainda não acabou, inclusive em andamento. O evento continua visível, para quem se inscreveu saber, e não aceita inscrições. Repetir responde 409 sem mudar nada.
+         */
+        post: operations["cancelEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/events/{id}:publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publica um rascunho
+         * @description O evento passa a aparecer para quem está logado e aceita inscrições. Só vale para rascunho que ainda não começou; repetir responde 409 sem mudar nada.
+         */
+        post: operations["publishEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/waitlist/stats": {
         parameters: {
             query?: never;
@@ -56,6 +136,74 @@ export interface paths {
          * @description Só ADMIN.
          */
         get: operations["getWaitlistStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lista os eventos que ainda vão começar
+         * @description Só os publicados, do início mais próximo ao mais distante, paginados por cursor. A última página vem com nextPageToken null.
+         */
+        get: operations["listUpcomingEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/registration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lê a própria inscrição no evento
+         * @description Só a de quem chama: não há como ler a inscrição de outra pessoa. Sem inscrição, 404, exista o evento ou não.
+         */
+        get: operations["getMyRegistration"];
+        /**
+         * Inscreve quem chama no evento
+         * @description Sem corpo. Idempotente pela chave evento + conta: repetir devolve a mesma inscrição, com a mesma data, por isso dispensa If-Match e Idempotency-Key (docs/adr/0016). Exige perfil completo e 18 anos.
+         */
+        put: operations["registerForEvent"];
+        post?: never;
+        /**
+         * Cancela a própria inscrição no evento
+         * @description Idempotente: sem inscrição, também responde 204. Só até o evento começar.
+         */
+        delete: operations["cancelMyRegistration"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lê um evento publicado ou cancelado
+         * @description Sem capacidade, contagem nem inscritos. Um rascunho responde como um id que não existe.
+         */
+        get: operations["getEvent"];
         put?: never;
         post?: never;
         delete?: never;
@@ -128,6 +276,26 @@ export interface paths {
         patch: operations["editMyProfile"];
         trace?: never;
     };
+    "/api/me/registrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lista as próprias inscrições
+         * @description Em eventos que ainda não acabaram, inclusive cancelados e em andamento, do início mais próximo ao mais distante, paginadas por cursor. A última página vem com nextPageToken null.
+         */
+        get: operations["listMyRegistrations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reports": {
         parameters: {
             query?: never;
@@ -188,10 +356,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Encerra a sessão
+         * @description Encerra a sessão web aqui, apagando-a do servidor, e devolve a URL de logout do Entra, para o front navegar até ela e sair também de lá. Exige o token CSRF no header X-XSRF-TOKEN. Sem sessão ativa a resposta é a mesma. A URL leva só client_id e post_logout_redirect_uri, nunca o ID token.
+         */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AdminEventResponse: {
+            /**
+             * Format: int32
+             * @description Quantas pessoas podem se inscrever
+             */
+            capacity: number;
+            /** @description Descrição curta, em parágrafos */
+            description: string;
+            /**
+             * Format: date-time
+             * @description Fim, em UTC; o evento já acabou neste instante
+             */
+            endsAt: string;
+            /**
+             * Format: uuid
+             * @description Id do evento
+             */
+            id: string;
+            /**
+             * Format: int64
+             * @description Quantas pessoas se inscreveram
+             */
+            registrationCount: number;
+            /**
+             * Format: date-time
+             * @description Início, em UTC; o evento começou neste instante
+             */
+            startsAt: string;
+            /**
+             * @description Estado guardado: rascunho, publicado ou cancelado
+             * @enum {string}
+             */
+            status: "DRAFT" | "PUBLISHED" | "CANCELLED";
+            /** @description Título, em uma linha */
+            title: string;
+        };
         BlockedAccount: {
             /**
              * Format: uuid
@@ -209,6 +433,27 @@ export interface components {
             items: components["schemas"]["BlockedAccount"][];
             /** @description Token da próxima página, ou null na última */
             nextPageToken: string | null;
+        };
+        CreateEventRequest: {
+            /**
+             * Format: int32
+             * @description Quantas pessoas podem se inscrever
+             */
+            capacity: number;
+            /** @description Descrição curta em parágrafos, sem caracteres invisíveis */
+            description: string;
+            /**
+             * Format: date-time
+             * @description Fim, ISO 8601 com fuso; depois do início e no máximo 12 horas após ele
+             */
+            endsAt: string;
+            /**
+             * Format: date-time
+             * @description Início, ISO 8601 com fuso (Z ou -03:00); no futuro e até 365 dias à frente
+             */
+            startsAt: string;
+            /** @description Título em uma linha, sem caracteres invisíveis; espaços nas pontas são removidos */
+            title: string;
         };
         CurrentUserResponse: {
             /** @description Nome de exibição no Entra, ou null se o usuário não tiver nome */
@@ -233,6 +478,32 @@ export interface components {
              */
             region?: "BR-AC" | "BR-AL" | "BR-AP" | "BR-AM" | "BR-BA" | "BR-CE" | "BR-DF" | "BR-ES" | "BR-GO" | "BR-MA" | "BR-MT" | "BR-MS" | "BR-MG" | "BR-PA" | "BR-PB" | "BR-PR" | "BR-PE" | "BR-PI" | "BR-RJ" | "BR-RN" | "BR-RS" | "BR-RO" | "BR-RR" | "BR-SC" | "BR-SP" | "BR-SE" | "BR-TO" | null;
         };
+        EventResponse: {
+            /** @description Descrição curta, em parágrafos */
+            description: string;
+            /**
+             * Format: date-time
+             * @description Fim, em UTC; o evento já acabou neste instante
+             */
+            endsAt: string;
+            /**
+             * Format: uuid
+             * @description Id do evento
+             */
+            id: string;
+            /**
+             * Format: date-time
+             * @description Início, em UTC; o evento começou neste instante
+             */
+            startsAt: string;
+            /**
+             * @description Publicado ou cancelado; em andamento e encerrado se leem dos horários
+             * @enum {string}
+             */
+            status: "PUBLISHED" | "CANCELLED";
+            /** @description Título, em uma linha */
+            title: string;
+        };
         FileReportRequest: {
             /** @description Relato livre em parágrafos, sem caracteres invisíveis; obrigatório com o motivo OTHER. Vazio ou só com espaços conta como ausente. */
             description?: string | null;
@@ -254,6 +525,54 @@ export interface components {
              * @example ana@example.com
              */
             email: string;
+        };
+        LogoutResponse: {
+            /**
+             * Format: uri
+             * @description URL de logout do Entra; o front navega até ela depois do 200
+             */
+            logoutUrl: string;
+        };
+        MyRegistrationResponse: {
+            /**
+             * Format: date-time
+             * @description Fim do evento, em UTC
+             */
+            endsAt: string;
+            /**
+             * Format: uuid
+             * @description Id do evento
+             */
+            eventId: string;
+            /**
+             * @description Estado do evento: um cancelado continua na lista, para a pessoa saber
+             * @enum {string}
+             */
+            eventStatus: "PUBLISHED" | "CANCELLED";
+            /**
+             * Format: date-time
+             * @description Quando a inscrição foi feita
+             */
+            registeredAt: string;
+            /**
+             * Format: date-time
+             * @description Início do evento, em UTC
+             */
+            startsAt: string;
+            /** @description Título do evento */
+            title: string;
+        };
+        PageResponseEventResponse: {
+            /** @description Itens da página, pelo início do evento */
+            items: components["schemas"]["EventResponse"][];
+            /** @description Token da próxima página, ou null na última */
+            nextPageToken: string | null;
+        };
+        PageResponseMyRegistrationResponse: {
+            /** @description Itens da página, pelo início do evento */
+            items: components["schemas"]["MyRegistrationResponse"][];
+            /** @description Token da próxima página, ou null na última */
+            nextPageToken: string | null;
         };
         /** @description Erro no formato RFC 9457. Sem stack trace, SQL nem nome de classe. */
         ProblemDetail: {
@@ -285,6 +604,18 @@ export interface components {
              * @enum {string|null}
              */
             region: "BR-AC" | "BR-AL" | "BR-AP" | "BR-AM" | "BR-BA" | "BR-CE" | "BR-DF" | "BR-ES" | "BR-GO" | "BR-MA" | "BR-MT" | "BR-MS" | "BR-MG" | "BR-PA" | "BR-PB" | "BR-PR" | "BR-PE" | "BR-PI" | "BR-RJ" | "BR-RN" | "BR-RS" | "BR-RO" | "BR-RR" | "BR-SC" | "BR-SP" | "BR-SE" | "BR-TO" | null;
+        };
+        RegistrationResponse: {
+            /**
+             * Format: uuid
+             * @description Id do evento
+             */
+            eventId: string;
+            /**
+             * Format: date-time
+             * @description Quando a inscrição foi feita; não muda nas repetições do PUT
+             */
+            registeredAt: string;
         };
         ReportResponse: {
             /**
@@ -465,6 +796,325 @@ export interface operations {
             };
         };
     };
+    createEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEventRequest"];
+            };
+        };
+        responses: {
+            /** @description O rascunho criado */
+            201: {
+                headers: {
+                    /** @description Endereço do evento criado */
+                    Location: string;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminEventResponse"];
+                };
+            };
+            /** @description Campo ausente ou inválido (texto, horário sem fuso, início no passado ou além de um ano, duração acima de 12 horas, capacidade fora de 2 a 200), JSON malformado ou campo desconhecido */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem o papel ADMIN */
+            403: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Corpo em outro formato que não application/json */
+            415: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    getAdminEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id do evento, como a criação o devolveu */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description O evento */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminEventResponse"];
+                };
+            };
+            /** @description Id que não é UUID */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem o papel ADMIN */
+            403: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Não há evento com esse id */
+            404: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    cancelEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id do evento, como a criação o devolveu */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description O evento cancelado */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminEventResponse"];
+                };
+            };
+            /** @description Id que não é UUID */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem o papel ADMIN */
+            403: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Não há evento com esse id */
+            404: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description O evento já foi cancelado, já acabou ou mudou ao mesmo tempo por outra ação */
+            409: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    publishEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id do evento, como a criação o devolveu */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description O evento publicado */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminEventResponse"];
+                };
+            };
+            /** @description Id que não é UUID */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem o papel ADMIN */
+            403: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Não há evento com esse id */
+            404: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description O evento não é rascunho, já começou ou mudou ao mesmo tempo por outra ação */
+            409: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     getWaitlistStats: {
         parameters: {
             query?: never;
@@ -496,6 +1146,380 @@ export interface operations {
             };
             /** @description Sem o papel ADMIN */
             403: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    listUpcomingEvents: {
+        parameters: {
+            query?: {
+                /** @description Quantos eventos no máximo nesta página */
+                maxPageSize?: number;
+                /** @description O nextPageToken da página anterior; ausente na primeira */
+                pageToken?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Uma página dos eventos */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponseEventResponse"];
+                };
+            };
+            /** @description maxPageSize fora de 1 a 50, ou pageToken que a API não gerou */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    getMyRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id do evento */
+                eventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A inscrição */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationResponse"];
+                };
+            };
+            /** @description Id que não é UUID */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Quem chama não está inscrito nesse evento */
+            404: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    registerForEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id do evento */
+                eventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A inscrição que já existia */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationResponse"];
+                };
+            };
+            /** @description A inscrição criada */
+            201: {
+                headers: {
+                    /** @description Endereço da inscrição */
+                    Location: string;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationResponse"];
+                };
+            };
+            /** @description Id que não é UUID */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Perfil incompleto ou menor de 18 anos, ou sessão web sem o token CSRF no header X-XSRF-TOKEN */
+            403: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Evento inexistente ou rascunho */
+            404: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Evento cancelado, já começado ou lotado */
+            409: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description O evento está ocupado com outras inscrições; nada foi gravado */
+            503: {
+                headers: {
+                    /** @description Segundos até tentar de novo */
+                    "Retry-After": number;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    cancelMyRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id do evento */
+                eventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quem chama não está inscrito no evento */
+            204: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Id que não é UUID */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sessão web sem o token CSRF no header X-XSRF-TOKEN */
+            403: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Evento inexistente ou rascunho */
+            404: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description O evento já começou */
+            409: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    getEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id do evento */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description O evento */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventResponse"];
+                };
+            };
+            /** @description Id que não é UUID */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Evento inexistente ou rascunho */
+            404: {
                 headers: {
                     "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
@@ -766,6 +1790,62 @@ export interface operations {
             };
         };
     };
+    listMyRegistrations: {
+        parameters: {
+            query?: {
+                /** @description Quantas inscrições no máximo nesta página */
+                maxPageSize?: number;
+                /** @description O nextPageToken da página anterior; ausente na primeira */
+                pageToken?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Uma página das inscrições */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponseMyRegistrationResponse"];
+                };
+            };
+            /** @description maxPageSize fora de 1 a 50, ou pageToken que a API não gerou */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     fileReport: {
         parameters: {
             query?: never;
@@ -1004,6 +2084,47 @@ export interface operations {
             };
             /** @description Limite de inscrições indisponível; a inscrição é recusada */
             503: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sessão encerrada; navegue até logoutUrl */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogoutResponse"];
+                };
+            };
+            /** @description Sem o token CSRF no header X-XSRF-TOKEN; a sessão continua ativa */
+            403: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
                 headers: {
                     "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;

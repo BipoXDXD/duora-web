@@ -73,7 +73,7 @@ describe('fetchProfile', () => {
 
     const { profile } = await fetchProfile()
 
-    expect(Object.keys(profile).sort()).toEqual(['bio', 'birthDate', 'complete', 'displayName', 'region'])
+    expect(Object.keys(profile).toSorted()).toEqual(['bio', 'birthDate', 'complete', 'displayName', 'region'])
   })
 
   it('fails when the answer has no ETag, since the profile could not be edited', async () => {

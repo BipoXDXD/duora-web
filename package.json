@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "lint": "oxlint --deny-warnings",
     "typecheck": "tsc -b",
+    "api:types": "openapi-typescript api/openapi.json -o src/shared/api/schema.d.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage"
@@ -34,6 +35,7 @@
     "@vitest/coverage-v8": "^5.0.3",
     "culori": "^4.0.2",
     "jsdom": "^30.1.2",
+    "openapi-typescript": "7.13.0",
     "oxlint": "^1.81.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
@@ -42,5 +44,10 @@
   },
   "engines": {
     "node": ">=24"
+  },
+  "overrides": {
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
   }
 }

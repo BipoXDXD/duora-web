@@ -4,8 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { build } from 'vite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import viteConfig from '../../vite.config.ts'
-import rawConfig from '../../public/staticwebapp.config.json?raw'
+import viteConfig from '../vite.config.ts'
+
+const rawConfig = readFileSync(new URL('../public/staticwebapp.config.json', import.meta.url), 'utf8')
 
 const BUILD_TIMEOUT_MS = 60_000
 const CONFIG_FILE = 'staticwebapp.config.json'

@@ -312,7 +312,7 @@ O front é publicado no Azure Static Web Apps (ADR 0014 da duora-api). A configu
     seriam difíceis de desfazer).
   - `Permissions-Policy` nega sensores, câmera, microfone, localização, pagamento e USB. Quando uma feature
     pedir um deles (voz na sala, por exemplo), libere só ele, aqui.
-- **Como conferir:** `src/deploy/staticwebapp.config.test.ts` lê o JSON (fallback, exclusões, headers) e roda um
+- **Como conferir:** `deploy/staticwebapp.config.test.ts` lê o JSON (fallback, exclusões, headers) e roda um
   `vite build` num diretório temporário para checar que o `dist/index.html` e o CSS gerados não usam nada que a
   CSP bloqueie (script, estilo ou handler inline, nem fonte ou imagem de outra origem). Em 2026-10-07 o build
   também foi servido com esses headers num navegador real, sem violação de CSP e com as fontes e as imagens

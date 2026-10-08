@@ -156,6 +156,17 @@
     @apply bg-canvas font-sans text-fg antialiased;
   }
 
+  /*
+   * Abaixo do md o layout tem a barra de abas colada embaixo (MobileLayout). O foco por teclado rola o
+   * elemento só até a borda da janela, e a barra o cobriria (WCAG 2.4.11): a margem de rolagem é a altura
+   * da barra (53px mais a área segura) e uma folga para o anel de foco.
+   */
+  @media (width < 48rem) {
+    html {
+      scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+    }
+  }
+
   /* Um anel só para todo elemento focável, com o contraste medido no teste do tema. */
   :focus-visible {
     outline: 3px solid --theme(--color-focus inline);

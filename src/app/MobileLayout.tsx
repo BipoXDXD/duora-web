@@ -11,7 +11,7 @@ interface MobileLayoutProps {
 }
 
 const TAB_CLASS =
-  'flex min-h-11 min-w-11 flex-1 items-center justify-center rounded-lg text-sm font-semibold aria-[current=page]:text-fg-accent'
+  'flex min-h-11 min-w-11 flex-auto items-center justify-center rounded-lg px-1 text-sm font-semibold aria-[current=page]:text-fg-accent'
 
 export function MobileLayout({ route, children }: MobileLayoutProps) {
   return (
@@ -28,7 +28,7 @@ export function MobileLayout({ route, children }: MobileLayoutProps) {
       <main className="flex-1">{children}</main>
       <nav
         aria-label="Atalhos"
-        className="sticky bottom-0 z-10 flex gap-2 border-t border-divider bg-surface px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+        className="sticky bottom-0 z-10 flex gap-1 border-t border-divider bg-surface px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
       >
         <AppLink to={PATHS.home} className={TAB_CLASS} aria-current={route.page === 'home' ? 'page' : undefined}>
           Início

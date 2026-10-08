@@ -89,6 +89,7 @@ export function isProfileField(name: string): name is ProfileField {
 export type EditProfileResult =
   | { readonly kind: 'saved'; readonly saved: VersionedProfile }
   | { readonly kind: 'outdated' }
+  /** O 409 `BIRTH_DATE_ALREADY_SET`. Um 409 sem esse `reason` não diz que a data trava, e vira `failed`. */
   | { readonly kind: 'birthDateLocked' }
   /** O 400 da API, com os campos que ela recusou; vazio quando não os disse. */
   | { readonly kind: 'invalid'; readonly fieldErrors: readonly FieldError[] }
@@ -138,7 +139,7 @@ function resultOf(error: ApiError): EditProfileResult {
     case UNAUTHORIZED:
       return { kind: 'signedOut' }
     case CONFLICT:
-      return { kind: 'birthDateLocked' }
+      return error.refusalReason === 'BIRTH_DATE_ALREADY_SET' ? { kind: 'birthDateLocked' } : { kind: 'failed' }
     case PRECONDITION_FAILED:
       return { kind: 'outdated' }
     default:

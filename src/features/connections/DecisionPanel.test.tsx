@@ -10,6 +10,7 @@ import {
   networkFailure,
   neverAnswer,
   problemAnswer,
+  refusalAnswer,
   statusAnswer,
   stubApi,
   type FakeRoute,
@@ -213,7 +214,10 @@ describe('private decision after a round', () => {
   describe('failures when recording', () => {
     it('on 409 says the decision was already made and is final, and shows the one that counts', async () => {
       const { user } = await openRound(
-        byMethod({ GET: inSequence(NOT_DECIDED, decisionAnswer(false)), PUT: problemAnswer(409) }),
+        byMethod({
+          GET: inSequence(NOT_DECIDED, decisionAnswer(false)),
+          PUT: refusalAnswer(409, 'DECISION_ALREADY_MADE'),
+        }),
       )
 
       await chooseAndConfirm(user, 'Quero continuar em contato')
@@ -222,6 +226,16 @@ describe('private decision after a round', () => {
         'Você já tinha decidido nesta rodada, e a decisão é final. Esta é a que vale.',
       )
       expect(await within(panel()).findByText('Sua decisão: você não quer continuar em contato.')).toBeInTheDocument()
+    })
+
+    it('on a 409 without the reason says only that it could not record, not that it was already decided', async () => {
+      const { user } = await openRound(byMethod({ GET: NOT_DECIDED, PUT: problemAnswer(409) }))
+
+      await chooseAndConfirm(user, 'Não quero')
+
+      const alert = await within(panel()).findByRole('alert')
+      expect(alert).toHaveTextContent('Não foi possível registrar sua decisão. Tente de novo.')
+      expect(alert).not.toHaveTextContent('já tinha decidido')
     })
 
     it('on 404 says there is nothing to decide in this round', async () => {

@@ -10,6 +10,7 @@ import {
   networkFailure,
   neverAnswer,
   problemAnswer,
+  refusalAnswer,
   stubApi,
   type FakeRoute,
 } from '../../test/fakeApi.ts'
@@ -342,7 +343,10 @@ describe('profile page', () => {
   it('reloads the profile and explains when the birth date was already given elsewhere', async () => {
     const elsewhere = { ...EMPTY, birthDate: '1990-05-10' }
     const { user } = renderProfilePage(
-      byMethod({ GET: inSequence(profileAnswer(EMPTY, 0), profileAnswer(elsewhere, 1)), PATCH: problemAnswer(409) }),
+      byMethod({
+        GET: inSequence(profileAnswer(EMPTY, 0), profileAnswer(elsewhere, 1)),
+        PATCH: refusalAnswer(409, 'BIRTH_DATE_ALREADY_SET'),
+      }),
     )
     const form = await openEditor(user, 'Preencher perfil')
 

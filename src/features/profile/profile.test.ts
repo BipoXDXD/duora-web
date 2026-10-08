@@ -45,6 +45,13 @@ function problemAnswer(status: number, detail?: string, errors?: unknown): Respo
   })
 }
 
+function refusalAnswer(status: number, reason: string): Response {
+  return new Response(JSON.stringify({ title: 'Erro', status, reason }), {
+    status,
+    headers: { 'Content-Type': 'application/problem+json' },
+  })
+}
+
 function sentRequest(): { path: unknown; init: RequestInit } {
   const call = fetchMock.mock.calls[0]
   if (call === undefined) {
@@ -140,10 +147,19 @@ describe('editProfile', () => {
     await expect(editProfile('"4"', { bio: 'Oi' })).resolves.toEqual({ kind: 'outdated' })
   })
 
-  it('reports a birth date that can no longer change on 409', async () => {
-    fetchMock.mockResolvedValue(problemAnswer(409))
+  it('reports a birth date that can no longer change on a 409 BIRTH_DATE_ALREADY_SET', async () => {
+    fetchMock.mockResolvedValue(refusalAnswer(409, 'BIRTH_DATE_ALREADY_SET'))
 
     await expect(editProfile('"4"', { birthDate: '1991-01-01' })).resolves.toEqual({ kind: 'birthDateLocked' })
+  })
+
+  it.each([
+    ['has no reason', () => problemAnswer(409)],
+    ['has a reason the front does not know', () => refusalAnswer(409, 'SOMETHING_NEW')],
+  ])('reports a failure when a 409 %s, since it does not say the birth date is locked', async (_case, answer) => {
+    fetchMock.mockResolvedValue(answer())
+
+    await expect(editProfile('"4"', { birthDate: '1991-01-01' })).resolves.toEqual({ kind: 'failed' })
   })
 
   it('reports a 400 with the fields the API refused, in the order it listed them', async () => {

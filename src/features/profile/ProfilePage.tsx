@@ -88,7 +88,7 @@ function ProfileView({ profile, returned, onEdit }: ProfileViewProps) {
       {!profile.complete && (
         <p className="text-fg-muted">Para usar o Duora, informe nome, data de nascimento e estado.</p>
       )}
-      <dl className="grid w-full gap-4 sm:grid-cols-[max-content_1fr] sm:gap-x-8">
+      <dl className="grid w-full gap-6 sm:grid-cols-[max-content_1fr] sm:gap-x-8 sm:gap-y-4">
         <ProfileDetail term="Nome" value={profile.displayName} />
         <ProfileDetail
           term="Data de nascimento"
@@ -138,7 +138,7 @@ function EditButton({ label, className, hasFocus, onEdit }: EditButtonProps) {
 
 function ProfileDetail({ term, value }: { readonly term: string; readonly value: string | null }) {
   return (
-    <div className="contents">
+    <div className="flex flex-col gap-1 sm:contents">
       <dt className="font-semibold text-fg-muted">{term}</dt>
       <dd className={value === null ? 'text-fg-muted' : 'whitespace-pre-line text-fg'}>{value ?? 'Não informado'}</dd>
     </div>

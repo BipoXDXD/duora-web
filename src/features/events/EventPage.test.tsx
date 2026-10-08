@@ -10,6 +10,7 @@ import {
   jsonAnswer,
   neverAnswer,
   problemAnswer,
+  refusalAnswer,
   statusAnswer,
   stubApi,
   type FakeRoute,
@@ -23,8 +24,11 @@ const REGISTRATION = `${EVENT}/registration`
 const REGISTERED = jsonAnswer({ eventId: DINNER.id, registeredAt: '2026-10-05T12:00:00Z' })
 const NOT_REGISTERED = problemAnswer(404)
 
-const BUSY: FakeRoute = () =>
-  Promise.resolve(new Response(null, { status: 503, headers: { 'Retry-After': '3' } }))
+function busyAnswer(status: number): FakeRoute {
+  return () => Promise.resolve(new Response(null, { status, headers: { 'Retry-After': '3' } }))
+}
+
+const BUSY = busyAnswer(503)
 
 function pairingAnswer(roundNumber: number, partnerAccountId: string | null): FakeRoute {
   return jsonAnswer({ eventId: DINNER.id, roundNumber, partnerAccountId })
@@ -151,26 +155,57 @@ describe('event page', () => {
       await waitFor(() => expect(screen.getByRole('button', { name: 'Inscrevendo…' })).toBeDisabled())
     })
 
-    it('explains an incomplete profile on 403 and links to the profile', async () => {
+    it('explains an incomplete profile on a 403 PROFILE_INCOMPLETE and links to the profile', async () => {
       const { user } = renderEventPage({
         [EVENT]: jsonAnswer(DINNER),
-        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: problemAnswer(403) }),
+        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: refusalAnswer(403, 'PROFILE_INCOMPLETE') }),
         '/api/me/profile': neverAnswer(),
       })
 
       await user.click(await screen.findByRole('button', { name: 'Quero me inscrever' }))
 
       const alert = await screen.findByRole('alert')
-      expect(alert).toHaveTextContent('Para se inscrever, seu perfil precisa estar completo.')
-      expect(alert).toHaveTextContent('só para maiores de 18 anos')
+      expect(alert).toHaveTextContent('Para se inscrever, seu perfil precisa estar completo')
+      expect(alert).not.toHaveTextContent('18 anos')
       await user.click(screen.getByRole('link', { name: 'Completar meu perfil' }))
       expect(window.location.pathname).toBe('/perfil')
+    })
+
+    it('tells an underage account that events are for adults, with no link to complete the profile', async () => {
+      const { user } = renderEventPage({
+        [EVENT]: jsonAnswer(DINNER),
+        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: refusalAnswer(403, 'UNDERAGE') }),
+      })
+
+      await user.click(await screen.findByRole('button', { name: 'Quero me inscrever' }))
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent('Os eventos do Duora são só para maiores de 18 anos')
+      expect(screen.queryByRole('link', { name: 'Completar meu perfil' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Quero me inscrever' }).className).toBe(PRIMARY_BUTTON)
+    })
+
+    it.each([
+      ['has no reason', problemAnswer(403)],
+      ['has a reason the front does not know', refusalAnswer(403, 'SOMETHING_NEW')],
+    ])('gives the generic refusal, with no link, when a 403 %s', async (_case, answer) => {
+      const { user } = renderEventPage({
+        [EVENT]: jsonAnswer(DINNER),
+        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: answer }),
+      })
+
+      await user.click(await screen.findByRole('button', { name: 'Quero me inscrever' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Não foi possível fazer a inscrição: sua conta não pode participar deste evento.',
+      )
+      expect(screen.queryByRole('link', { name: 'Completar meu perfil' })).not.toBeInTheDocument()
     })
 
     it('keeps a single primary button: the next step in the notice outranks "Quero me inscrever"', async () => {
       const { user } = renderEventPage({
         [EVENT]: jsonAnswer(DINNER),
-        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: problemAnswer(403) }),
+        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: refusalAnswer(403, 'PROFILE_INCOMPLETE') }),
         '/api/me/profile': neverAnswer(),
       })
       const register = await screen.findByRole('button', { name: 'Quero me inscrever' })
@@ -207,10 +242,10 @@ describe('event page', () => {
       expect(screen.getByRole('button', { name: 'Quero me inscrever' }).className).toBe(PRIMARY_BUTTON)
     })
 
-    it('explains a full, cancelled or started event on 409 and reads the event again', async () => {
+    it('explains a cancelled event on 409 EVENT_CANCELLED and reads the event again', async () => {
       const { user } = renderEventPage({
         [EVENT]: inSequence(jsonAnswer(DINNER), jsonAnswer({ ...DINNER, status: 'CANCELLED' })),
-        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: problemAnswer(409) }),
+        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: refusalAnswer(409, 'EVENT_CANCELLED') }),
       })
 
       await user.click(await screen.findByRole('button', { name: 'Quero me inscrever' }))
@@ -219,10 +254,30 @@ describe('event page', () => {
       expect(screen.queryByRole('button', { name: 'Quero me inscrever' })).not.toBeInTheDocument()
     })
 
-    it('keeps the offer to register when the event is full', async () => {
+    it.each([
+      ['EVENT_FULL', 'O evento lotou, então não dá mais para se inscrever.'],
+      ['EVENT_STARTED', 'O evento já começou, e as inscrições estão fechadas.'],
+      ['EVENT_ENDED', 'O evento já terminou, e as inscrições estão fechadas.'],
+    ])('names the reason %s of a 409 and keeps the offer to register', async (reason, text) => {
       const { user } = renderEventPage({
         [EVENT]: jsonAnswer(DINNER),
-        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: problemAnswer(409) }),
+        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: refusalAnswer(409, reason) }),
+      })
+
+      await user.click(await screen.findByRole('button', { name: 'Quero me inscrever' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(text)
+      expect(screen.getByRole('button', { name: 'Quero me inscrever' })).toBeEnabled()
+    })
+
+    it.each([
+      ['has no reason', problemAnswer(409)],
+      ['has a reason the front does not know', refusalAnswer(409, 'SOMETHING_NEW')],
+      ['has a reason that does not fit a registration', refusalAnswer(409, 'DECISION_ALREADY_MADE')],
+    ])('gives the generic refusal when a 409 %s', async (_case, answer) => {
+      const { user } = renderEventPage({
+        [EVENT]: jsonAnswer(DINNER),
+        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: answer }),
       })
 
       await user.click(await screen.findByRole('button', { name: 'Quero me inscrever' }))
@@ -232,10 +287,10 @@ describe('event page', () => {
       )
     })
 
-    it('asks to wait the seconds of Retry-After when the event is busy', async () => {
+    it.each([503, 429])('asks to wait the seconds of Retry-After on a %s', async (status) => {
       const { user } = renderEventPage({
         [EVENT]: jsonAnswer(DINNER),
-        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: BUSY }),
+        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: busyAnswer(status) }),
       })
 
       await user.click(await screen.findByRole('button', { name: 'Quero me inscrever' }))
@@ -316,7 +371,23 @@ describe('event page', () => {
       await waitFor(() => expect(screen.getByRole('button', { name: 'Cancelando…' })).toBeDisabled())
     })
 
-    it('keeps the registration and explains on 409 that the event already started', async () => {
+    it.each([
+      ['EVENT_STARTED', 'O evento já começou, então a inscrição não pode mais ser cancelada.'],
+      ['EVENT_ENDED', 'O evento já terminou, então a inscrição não pode mais ser cancelada.'],
+    ])('keeps the registration and explains a 409 %s', async (reason, text) => {
+      const { user } = renderEventPage({
+        [EVENT]: jsonAnswer(DINNER),
+        [REGISTRATION]: byMethod({ GET: REGISTERED, DELETE: refusalAnswer(409, reason) }),
+      })
+
+      await user.click(await screen.findByRole('button', { name: 'Cancelar inscrição' }))
+      await user.click(screen.getByRole('button', { name: 'Sim, cancelar' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(text)
+      expect(screen.getByText('Você está na lista desde 5 de outubro de 2026.')).toBeInTheDocument()
+    })
+
+    it('gives the generic refusal when the 409 of the cancel has no reason', async () => {
       const { user } = renderEventPage({
         [EVENT]: jsonAnswer(DINNER),
         [REGISTRATION]: byMethod({ GET: REGISTERED, DELETE: problemAnswer(409) }),
@@ -326,8 +397,20 @@ describe('event page', () => {
       await user.click(screen.getByRole('button', { name: 'Sim, cancelar' }))
 
       expect(await screen.findByRole('alert')).toHaveTextContent(
-        'O evento já começou, então a inscrição não pode mais ser cancelada.',
+        'A inscrição não pode mais ser cancelada: o evento já começou ou terminou.',
       )
+    })
+
+    it.each([503, 429])('keeps the registration and asks to wait on a %s of the cancel', async (status) => {
+      const { user } = renderEventPage({
+        [EVENT]: jsonAnswer(DINNER),
+        [REGISTRATION]: byMethod({ GET: REGISTERED, DELETE: busyAnswer(status) }),
+      })
+
+      await user.click(await screen.findByRole('button', { name: 'Cancelar inscrição' }))
+      await user.click(screen.getByRole('button', { name: 'Sim, cancelar' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Tente de novo em 3 segundos.')
       expect(screen.getByText('Você está na lista desde 5 de outubro de 2026.')).toBeInTheDocument()
     })
   })

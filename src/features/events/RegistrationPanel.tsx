@@ -65,7 +65,7 @@ export function RegistrationPanel({ eventId }: RegistrationPanelProps) {
       apply(
         noticeOfCancel(result),
         result.kind === 'cancelled' ? null : undefined,
-        result.kind === 'alreadyStarted' || result.kind === 'notFound',
+        result.kind === 'tooLate' || result.kind === 'notFound',
       ),
   })
 

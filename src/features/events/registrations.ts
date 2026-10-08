@@ -1,5 +1,5 @@
 import { z } from 'zod/mini'
-import { ApiError, isApiFailure, readJsonBody, sendApiRequest } from '../../shared/api/http.ts'
+import { ApiError, isApiFailure, readJsonBody, sendApiRequest, type RefusalReason } from '../../shared/api/http.ts'
 import { EVENT_STATUSES, instantSchema, pageQuery } from './events.ts'
 
 /** Corpo de PUT e GET /api/events/{id}/registration (RegistrationResponse). */
@@ -28,22 +28,30 @@ export type Registration = Readonly<z.output<typeof registrationSchema>>
 export type MyRegistrationsPage = Readonly<z.output<typeof myRegistrationsPageSchema>>
 export type MyRegistration = Readonly<MyRegistrationsPage['items'][number]>
 
+/** Por que o evento não aceita mais a ação: `lotou`, `foi cancelado`, `já começou` ou `já terminou`. */
+export type EventClosure = 'full' | 'cancelled' | 'started' | 'ended'
+
 /**
- * O 403 junta perfil incompleto, menor de 18 e token CSRF ausente; o cliente HTTP sempre manda o token,
- * então para a tela ele é o perfil. O 409 junta lotado, cancelado e começado, sem dizer qual.
+ * O que a API respondeu a uma inscrição. Os 403 e 409 de regra trazem o `reason` (ADR 0020 da duora-api); sem
+ * ele, ou com um que o front não conhece, vale a recusa genérica do status: `notAllowed` (403) e `unavailable`
+ * sem `cause` (409). `busy` junta o 503 (evento ocupado ou limite não contado) e o 429 (limite da conta).
  */
 export type RegisterResult =
   | { readonly kind: 'registered'; readonly registration: Registration }
   | { readonly kind: 'profileIncomplete' }
-  | { readonly kind: 'unavailable' }
+  | { readonly kind: 'underage' }
+  | { readonly kind: 'notAllowed' }
+  | { readonly kind: 'unavailable'; readonly cause: EventClosure | null }
   | { readonly kind: 'busy'; readonly retryAfterSeconds: number | null }
   | { readonly kind: 'notFound' }
   | { readonly kind: 'signedOut' }
   | { readonly kind: 'failed' }
 
+/** `tooLate` é o 409 do cancelamento: o evento já começou ou já terminou, e `cause` diz qual dos dois. */
 export type CancelResult =
   | { readonly kind: 'cancelled' }
-  | { readonly kind: 'alreadyStarted' }
+  | { readonly kind: 'tooLate'; readonly cause: 'started' | 'ended' | null }
+  | { readonly kind: 'busy'; readonly retryAfterSeconds: number | null }
   | { readonly kind: 'notFound' }
   | { readonly kind: 'signedOut' }
   | { readonly kind: 'failed' }
@@ -52,7 +60,20 @@ const UNAUTHORIZED = 401
 const FORBIDDEN = 403
 const NOT_FOUND = 404
 const CONFLICT = 409
+const TOO_MANY_REQUESTS = 429
 const SERVICE_UNAVAILABLE = 503
+
+const CLOSURE_BY_REASON: Readonly<Partial<Record<RefusalReason, EventClosure>>> = {
+  EVENT_FULL: 'full',
+  EVENT_CANCELLED: 'cancelled',
+  EVENT_STARTED: 'started',
+  EVENT_ENDED: 'ended',
+}
+
+/** O motivo do 409 em termos do evento, ou `null` quando a API não o disse ou disse um que não é de evento. */
+function closureOf(error: ApiError): EventClosure | null {
+  return error.refusalReason === null ? null : (CLOSURE_BY_REASON[error.refusalReason] ?? null)
+}
 
 function registrationPath(eventId: string): string {
   return `/api/events/${encodeURIComponent(eventId)}/registration`
@@ -92,15 +113,34 @@ function registerResultOf(error: ApiError): RegisterResult {
     case UNAUTHORIZED:
       return { kind: 'signedOut' }
     case FORBIDDEN:
-      return { kind: 'profileIncomplete' }
+      return forbiddenResultOf(error)
     case NOT_FOUND:
       return { kind: 'notFound' }
     case CONFLICT:
-      return { kind: 'unavailable' }
+      return { kind: 'unavailable', cause: closureOf(error) }
+    case TOO_MANY_REQUESTS:
     case SERVICE_UNAVAILABLE:
       return { kind: 'busy', retryAfterSeconds: error.retryAfterSeconds }
     default:
       return { kind: 'failed' }
+  }
+}
+
+/** No cancelamento só importa se o evento começou ou terminou; outro motivo vira a recusa genérica. */
+function lateClosureOf(error: ApiError): 'started' | 'ended' | null {
+  const closure = closureOf(error)
+  return closure === 'started' || closure === 'ended' ? closure : null
+}
+
+/** O cliente HTTP sempre manda o token CSRF, então um 403 aqui é recusa de regra; sem `reason`, é a genérica. */
+function forbiddenResultOf(error: ApiError): RegisterResult {
+  switch (error.refusalReason) {
+    case 'PROFILE_INCOMPLETE':
+      return { kind: 'profileIncomplete' }
+    case 'UNDERAGE':
+      return { kind: 'underage' }
+    default:
+      return { kind: 'notAllowed' }
   }
 }
 
@@ -127,7 +167,10 @@ function cancelResultOf(error: ApiError): CancelResult {
     case NOT_FOUND:
       return { kind: 'notFound' }
     case CONFLICT:
-      return { kind: 'alreadyStarted' }
+      return { kind: 'tooLate', cause: lateClosureOf(error) }
+    case TOO_MANY_REQUESTS:
+    case SERVICE_UNAVAILABLE:
+      return { kind: 'busy', retryAfterSeconds: error.retryAfterSeconds }
     default:
       return { kind: 'failed' }
   }

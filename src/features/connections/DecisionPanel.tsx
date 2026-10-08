@@ -55,8 +55,9 @@ export function DecisionPanel({ eventId, roundNumber }: DecisionPanelProps) {
     },
   })
 
+  // mt-4 soma ao gap do pai: mais espaço acima do título do que entre ele e o conteúdo que abre.
   return (
-    <section aria-labelledby={headingId} className="flex w-full flex-col items-start gap-4">
+    <section aria-labelledby={headingId} className="mt-4 flex w-full flex-col items-start gap-4">
       <h3 id={headingId} className="font-display text-xl font-medium text-fg">
         Continuar em contato?
       </h3>

@@ -1,6 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { BlockedAccountsPage } from '../features/blocks/BlockedAccountsPage.tsx'
+import { EventPage } from '../features/events/EventPage.tsx'
+import { EventsPage } from '../features/events/EventsPage.tsx'
+import { MyRegistrationsPage } from '../features/events/MyRegistrationsPage.tsx'
 import { ProfilePage } from '../features/profile/ProfilePage.tsx'
 import { usePathname } from '../shared/routing/history.ts'
 import { routeOf, type Route } from '../shared/routing/routes.ts'
@@ -32,13 +35,19 @@ function Shell() {
 }
 
 function Page({ route }: { readonly route: Route }) {
-  switch (route) {
+  switch (route.page) {
     case 'home':
       return <HomePage />
     case 'profile':
       return <ProfilePage />
     case 'blockedAccounts':
       return <BlockedAccountsPage />
+    case 'events':
+      return <EventsPage />
+    case 'event':
+      return <EventPage eventId={route.eventId} />
+    case 'registrations':
+      return <MyRegistrationsPage />
     case 'notFound':
       return <NotFoundPage />
   }

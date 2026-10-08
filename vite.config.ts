@@ -2,6 +2,10 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
+// As telas mostram horários no fuso de quem usa o app. Nos testes o fuso é fixo, para o texto esperado não
+// depender da máquina; os workers do Vitest herdam esta variável.
+process.env.TZ = 'America/Sao_Paulo'
+
 const API_ORIGIN = 'http://localhost:8080'
 
 // Sem changeOrigin: o Host continua localhost:5173, então o Spring monta o redirect_uri do Entra

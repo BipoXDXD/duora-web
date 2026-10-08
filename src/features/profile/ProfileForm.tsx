@@ -7,6 +7,7 @@ import { LOGIN_URL } from '../auth/loginUrl.ts'
 import {
   editProfile,
   isRegion,
+  PROFILE_FIELDS,
   REGION_CODES,
   REGION_NAMES,
   type EditProfileResult,
@@ -19,10 +20,10 @@ import {
   formValuesOf,
   rebaseFormValues,
   todayIsoDate,
-  type FieldProblem,
   type FieldProblems,
   type ProfileFormValues,
 } from './profileForm.ts'
+import { problemsFromApi } from './profileApiProblems.ts'
 import { PROFILE_QUERY } from './profileQuery.ts'
 import { formatBirthDate, problemMessage } from './profileText.ts'
 
@@ -34,9 +35,6 @@ interface ProfileFormProps {
 
 /** O aviso do formulário inteiro; os problemas de um campo ficam no próprio campo. */
 type FormNotice = 'unchanged' | 'outdated' | 'birthDateLocked' | 'rejected' | 'signedOut' | 'failed'
-
-/** Ordem dos campos na tela: o foco vai para o primeiro com problema. */
-const FIELD_ORDER: readonly ProfileField[] = ['displayName', 'birthDate', 'region', 'bio']
 
 /** Os estados pelo nome, na ordem alfabética do português. */
 const REGIONS_BY_NAME = REGION_CODES.toSorted((a, b) => REGION_NAMES[a].localeCompare(REGION_NAMES[b], 'pt-BR'))
@@ -81,13 +79,14 @@ export function ProfileForm({ initial, onSaved, onCancel }: ProfileFormProps) {
       case 'birthDateLocked':
         await reloadKeepingEdits(result.kind)
         return
-      case 'invalid':
-        if (result.field === null) {
+      case 'invalid': {
+        const { problems: refused, hasUnplacedProblem } = problemsFromApi(result.fieldErrors)
+        showProblems(refused)
+        if (hasUnplacedProblem) {
           setNotice('rejected')
-        } else {
-          showProblems(problemOn(result.field, 'rejected'))
         }
         return
+      }
       case 'signedOut':
       case 'failed':
         setNotice(result.kind)
@@ -111,7 +110,7 @@ export function ProfileForm({ initial, onSaved, onCancel }: ProfileFormProps) {
 
   function showProblems(found: FieldProblems) {
     setProblems(found)
-    const first = FIELD_ORDER.find((field) => found[field] !== undefined)
+    const first = PROFILE_FIELDS.find((field) => found[field] !== undefined)
     const control = first === undefined ? null : formRef.current?.elements.namedItem(first)
     if (control instanceof HTMLElement) {
       control.focus()
@@ -207,12 +206,6 @@ export function ProfileForm({ initial, onSaved, onCancel }: ProfileFormProps) {
       </div>
     </form>
   )
-}
-
-function problemOn(field: ProfileField, problem: FieldProblem): FieldProblems {
-  const problems: Partial<Record<ProfileField, FieldProblem>> = {}
-  problems[field] = problem
-  return problems
 }
 
 function messageOf(field: ProfileField, problems: FieldProblems): string | null {

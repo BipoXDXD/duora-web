@@ -19,6 +19,11 @@ describe('problemMessage', () => {
     ['birthDate', 'notADate', 'Informe uma data válida.'],
     ['birthDate', 'underage', 'O Duora é só para maiores de 18 anos.'],
     ['birthDate', 'implausibleAge', 'Confira o ano de nascimento.'],
+    ['displayName', 'forbiddenCharacter', 'Use uma linha só, sem caracteres invisíveis.'],
+    ['bio', 'forbiddenCharacter', 'A apresentação tem caracteres que não são aceitos.'],
+    ['region', 'forbiddenCharacter', 'Escolha um estado da lista.'],
+    ['displayName', 'rejected', 'Confira o nome.'],
+    ['bio', 'rejected', 'Confira a apresentação.'],
     ['birthDate', 'rejected', 'Confira a data de nascimento.'],
     ['region', 'rejected', 'Escolha um estado da lista.'],
   ] as const)('tells the %s problem "%s" in words', (field, problem, message) => {

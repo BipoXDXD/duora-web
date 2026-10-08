@@ -9,12 +9,18 @@ export function formatBirthDate(isoDate: string): string {
   return BIRTH_DATE_FORMAT.format(new Date(`${isoDate}T00:00:00Z`))
 }
 
-/** O que a API recusou sem regra que o front conheça, como um caractere invisível. */
+/** O que a API recusou por um motivo que o front não distingue: só diz qual campo conferir. */
 const REJECTED: Readonly<Record<ProfileField, string>> = {
-  displayName: 'Confira o nome: use uma linha só, sem caracteres invisíveis.',
+  displayName: 'Confira o nome.',
   birthDate: 'Confira a data de nascimento.',
-  bio: 'Confira a apresentação: ela tem caracteres que não são aceitos.',
+  bio: 'Confira a apresentação.',
   region: 'Escolha um estado da lista.',
+}
+
+/** Caractere de controle, invisível ou espaço especial: só nome e apresentação são texto livre. */
+const FORBIDDEN_CHARACTER: Readonly<Partial<Record<ProfileField, string>>> = {
+  displayName: 'Use uma linha só, sem caracteres invisíveis.',
+  bio: 'A apresentação tem caracteres que não são aceitos.',
 }
 
 export function problemMessage(field: ProfileField, problem: FieldProblem): string {
@@ -29,6 +35,8 @@ export function problemMessage(field: ProfileField, problem: FieldProblem): stri
       return 'O Duora é só para maiores de 18 anos.'
     case 'implausibleAge':
       return 'Confira o ano de nascimento.'
+    case 'forbiddenCharacter':
+      return FORBIDDEN_CHARACTER[field] ?? REJECTED[field]
     case 'rejected':
       return REJECTED[field]
   }

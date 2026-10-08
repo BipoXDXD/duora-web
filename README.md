@@ -98,8 +98,12 @@ preview` já fazem isso.
 - **412** (o perfil mudou em outra aba ou aparelho): o front lê o perfil de novo, mantém os campos que a pessoa
   editou, mostra a versão nova dos outros e pede para conferir e salvar de novo. **409** faz o mesmo, explicando
   que a data de nascimento já tinha sido informada.
-- **400**: a mensagem vai para o campo que a API citou no começo do `detail` do ProblemDetail ("bio must…"). Isso
-  não está na spec; se o `detail` não citar um campo, o erro aparece no formulário inteiro.
+- **400**: a API lista os campos recusados em `errors: [{field, code}]` (`ValidationProblemDetail` da spec, ADR 0018
+  da duora-api). O front escolhe a mensagem em português pelo par (campo, `code`), mostra todos os erros de uma vez
+  e põe o foco no primeiro campo com erro, na ordem da tela. Se algum erro não for de um campo do formulário
+  (corpo inteiro, campo desconhecido) ou a lista vier vazia, o aviso geral "Confira os dados do perfil" aparece
+  também. `code` que o front não conhece (a API pode ampliar a lista) só marca o campo como recusado. O `detail` em
+  inglês nunca é lido para decidir o campo.
 - **401** pede para entrar de novo; falha de rede ou 5xx mantém o que foi digitado e oferece tentar de novo.
 
 ### Contas bloqueadas
@@ -285,6 +289,4 @@ gerados da spec, testes com cobertura e build. Também roda o gitleaks sobre tod
 - A cópia da spec em `api/openapi.json` é atualizada à mão; o CI não a compara com a da duora-api, que é um
   repositório privado. Quando o contrato mudar na API, rode a atualização acima.
 - O SPA fallback (`index.html` para `/perfil` e `/perfil/bloqueios`) precisa existir onde o front for publicado.
-- O campo do 400 do perfil vem do texto do `detail`; um campo estruturado no ProblemDetail (por exemplo
-  `field` ou uma lista `errors`) na spec da API tornaria isso um contrato.
 - A lista de bloqueios não tem o nome nem a foto de quem foi bloqueado, porque a API não os manda.

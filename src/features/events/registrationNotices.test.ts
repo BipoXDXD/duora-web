@@ -20,3 +20,22 @@ describe('noticeOfRegister', () => {
     expect(noticeOfCancel({ kind: 'signedOut' }).action).toBe('signIn')
   })
 })
+
+describe('noticeOfCancel', () => {
+  it.each([
+    [{ kind: 'notFound' }, 'Este evento não existe mais.'],
+    [{ kind: 'failed' }, 'Não foi possível cancelar a inscrição. Tente de novo.'],
+  ] as const)('explains %o', (result, text) => {
+    expect(noticeOfCancel(result)).toEqual({ tone: 'error', text, action: null })
+  })
+})
+
+describe('noticeOfRegister for a gone event', () => {
+  it('says the event does not exist anymore', () => {
+    expect(noticeOfRegister({ kind: 'notFound' })).toEqual({
+      tone: 'error',
+      text: 'Este evento não existe mais.',
+      action: null,
+    })
+  })
+})

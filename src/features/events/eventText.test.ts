@@ -17,7 +17,12 @@ describe('formatEventTime', () => {
 
 describe('PHASE_LABELS', () => {
   it('labels only the phases that change what the person can do', () => {
-    expect(PHASE_LABELS).toEqual({ upcoming: null, inProgress: 'Em andamento', ended: 'Encerrado', cancelled: 'Cancelado' })
+    expect(PHASE_LABELS).toEqual({
+      upcoming: null,
+      inProgress: 'Em andamento',
+      ended: 'Encerrado',
+      cancelled: 'Cancelado',
+    })
   })
 })
 

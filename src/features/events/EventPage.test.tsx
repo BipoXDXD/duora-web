@@ -71,7 +71,10 @@ describe('event page', () => {
   })
 
   it('offers to try again when the event could not be read', async () => {
-    const { user } = renderEventPage({ [EVENT]: inSequence(problemAnswer(500), jsonAnswer(DINNER)), [REGISTRATION]: NOT_REGISTERED })
+    const { user } = renderEventPage({
+      [EVENT]: inSequence(problemAnswer(500), jsonAnswer(DINNER)),
+      [REGISTRATION]: NOT_REGISTERED,
+    })
 
     expect(await screen.findByText('Não foi possível carregar o evento.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
@@ -119,7 +122,10 @@ describe('event page', () => {
       document.cookie = 'XSRF-TOKEN=csrf-123; path=/'
       const { fetchMock, user } = renderEventPage({
         [EVENT]: jsonAnswer(DINNER),
-        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: jsonAnswer({ eventId: DINNER.id, registeredAt: '2026-10-08T15:00:00Z' }, 201) }),
+        [REGISTRATION]: byMethod({
+          GET: NOT_REGISTERED,
+          PUT: jsonAnswer({ eventId: DINNER.id, registeredAt: '2026-10-08T15:00:00Z' }, 201),
+        }),
       })
 
       await user.click(await screen.findByRole('button', { name: 'Quero me inscrever' }))
@@ -313,6 +319,18 @@ describe('event page', () => {
 
       expect(await screen.findByText('O evento já começou, e as inscrições estão fechadas.')).toBeInTheDocument()
       expect(screen.getByText('Em andamento')).toBeInTheDocument()
+    })
+
+    it('offers to try again when the registration could not be read', async () => {
+      const { user } = renderEventPage({
+        [EVENT]: jsonAnswer(DINNER),
+        [REGISTRATION]: inSequence(problemAnswer(500), REGISTERED),
+      })
+
+      expect(await screen.findByText('Não foi possível verificar sua inscrição.')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
+
+      expect(await screen.findByRole('button', { name: 'Ver minha dupla' })).toBeInTheDocument()
     })
 
     it('shows the partner of the round the person asks for, by the end of the account id', async () => {

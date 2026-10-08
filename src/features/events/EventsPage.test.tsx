@@ -114,6 +114,17 @@ describe('events page', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('says it is loading the next page and blocks a second click meanwhile', async () => {
+    const { user } = renderEventsPage({
+      [LIST]: pageOf([DINNER], 'page-2'),
+      [`${LIST}?pageToken=page-2`]: neverAnswer(),
+    })
+
+    await user.click(await screen.findByRole('button', { name: 'Carregar mais' }))
+
+    expect(await screen.findByRole('button', { name: 'Carregando…' })).toBeDisabled()
+  })
+
   it('links to the own registrations', async () => {
     renderEventsPage({ [LIST]: pageOf([]) })
 

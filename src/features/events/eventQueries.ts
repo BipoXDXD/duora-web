@@ -21,7 +21,10 @@ interface Page<T> {
 const FIRST_PAGE: string | null = null
 
 /** Uma lista paginada por cursor, com as páginas já carregadas juntas em `items`. */
-export function usePagedList<T>(queryKey: readonly string[], fetchPage: (pageToken: string | null) => Promise<Page<T>>) {
+export function usePagedList<T>(
+  queryKey: readonly string[],
+  fetchPage: (pageToken: string | null) => Promise<Page<T>>,
+) {
   const query = useInfiniteQuery({
     queryKey,
     queryFn: ({ pageParam }) => fetchPage(pageParam),

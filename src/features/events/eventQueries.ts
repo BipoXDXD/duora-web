@@ -35,6 +35,7 @@ export function usePagedList<T>(
   return {
     items: query.data?.pages.flatMap((page) => page.items),
     hasFailed: query.isError && query.data === undefined,
+    error: query.error,
     retry: () => void query.refetch(),
     loadMore: {
       hasNextPage: query.hasNextPage,

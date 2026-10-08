@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
+import { ConnectionsPage } from '../features/connections/ConnectionsPage.tsx'
 import { BlockedAccountsPage } from '../features/blocks/BlockedAccountsPage.tsx'
 import { EventPage } from '../features/events/EventPage.tsx'
 import { EventsPage } from '../features/events/EventsPage.tsx'
@@ -48,6 +49,8 @@ function Page({ route }: { readonly route: Route }) {
       return <EventPage eventId={route.eventId} />
     case 'registrations':
       return <MyRegistrationsPage />
+    case 'connections':
+      return <ConnectionsPage />
     case 'notFound':
       return <NotFoundPage />
   }

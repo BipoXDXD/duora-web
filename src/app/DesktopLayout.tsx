@@ -45,6 +45,12 @@ export function DesktopLayout({ route, children }: DesktopLayoutProps) {
                 isCurrent={isEventsRoute(route)}
               />
               <MemberLink
+                to={PATHS.connections}
+                label="Conexões"
+                className={NAV_LINK_CLASS}
+                isCurrent={route.page === 'connections'}
+              />
+              <MemberLink
                 to={PATHS.profile}
                 label="Meu perfil"
                 className={NAV_LINK_CLASS}

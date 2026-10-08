@@ -87,7 +87,8 @@ inferior do celular. As páginas do perfil mostram "Entre para ver…" a quem n�
 
 Em produção, o servidor de arquivos estáticos precisa devolver o `index.html` para `/perfil` e
 `/perfil/bloqueios` (SPA fallback), para o recarregar e o link direto funcionarem. O `vite dev` e o `vite
-preview` já fazem isso.
+preview` já fazem isso; no Azure Static Web Apps é o `public/staticwebapp.config.json`
+(veja [Publicação](#publicação-azure-static-web-apps)).
 
 ### Meu perfil
 
@@ -257,6 +258,7 @@ com o `culori` sobre os tokens lidos do `index.css` (veja [Tokens e temas](#toke
 src/
   app/                 casca: App, os dois layouts, o breakpoint, a página inicial e o tema
     theme/             escolha de tema (data-theme + localStorage) e o botão
+  deploy/              teste da configuração do Static Web Apps e da CSP frente ao build
   features/
     auth/              sessão (GET /api/me), logout, URL de login, os controles dos cabeçalhos e o RequireSession
     blocks/            contas bloqueadas: listagem paginada e desbloqueio
@@ -279,6 +281,65 @@ docs/
 
 O código fica organizado por feature, como os módulos da duora-api.
 
+## Publicação (Azure Static Web Apps)
+
+O front é publicado no Azure Static Web Apps (ADR 0014 da duora-api). A configuração fica em
+`public/staticwebapp.config.json`; o Vite a copia para a raiz de `dist/`, onde o SWA a lê.
+
+- **Fallback de navegação:** todo caminho que não é arquivo devolve `/index.html` (o roteador do app decide a
+  página), então recarregar `/perfil` ou abrir um link direto funciona. Ficam **fora** do fallback, para dar 404
+  em vez de HTML: `/assets/*`, `/images/*`, `/backgrounds/*`, arquivos soltos na raiz por extensão (favicon,
+  ícones, `.js`, `.css`...) e os caminhos que pertencem ao BFF, os mesmos que o Vite repassa em desenvolvimento
+  (`/api/*`, `/oauth2/*`, `/login/oauth2/*`, `/logout`, `/actuator/*`). Uma rota nova do app (`/eventos`...)
+  não precisa de mudança aqui; um prefixo novo do BFF precisa entrar em `exclude` (o teste falha se o proxy do
+  `vite.config.ts` e a lista divergirem).
+- **Sem papéis do SWA:** o arquivo não define `routes` com `allowedRoles`, `rewrite` nem `redirect`. Quem
+  autentica é o BFF (ADR 0002); a única regra de `routes` é o cache de `/assets/*`.
+- **Cache:** `/assets/*` leva `public, max-age=31536000, immutable` (o nome tem hash do conteúdo). O resto,
+  inclusive o `index.html` e as páginas do fallback, leva `no-cache` (guarda, mas revalida), para um deploy novo
+  valer na hora. No SWA os headers de `routes` não valem para respostas do fallback, por isso o `no-cache` é
+  global.
+- **Headers de segurança** (globais):
+  - `Content-Security-Policy`: `default-src 'self'`, `script-src 'self'`, `style-src 'self'` (sem `unsafe-inline`
+    nem `unsafe-eval`), `img-src` e `font-src` com `'self' data:` (o grão do fundo é um SVG em `data:` e o Vite
+    embute uma fonte pequena), `connect-src 'self'`, `object-src 'none'`, `base-uri 'self'`,
+    `form-action 'self'`, `frame-ancestors 'none'` e `upgrade-insecure-requests`. Nenhum script ou estilo é
+    inline. Se um componente passar a usar `style={...}`, o React o aplica pelo CSSOM, que a CSP não bloqueia (só
+    o atributo `style=` escrito no HTML seria bloqueado).
+  - `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` (redundante com `frame-ancestors`, para
+    navegador antigo), `Referrer-Policy: strict-origin-when-cross-origin`, `Cross-Origin-Opener-Policy:
+    same-origin` e `Strict-Transport-Security: max-age=31536000` (sem `includeSubDomains` nem `preload`, que
+    seriam difíceis de desfazer).
+  - `Permissions-Policy` nega sensores, câmera, microfone, localização, pagamento e USB. Quando uma feature
+    pedir um deles (voz na sala, por exemplo), libere só ele, aqui.
+- **Como conferir:** `src/deploy/staticwebapp.config.test.ts` lê o JSON (fallback, exclusões, headers) e roda um
+  `vite build` num diretório temporário para checar que o `dist/index.html` e o CSS gerados não usam nada que a
+  CSP bloqueie (script, estilo ou handler inline, nem fonte ou imagem de outra origem). Em 2026-10-07 o build
+  também foi servido com esses headers num navegador real, sem violação de CSP e com as fontes e as imagens
+  carregadas. A CSP depende do build: ao trocar de fonte, adicionar CDN, analytics ou imagem externa, o teste
+  falha e a política muda junto com o código.
+- **Em produção, confira uma vez:** `curl -I https://<site>/perfil` deve mostrar `200` e os headers acima, e
+  `curl -I https://<site>/api/me` não pode devolver HTML (sem a saída para o BFF o esperado é um 404 do SWA).
+
+### Pendência: SWA e BFF
+
+O BFF exige que front e API estejam na **mesma origem** (ADR 0002): o cookie `__Host-DUORA_SESSION` não tem
+`Domain`, o `XSRF-TOKEN` só é lido pelo JavaScript da origem que o recebeu, não há CORS, e o `redirect_uri` do
+Entra é `/login/oauth2/code/entra` no mesmo host. Hoje o SWA (`*.azurestaticapps.net`) e o Container Apps
+(`*.azurecontainerapps.io`) são sites diferentes, então o login web **não funciona** entre eles. A decisão é do
+usuário (a ADR 0014 deixa o domínio próprio como pendência 4). Opções, sem nada implementado:
+
+| Opção | Prós | Contras |
+|---|---|---|
+| **A. Front Door (ou Application Gateway) num domínio próprio**, com rotas `/api`, `/oauth2`, `/login/oauth2`, `/logout` para o Container Apps e o resto para o SWA | Mesma origem real; o BFF não muda; o front continua em SWA | Serviço a mais (custo fixo mensal e a configuração de rotas/WAF); exige domínio próprio; o SWA precisa aceitar o host do Front Door (`forwardingGateway`, plano Standard) |
+| **B. Plano Standard do SWA com o Container Apps "linkado"** (proxy de `/api/*`) | Sem serviço extra; mesma origem para `/api` | Só proxia `/api`: o BFF teria de mover `/oauth2`, `/login/oauth2` e `/logout` para baixo de `/api` (mudança na API e novos redirect URIs no Entra); o Container Apps passa a aceitar só tráfego vindo do SWA (a documentação diz que remover isso exige apagar o identity provider; pode afetar o app mobile com bearer e a verificação de readiness pelo ingress); teto de 45 s por requisição; Standard é pago |
+| **C. Servir o front pelo próprio BFF** (arquivos do `dist/` na imagem da API ou num nginx na frente, no Container Apps) | Mesma origem trivial; sem domínio próprio no piloto; um deploy só | Abandona o SWA da ADR 0014 (exigiria revisá-la); o front passa a ser deploy do container; perde CDN global do SWA |
+| **D. Subdomínios do mesmo site (`app.` e `api.`) com cookie de domínio** | Sem serviço extra, só DNS | Incompatível com o `__Host-` e com a ADR 0002 (CORS, CSRF e `connect-src` mudam; o cookie `XSRF-TOKEN` fica ilegível para o front); reabre a decisão de segurança do BFF |
+
+Recomendação: **A** se o piloto precisar do SWA com a API como está (custo e configuração a mais, nenhuma mudança
+na API); **C** se o objetivo for a opção mais simples até haver usuários reais. Qualquer que seja a escolha, a
+`connect-src 'self'` da CSP continua valendo nas opções A, B e C; só a D a muda.
+
 ## CI
 
 O GitHub Actions (`.github/workflows/ci.yml`) roda lint, checagem de tipos, a checagem de drift dos tipos
@@ -288,5 +349,6 @@ gerados da spec, testes com cobertura e build. Também roda o gitleaks sobre tod
 
 - A cópia da spec em `api/openapi.json` é atualizada à mão; o CI não a compara com a da duora-api, que é um
   repositório privado. Quando o contrato mudar na API, rode a atualização acima.
-- O SPA fallback (`index.html` para `/perfil` e `/perfil/bloqueios`) precisa existir onde o front for publicado.
+- Como o SWA fala com o BFF (mesma origem, Front Door ou outra saída) está em aberto e depende de decisão do
+  usuário; veja [Pendência: SWA e BFF](#pendência-swa-e-bff). A CSP (`connect-src 'self'`) pressupõe a mesma origem.
 - A lista de bloqueios não tem o nome nem a foto de quem foi bloqueado, porque a API não os manda.

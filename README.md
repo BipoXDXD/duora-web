@@ -104,8 +104,8 @@ link direto funcionarem. O `vite dev` e o `vite preview` já fazem isso; no Azur
   nascimento de maior de 18 e no máximo 120 anos, informada uma vez só) e manda no `PATCH` só os campos que
   mudaram, com `If-Match`. Campo apagado vira `null`; a data de nascimento já informada aparece como texto.
 - **412** (o perfil mudou em outra aba ou aparelho): o front lê o perfil de novo, mantém os campos que a pessoa
-  editou, mostra a versão nova dos outros e pede para conferir e salvar de novo. **409** faz o mesmo, explicando
-  que a data de nascimento já tinha sido informada.
+  editou, mostra a versão nova dos outros e pede para conferir e salvar de novo. **409** com `reason`
+  `BIRTH_DATE_ALREADY_SET` faz o mesmo, explicando que a data de nascimento já tinha sido informada.
 - **400**: a API lista os campos recusados em `errors: [{field, code}]` (`ValidationProblemDetail` da spec, ADR 0018
   da duora-api). O front escolhe a mensagem em português pelo par (campo, `code`), mostra todos os erros de uma vez
   e põe o foco no primeiro campo com erro, na ordem da tela. Se algum erro não for de um campo do formulário
@@ -132,14 +132,27 @@ link direto funcionarem. O `vite dev` e o `vite preview` já fazem isso; no Azur
 - No evento que ainda vai começar, `GET /api/events/{id}/registration` diz se a pessoa está inscrita.
   "Quero me inscrever" faz `PUT` (repetir é seguro) e "Cancelar inscrição" pede confirmação antes do `DELETE`.
   Cada falha esperada tem mensagem própria:
-  - **403**: o perfil precisa estar completo e a pessoa ter 18 anos; o aviso traz o link "Completar meu perfil".
-    O 403 por CSRF não chega a acontecer, porque o cliente HTTP sempre manda o token.
-  - **409**: o evento lotou, foi cancelado ou começou (a API não diz qual); o front relê o evento.
-  - **503**: muita gente se inscrevendo; o aviso diz quantos segundos esperar pelo `Retry-After`.
+  - **403** (`reason` da ADR 0020 da duora-api): `PROFILE_INCOMPLETE` pede o perfil completo (nome, data de
+    nascimento e região) e traz o link "Completar meu perfil"; `UNDERAGE` diz que os eventos são só para maiores de
+    18 anos, **sem** o link, porque a data de nascimento não muda. O 403 por CSRF não chega a acontecer, porque o
+    cliente HTTP sempre manda o token.
+  - **409**: `EVENT_FULL`, `EVENT_CANCELLED`, `EVENT_STARTED` e `EVENT_ENDED` têm mensagem própria; o front relê o
+    evento. No cancelamento, `EVENT_STARTED` e `EVENT_ENDED` também.
+  - **Sem `reason`, ou com um que o front não conhece**, vale a recusa genérica do status (a API manda tratar
+    assim): 403 diz que a conta não pode participar do evento e 409 lista os motivos possíveis. O `reason` é lido
+    em `ApiError.refusalReason` (`UNRECOGNIZED` quando não conhecido, `null` quando ausente); um teste de tipo
+    confere a lista contra a spec.
+  - **503** e **429** (limite de inscrições e cancelamentos da conta): o aviso diz quantos segundos esperar pelo
+    `Retry-After`, na inscrição e no cancelamento, sem apontar o motivo.
   - **404**: o evento sumiu; **401**: "Entrar de novo"; o resto: "Tente de novo".
-- Durante o evento, quem está inscrito digita a rodada que o anfitrião anunciou (1 a 100) e vê a dupla, que ficou
-  de fora, ou que a rodada ainda não começou (404). O front não sabe quantas rodadas existem; "Ver a rodada N+1"
-  avança. A API só manda o id da dupla, então a tela mostra os últimos 8 caracteres, como nas contas bloqueadas.
+- Durante o evento, quem está inscrito vê a dupla da **rodada atual**, que vem de `currentRound` no
+  `GET /api/events/{id}` (a última rodada iniciada, de 1 a 100). Não há campo para digitar. "Rodada anterior" e
+  "Rodada seguinte" andam de 1 até a atual (só aparecem com mais de uma rodada). Se a pessoa estava na rodada, a
+  tela mostra a conta da dupla ou que ela ficou de fora; um 404 numa rodada já iniciada é "você não estava nela".
+  Com `currentRound` `null`, a tela diz "Nenhuma rodada começou ainda". "Ver se começou outra rodada" relê o evento
+  (a página não muda sozinha): quem acompanha a atual passa para a nova, quem escolheu uma anterior fica nela. A
+  lista de eventos manda `currentRound` sempre `null`, porque só traz eventos que ainda vão começar. A API só manda
+  o id da dupla, então a tela mostra os últimos 8 caracteres, como nas contas bloqueadas.
 
 ### Decisão privada e conexões
 
@@ -157,7 +170,8 @@ contato com a dupla; se as duas disserem sim, surge uma conexão.
 - **O front nunca recebe a decisão do par, e a tela depende só da própria.** O schema guarda só `interested` e
   `decidedAt` (um teste de tipo garante que não há outro campo), a tela da decisão não lê a lista de conexões, e
   um teste mostra o mesmo texto com campos sobre o par contrabandeados na resposta e com a conexão já na lista.
-- Falhas: **409** (já tinha decidido, com a outra escolha) avisa que a decisão é final e relê a que vale; **404**
+- Falhas: **409** com `reason` `DECISION_ALREADY_MADE` (já tinha decidido, com a outra escolha) avisa que a decisão é
+  final e relê a que vale (um 409 sem esse `reason` vira "Tente de novo", sem afirmar nada); **404**
   diz que não há o que decidir nesta rodada; **503** e **429** pedem para esperar o `Retry-After` e mantêm a
   confirmação para tentar de novo, sem dizer nada sobre o par (o 503 da API vem da espera pela decisão do par, e a
   mensagem não conta isso); **401** oferece "Entrar de novo"; o resto, "Tente de novo". Erro é `role="alert"`;
@@ -404,13 +418,12 @@ gerados da spec, testes com cobertura e build. Também roda o gitleaks sobre tod
 - Como o SWA fala com o BFF (mesma origem, Front Door ou outra saída) está em aberto e depende de decisão do
   usuário; veja [Pendência: SWA e BFF](#pendência-swa-e-bff). A CSP (`connect-src 'self'`) pressupõe a mesma origem.
 - A lista de bloqueios não tem o nome nem a foto de quem foi bloqueado, porque a API não os manda.
-- Eventos: a API não diz quantas rodadas o evento tem nem qual está valendo, então a pessoa digita o número. Um
-  campo `currentRound` (ou a lista de rodadas iniciadas) no evento permitiria mostrar a dupla sem perguntar.
 - A dupla aparece só pelo fim do id da conta, porque a API não manda nome nem foto do par.
-- O 409 da inscrição junta lotado, cancelado e começado; um código por motivo no ProblemDetail deixaria a
-  mensagem exata. A lista também não mostra vagas restantes, que a API não expõe.
-- A fase do evento (em andamento, encerrado) é calculada quando ele é lido; a página não muda sozinha quando o
-  evento começa com ela aberta.
+- A lista de eventos não mostra vagas restantes, que a API não expõe.
+- A fase do evento (em andamento, encerrado) e a rodada atual são calculadas quando o evento é lido; a página não
+  muda sozinha quando o evento começa ou o anfitrião inicia uma rodada com ela aberta. Durante o evento, "Ver se
+  começou outra rodada" relê o evento; antes dele, é preciso recarregar a página. Um polling ou o Web PubSub
+  resolveriam, e dependem de decisão.
 - Decisão e conexões (UX, dependem de decisões da API, ADR 0019):
   - A conexão aparece só pelo fim do id e pela data; nome e foto dependem de uma API publicada do perfil. Também não
     há como chegar dela à pessoa (chat, desconectar).

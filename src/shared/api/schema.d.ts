@@ -230,7 +230,7 @@ export interface paths {
         get: operations["getMyDecision"];
         /**
          * Decide se continua em contato com o par da rodada
-         * @description Uma decisão por pessoa e rodada, e final: repetir a mesma escolha devolve a mesma decisão (200); a outra escolha é recusada (409). A resposta é a mesma qualquer que seja a decisão do par; se os dois disserem sim, a conexão aparece em listMyConnections.
+         * @description Uma decisão por pessoa e rodada, e final: repetir a mesma escolha devolve a mesma decisão (200); a outra escolha é recusada (409). A resposta é a mesma qualquer que seja a decisão do par; se os dois disserem sim, a conexão aparece em listMyConnections. Cada chamada, repetida ou não, gasta o limite da conta: 120 por hora, repostas aos poucos.
          */
         put: operations["decideAboutMyPartner"];
         post?: never;
@@ -635,6 +635,11 @@ export interface components {
             region?: "BR-AC" | "BR-AL" | "BR-AP" | "BR-AM" | "BR-BA" | "BR-CE" | "BR-DF" | "BR-ES" | "BR-GO" | "BR-MA" | "BR-MT" | "BR-MS" | "BR-MG" | "BR-PA" | "BR-PB" | "BR-PR" | "BR-PE" | "BR-PI" | "BR-RJ" | "BR-RN" | "BR-RS" | "BR-RO" | "BR-RR" | "BR-SC" | "BR-SP" | "BR-SE" | "BR-TO" | null;
         };
         EventResponse: {
+            /**
+             * Format: int32
+             * @description Número da última rodada iniciada, ou null antes da primeira. Na lista, sempre null: ela só traz eventos que ainda não começaram
+             */
+            currentRound: number | null;
             /** @description Descrição curta, em parágrafos */
             description: string;
             /**
@@ -787,6 +792,24 @@ export interface components {
              * @enum {string|null}
              */
             region: "BR-AC" | "BR-AL" | "BR-AP" | "BR-AM" | "BR-BA" | "BR-CE" | "BR-DF" | "BR-ES" | "BR-GO" | "BR-MA" | "BR-MT" | "BR-MS" | "BR-MG" | "BR-PA" | "BR-PB" | "BR-PR" | "BR-PE" | "BR-PI" | "BR-RJ" | "BR-RN" | "BR-RS" | "BR-RO" | "BR-RR" | "BR-SC" | "BR-SP" | "BR-SE" | "BR-TO" | null;
+        };
+        /** @description Ação recusada pela regra de negócio, no formato RFC 9457. Além do detail, em inglês e para pessoas, reason diz a máquinas o motivo. Trate um reason desconhecido, ou a falta dele, como recusa genérica do status. */
+        RefusalProblemDetail: {
+            detail?: string;
+            /** Format: uri-reference */
+            instance?: string;
+            /**
+             * @description EVENT_NOT_PUBLISHED: o evento é rascunho. EVENT_ALREADY_PUBLISHED: já publicado. EVENT_CANCELLED: cancelado. EVENT_STARTED: já começou. EVENT_ENDED: já acabou. EVENT_FULL: sem vagas. EVENT_NOT_UNDERWAY: fora do horário ou não publicado, para iniciar rodada. ROUND_OUT_OF_SEQUENCE: a rodada anterior não existe. PROFILE_INCOMPLETE (403): falta nome, data de nascimento ou região. UNDERAGE (403): menor de 18 anos. BIRTH_DATE_ALREADY_SET: a data de nascimento não muda.
+             * @enum {string}
+             */
+            reason?: "EVENT_NOT_PUBLISHED" | "EVENT_ALREADY_PUBLISHED" | "EVENT_CANCELLED" | "EVENT_STARTED" | "EVENT_ENDED" | "EVENT_FULL" | "EVENT_NOT_UNDERWAY" | "ROUND_OUT_OF_SEQUENCE" | "PROFILE_INCOMPLETE" | "UNDERAGE" | "BIRTH_DATE_ALREADY_SET" | "DECISION_ALREADY_MADE";
+            /** @description Correlation ID, o mesmo do header X-Request-Id; vem nos erros inesperados (500) */
+            requestId?: string;
+            /** Format: int32 */
+            status: number;
+            title: string;
+            /** Format: uri-reference */
+            type?: string;
         };
         RegistrationResponse: {
             /**
@@ -1230,7 +1253,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                    "application/problem+json": components["schemas"]["RefusalProblemDetail"];
                 };
             };
             /** @description Limite de rodadas desta conta ADMIN esgotado */
@@ -1412,7 +1435,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                    "application/problem+json": components["schemas"]["RefusalProblemDetail"];
                 };
             };
             /** @description Erro inesperado */
@@ -1496,7 +1519,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                    "application/problem+json": components["schemas"]["RefusalProblemDetail"];
                 };
             };
             /** @description Erro inesperado */
@@ -1743,7 +1766,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                    "application/problem+json": components["schemas"]["RefusalProblemDetail"];
                 };
             };
             /** @description Evento inexistente ou rascunho */
@@ -1763,7 +1786,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                    "application/problem+json": components["schemas"]["RefusalProblemDetail"];
                 };
             };
             /** @description Limite de inscrições e cancelamentos desta conta esgotado */
@@ -1869,7 +1892,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                    "application/problem+json": components["schemas"]["RefusalProblemDetail"];
                 };
             };
             /** @description Limite de inscrições e cancelamentos desta conta esgotado */
@@ -2061,12 +2084,24 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                    "application/problem+json": components["schemas"]["RefusalProblemDetail"];
                 };
             };
             /** @description Corpo em outro formato que não application/json */
             415: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Limite de decisões desta conta esgotado; nada foi gravado */
+            429: {
+                headers: {
+                    /** @description Segundos até a próxima chamada ficar disponível */
+                    "Retry-After": number;
                     "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
@@ -2084,7 +2119,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetail"];
                 };
             };
-            /** @description A decisão do par na mesma rodada demorou além do teto; nada foi gravado */
+            /** @description A decisão do par na mesma rodada demorou além do teto, ou o limite desta conta não pôde ser contado; nada foi gravado */
             503: {
                 headers: {
                     /** @description Segundos até tentar de novo */
@@ -2489,7 +2524,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                    "application/problem+json": components["schemas"]["RefusalProblemDetail"];
                 };
             };
             /** @description O If-Match não é o ETag atual: o perfil mudou desde a leitura, ou o valor não é um ETag */

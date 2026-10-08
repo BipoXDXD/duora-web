@@ -87,7 +87,7 @@ describe('decide', () => {
   it.each([
     [401, { kind: 'signedOut' }],
     [404, { kind: 'notPaired' }],
-    [409, { kind: 'alreadyDecided' }],
+    [409, { kind: 'failed' }],
     [400, { kind: 'failed' }],
     [500, { kind: 'failed' }],
   ])('turns %i into %o', async (status, result) => {
@@ -95,6 +95,21 @@ describe('decide', () => {
 
     await expect(decide(EVENT_ID, 2, true)).resolves.toEqual(result)
   })
+
+  it('turns a 409 with the reason DECISION_ALREADY_MADE into already decided', async () => {
+    fetchMock.mockResolvedValue(json({ title: 'Conflict', status: 409, reason: 'DECISION_ALREADY_MADE' }, 409))
+
+    await expect(decide(EVENT_ID, 2, true)).resolves.toEqual({ kind: 'alreadyDecided' })
+  })
+
+  it.each(['EVENT_FULL', 'SOMETHING_NEW'])(
+    'does not call a 409 with the reason %s an already made decision',
+    async (reason) => {
+      fetchMock.mockResolvedValue(json({ title: 'Conflict', status: 409, reason }, 409))
+
+      await expect(decide(EVENT_ID, 2, true)).resolves.toEqual({ kind: 'failed' })
+    },
+  )
 
   it.each([503, 429])('asks to wait the Retry-After on %i', async (status) => {
     fetchMock.mockResolvedValue(new Response(null, { status, headers: { 'Retry-After': '2' } }))

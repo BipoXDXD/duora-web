@@ -23,6 +23,7 @@ const DINNER = {
   startsAt: '2026-10-10T22:00:00Z',
   endsAt: '2026-10-11T01:00:00Z',
   status: 'PUBLISHED',
+  currentRound: null,
 } as const
 
 function json(body: unknown, status = 200): Response {
@@ -67,6 +68,11 @@ describe('fetchEventsPage', () => {
     ['a start that is not a time', { ...DINNER, startsAt: 'amanhã' }],
     ['an unknown status', { ...DINNER, status: 'DRAFT' }],
     ['no title', { ...DINNER, title: undefined }],
+    ['no current round field', { ...DINNER, currentRound: undefined }],
+    ['a current round below the first', { ...DINNER, currentRound: 0 }],
+    ['a current round above the last', { ...DINNER, currentRound: 101 }],
+    ['a current round with a fraction', { ...DINNER, currentRound: 1.5 }],
+    ['a current round as text', { ...DINNER, currentRound: '2' }],
   ])('fails on an event with %s', async (_case, event) => {
     fetchMock.mockResolvedValue(json({ items: [event], nextPageToken: null }))
 
@@ -88,6 +94,14 @@ describe('fetchEvent', () => {
 
     expect(sentPath()).toBe(`/api/events/${DINNER.id}`)
     expect(event?.title).toBe('Jantar às cegas')
+  })
+
+  it.each([null, 1, 2, 100])('reads the current round %s as it came', async (currentRound) => {
+    fetchMock.mockResolvedValue(json({ ...DINNER, currentRound }))
+
+    const event = await fetchEvent(DINNER.id)
+
+    expect(event?.currentRound).toBe(currentRound)
   })
 
   it('returns null when the event does not exist', async () => {

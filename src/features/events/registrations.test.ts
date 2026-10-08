@@ -28,6 +28,14 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
+function refusal(status: number, reason?: string, headers: Readonly<Record<string, string>> = {}): Response {
+  const body = { title: 'Erro', status, ...(reason !== undefined && { reason }) }
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/problem+json', ...headers },
+  })
+}
+
 function sentRequest(): { path: unknown; init: RequestInit } {
   const call = fetchMock.mock.calls[0]
   if (call === undefined) {
@@ -85,20 +93,57 @@ describe('register', () => {
 
   it.each([
     [401, { kind: 'signedOut' }],
-    [403, { kind: 'profileIncomplete' }],
+    [403, { kind: 'notAllowed' }],
     [404, { kind: 'notFound' }],
-    [409, { kind: 'unavailable' }],
+    [409, { kind: 'unavailable', cause: null }],
     [500, { kind: 'failed' }],
-  ] as const)('reports %s as %o', async (status, result) => {
+  ] as const)('reports %s without a reason as %o', async (status, result) => {
     fetchMock.mockResolvedValue(new Response(null, { status }))
 
     await expect(register(EVENT_ID)).resolves.toEqual(result)
   })
 
-  it('reports 503 as busy, with the seconds to wait', async () => {
-    fetchMock.mockResolvedValue(new Response(null, { status: 503, headers: { 'Retry-After': '3' } }))
+  it.each([
+    ['PROFILE_INCOMPLETE', { kind: 'profileIncomplete' }],
+    ['UNDERAGE', { kind: 'underage' }],
+    ['EVENT_FULL', { kind: 'notAllowed' }],
+    ['EVENT_FROM_THE_FUTURE', { kind: 'notAllowed' }],
+  ] as const)('reports a 403 with the reason %s as %o', async (reason, result) => {
+    fetchMock.mockResolvedValue(refusal(403, reason))
+
+    await expect(register(EVENT_ID)).resolves.toEqual(result)
+  })
+
+  it.each([
+    ['EVENT_FULL', 'full'],
+    ['EVENT_CANCELLED', 'cancelled'],
+    ['EVENT_STARTED', 'started'],
+    ['EVENT_ENDED', 'ended'],
+    ['EVENT_NOT_PUBLISHED', null],
+    ['UNDERAGE', null],
+    ['EVENT_FROM_THE_FUTURE', null],
+  ] as const)('reports a 409 with the reason %s as unavailable because of %s', async (reason, cause) => {
+    fetchMock.mockResolvedValue(refusal(409, reason))
+
+    await expect(register(EVENT_ID)).resolves.toEqual({ kind: 'unavailable', cause })
+  })
+
+  it('reports a 409 whose body has no reason as the generic refusal', async () => {
+    fetchMock.mockResolvedValue(refusal(409))
+
+    await expect(register(EVENT_ID)).resolves.toEqual({ kind: 'unavailable', cause: null })
+  })
+
+  it.each([429, 503])('reports %s as busy, with the seconds to wait', async (status) => {
+    fetchMock.mockResolvedValue(new Response(null, { status, headers: { 'Retry-After': '3' } }))
 
     await expect(register(EVENT_ID)).resolves.toEqual({ kind: 'busy', retryAfterSeconds: 3 })
+  })
+
+  it('reports a 429 without Retry-After as busy, without a wait', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 429 }))
+
+    await expect(register(EVENT_ID)).resolves.toEqual({ kind: 'busy', retryAfterSeconds: null })
   })
 
   it('reports a network failure as failed', async () => {
@@ -135,12 +180,29 @@ describe('cancelRegistration', () => {
   it.each([
     [401, { kind: 'signedOut' }],
     [404, { kind: 'notFound' }],
-    [409, { kind: 'alreadyStarted' }],
+    [409, { kind: 'tooLate', cause: null }],
     [500, { kind: 'failed' }],
-  ] as const)('reports %s as %o', async (status, result) => {
+  ] as const)('reports %s without a reason as %o', async (status, result) => {
     fetchMock.mockResolvedValue(new Response(null, { status }))
 
     await expect(cancelRegistration(EVENT_ID)).resolves.toEqual(result)
+  })
+
+  it.each([
+    ['EVENT_STARTED', 'started'],
+    ['EVENT_ENDED', 'ended'],
+    ['EVENT_CANCELLED', null],
+    ['EVENT_FROM_THE_FUTURE', null],
+  ] as const)('reports a 409 with the reason %s as too late because of %s', async (reason, cause) => {
+    fetchMock.mockResolvedValue(refusal(409, reason))
+
+    await expect(cancelRegistration(EVENT_ID)).resolves.toEqual({ kind: 'tooLate', cause })
+  })
+
+  it.each([429, 503])('reports %s as busy, with the seconds to wait', async (status) => {
+    fetchMock.mockResolvedValue(new Response(null, { status, headers: { 'Retry-After': '7' } }))
+
+    await expect(cancelRegistration(EVENT_ID)).resolves.toEqual({ kind: 'busy', retryAfterSeconds: 7 })
   })
 
   it('reports a network failure as failed', async () => {

@@ -1,4 +1,3 @@
-import { FIRST_ROUND, LAST_ROUND } from './pairing.ts'
 import type { EventPhase } from './events.ts'
 
 /** Sem `timeZone`: o Intl usa o fuso de quem está com o app aberto. */
@@ -34,16 +33,4 @@ const ACCOUNT_CODE_LENGTH = 8
 
 export function accountCode(accountId: string): string {
   return accountId.slice(-ACCOUNT_CODE_LENGTH)
-}
-
-const WHOLE_NUMBER = /^\d+$/
-
-/** O número da rodada digitado, ou `null` fora de 1 a 100, a faixa que a API aceita. */
-export function parseRoundNumber(text: string): number | null {
-  const trimmed = text.trim()
-  if (!WHOLE_NUMBER.test(trimmed)) {
-    return null
-  }
-  const round = Number(trimmed)
-  return round >= FIRST_ROUND && round <= LAST_ROUND ? round : null
 }

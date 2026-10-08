@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { accountCode, formatEventTime, parseRoundNumber, PHASE_LABELS } from './eventText.ts'
+import { accountCode, formatEventTime, PHASE_LABELS } from './eventText.ts'
 
 describe('formatEventTime', () => {
   it('shows the weekday, the day and the hours in the time zone of the user', () => {
@@ -29,19 +29,5 @@ describe('PHASE_LABELS', () => {
 describe('accountCode', () => {
   it('is the end of the account id', () => {
     expect(accountCode('0199a1d2-1111-7aaa-8bbb-cccc1a2b3c4d')).toBe('1a2b3c4d')
-  })
-})
-
-describe('parseRoundNumber', () => {
-  it.each([
-    ['1', 1],
-    ['100', 100],
-    [' 7 ', 7],
-  ])('reads %j as round %i', (text, round) => {
-    expect(parseRoundNumber(text)).toBe(round)
-  })
-
-  it.each(['', '  ', '0', '101', '-1', '1.5', '2e1', 'um', '1 2'])('rejects %j', (text) => {
-    expect(parseRoundNumber(text)).toBeNull()
   })
 })

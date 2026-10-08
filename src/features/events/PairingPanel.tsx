@@ -1,101 +1,125 @@
-import { useQuery } from '@tanstack/react-query'
-import { useId, useState, type FormEvent } from 'react'
+import { useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useId, useState } from 'react'
 import { DecisionPanel } from '../connections/DecisionPanel.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
-import { FIELD_CONTROL, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
+import { SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
 import { EVENT_KEYS, READ_OPTIONS } from './eventQueries.ts'
-import { accountCode, parseRoundNumber } from './eventText.ts'
-import { fetchPairing, LAST_ROUND, type Pairing } from './pairing.ts'
+import { accountCode } from './eventText.ts'
+import { fetchPairing, FIRST_ROUND, type Pairing } from './pairing.ts'
 
 interface PairingPanelProps {
   readonly eventId: string
+  /** A última rodada que o anfitrião iniciou, ou `null` se nenhuma começou (`EventResponse.currentRound`). */
+  readonly currentRound: number | null
 }
 
-const FIRST_ROUND_TEXT = '1'
-
 /**
- * "Sua dupla na rodada N" para quem está inscrito num evento em andamento. O front não sabe quantas rodadas
- * existem nem qual está valendo: a pessoa digita o número (o anfitrião anuncia) e pode avançar para a próxima.
+ * "Sua dupla" para quem está inscrito num evento em andamento. A rodada vem do evento: a atual é a padrão, e
+ * as anteriores (1 até a atual) ficam a um botão de distância. Rodada que ainda não começou não se pede.
  */
-export function PairingPanel({ eventId }: PairingPanelProps) {
-  const [roundText, setRoundText] = useState(FIRST_ROUND_TEXT)
-  const [round, setRound] = useState<number | null>(null)
-  const [isRoundInvalid, setIsRoundInvalid] = useState(false)
+export function PairingPanel({ eventId, currentRound }: PairingPanelProps) {
   const headingId = useId()
-  const fieldId = useId()
-  const problemId = useId()
-  const query = useQuery({
-    queryKey: EVENT_KEYS.pairing(eventId, round ?? 0),
-    queryFn: () => fetchPairing(eventId, round ?? 0),
-    enabled: round !== null,
-    ...READ_OPTIONS,
-  })
-
-  function showRound(next: number) {
-    setIsRoundInvalid(false)
-    setRoundText(String(next))
-    if (next === round) {
-      void query.refetch()
-    } else {
-      setRound(next)
-    }
-  }
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const parsed = parseRoundNumber(roundText)
-    if (parsed === null) {
-      setIsRoundInvalid(true)
-      return
-    }
-    showRound(parsed)
-  }
-
   return (
     <section aria-labelledby={headingId} className="flex flex-col items-start gap-4">
       <h2 id={headingId} className="font-display text-2xl font-medium text-fg">
         Sua dupla
       </h2>
-      <p className="text-fg-muted">Informe a rodada que o anfitrião anunciou.</p>
-      <form noValidate onSubmit={submit} className="flex flex-wrap items-end gap-4">
-        <div className="flex flex-col gap-2">
-          <label htmlFor={fieldId} className="font-semibold text-fg">
-            Rodada
-          </label>
-          <input
-            id={fieldId}
-            type="text"
-            inputMode="numeric"
-            value={roundText}
-            onChange={(event) => setRoundText(event.target.value)}
-            aria-invalid={isRoundInvalid}
-            aria-describedby={isRoundInvalid ? problemId : undefined}
-            className={`${FIELD_CONTROL} max-w-28`}
-          />
-        </div>
-        <button type="submit" className={PRIMARY_BUTTON}>
-          Ver minha dupla
-        </button>
-      </form>
-      {isRoundInvalid && (
-        <p id={problemId} className="text-sm font-semibold text-danger">
-          {`Informe um número de rodada de 1 a ${LAST_ROUND}.`}
-        </p>
+      {currentRound === null ? (
+        <NoRoundYet eventId={eventId} />
+      ) : (
+        <Rounds eventId={eventId} currentRound={currentRound} />
       )}
-      <div aria-live="polite" className="flex w-full flex-col items-start gap-4">
-        {round !== null && (
-          <RoundResult
-            eventId={eventId}
-            round={round}
-            pairing={query.data}
-            isLoading={query.isFetching}
-            hasFailed={query.isError}
-            onRetry={() => void query.refetch()}
-            onNextRound={() => showRound(round + 1)}
-          />
-        )}
-      </div>
     </section>
+  )
+}
+
+function NoRoundYet({ eventId }: { readonly eventId: string }) {
+  return (
+    <>
+      <p className="text-lg text-fg">Nenhuma rodada começou ainda.</p>
+      <CheckForRounds eventId={eventId} label="Ver se a primeira rodada começou" />
+    </>
+  )
+}
+
+/**
+ * Relê o evento, que é onde a API diz qual rodada está valendo. A página não muda sozinha quando o anfitrião
+ * inicia uma rodada.
+ */
+function CheckForRounds({ eventId, label }: { readonly eventId: string; readonly label: string }) {
+  const queryClient = useQueryClient()
+  const isChecking = useIsFetching({ queryKey: EVENT_KEYS.event(eventId) }) > 0
+  return (
+    <button
+      type="button"
+      onClick={() => void queryClient.invalidateQueries({ queryKey: EVENT_KEYS.event(eventId) })}
+      disabled={isChecking}
+      className={SECONDARY_BUTTON}
+    >
+      {isChecking ? 'Verificando…' : label}
+    </button>
+  )
+}
+
+interface RoundsProps {
+  readonly eventId: string
+  readonly currentRound: number
+}
+
+/**
+ * `chosen` é `null` enquanto a pessoa acompanha a rodada atual: quando o evento passa para a próxima, a tela
+ * acompanha. Escolher uma anterior fixa a escolha; voltar à atual a solta de novo.
+ */
+function Rounds({ eventId, currentRound }: RoundsProps) {
+  const [chosen, setChosen] = useState<number | null>(null)
+  const round = chosen ?? currentRound
+  const query = useQuery({
+    queryKey: EVENT_KEYS.pairing(eventId, round),
+    queryFn: () => fetchPairing(eventId, round),
+    ...READ_OPTIONS,
+  })
+
+  function showRound(next: number) {
+    setChosen(next === currentRound ? null : next)
+  }
+
+  return (
+    <>
+      <p className="text-fg-muted">
+        {round === currentRound ? `Rodada atual: ${round}.` : `Rodada ${round}. A rodada atual é a ${currentRound}.`}
+      </p>
+      <div aria-live="polite" className="flex w-full flex-col items-start gap-4">
+        <RoundResult
+          eventId={eventId}
+          round={round}
+          pairing={query.data}
+          isLoading={query.isFetching}
+          hasFailed={query.isError}
+          onRetry={() => void query.refetch()}
+        />
+      </div>
+      {currentRound > FIRST_ROUND && (
+        <div role="group" aria-label="Escolher a rodada" className="flex flex-wrap gap-4">
+          <button
+            type="button"
+            onClick={() => showRound(round - 1)}
+            disabled={round <= FIRST_ROUND}
+            className={SECONDARY_BUTTON}
+          >
+            Rodada anterior
+          </button>
+          <button
+            type="button"
+            onClick={() => showRound(round + 1)}
+            disabled={round >= currentRound}
+            className={SECONDARY_BUTTON}
+          >
+            Rodada seguinte
+          </button>
+        </div>
+      )}
+      <CheckForRounds eventId={eventId} label="Ver se começou outra rodada" />
+    </>
   )
 }
 
@@ -106,10 +130,9 @@ interface RoundResultProps {
   readonly isLoading: boolean
   readonly hasFailed: boolean
   readonly onRetry: () => void
-  readonly onNextRound: () => void
 }
 
-function RoundResult({ eventId, round, pairing, isLoading, hasFailed, onRetry, onNextRound }: RoundResultProps) {
+function RoundResult({ eventId, round, pairing, isLoading, hasFailed, onRetry }: RoundResultProps) {
   if (isLoading) {
     return <p className="text-fg-muted">{`Procurando sua dupla na rodada ${round}…`}</p>
   }
@@ -120,11 +143,6 @@ function RoundResult({ eventId, round, pairing, isLoading, hasFailed, onRetry, o
     <>
       <p className="w-full rounded-lg bg-surface p-4 text-lg text-fg shadow-raised">{pairingText(round, pairing)}</p>
       {pairing.kind === 'paired' && <DecisionPanel key={round} eventId={eventId} roundNumber={round} />}
-      {round < LAST_ROUND && (
-        <button type="button" onClick={onNextRound} className={SECONDARY_BUTTON}>
-          {`Ver a rodada ${round + 1}`}
-        </button>
-      )}
     </>
   )
 }
@@ -136,6 +154,6 @@ function pairingText(round: number, pairing: Pairing): string {
     case 'sittingOut':
       return `Na rodada ${round} você ficou de fora. Na próxima, quem ficou de fora tem prioridade.`
     case 'notInRound':
-      return `A rodada ${round} ainda não começou, ou você não estava nela.`
+      return `Você não estava na rodada ${round}.`
   }
 }

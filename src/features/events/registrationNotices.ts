@@ -1,4 +1,4 @@
-import type { CancelResult, RegisterResult } from './registrations.ts'
+import type { CancelResult, EventClosure, RegisterResult } from './registrations.ts'
 
 /**
  * O aviso depois de inscrever ou cancelar. `action` é o próximo passo que a tela oferece junto: completar
@@ -20,13 +20,18 @@ export function noticeOfRegister(result: RegisterResult): RegistrationNotice {
     case 'profileIncomplete':
       return {
         tone: 'error',
-        text: 'Para se inscrever, seu perfil precisa estar completo. Os eventos são só para maiores de 18 anos.',
+        text: 'Para se inscrever, seu perfil precisa estar completo: nome, data de nascimento e região.',
         action: 'completeProfile',
       }
+    case 'underage':
+      // Sem link para o perfil: a data de nascimento não muda, então "completar" não resolveria.
+      return error('Os eventos do Duora são só para maiores de 18 anos, por isso não foi possível fazer esta inscrição.')
+    case 'notAllowed':
+      return error('Não foi possível fazer a inscrição: sua conta não pode participar deste evento.')
     case 'unavailable':
-      return error('Não dá mais para se inscrever: o evento lotou, foi cancelado ou já começou.')
+      return error(UNAVAILABLE_TEXT[result.cause ?? 'unknown'])
     case 'busy':
-      return error(`Muita gente está se inscrevendo agora. Tente de novo ${waitText(result.retryAfterSeconds)}.`)
+      return error(busyText(result.retryAfterSeconds))
     case 'notFound':
       return error(GONE)
     case 'signedOut':
@@ -40,8 +45,10 @@ export function noticeOfCancel(result: CancelResult): RegistrationNotice {
   switch (result.kind) {
     case 'cancelled':
       return success('Inscrição cancelada.')
-    case 'alreadyStarted':
-      return error('O evento já começou, então a inscrição não pode mais ser cancelada.')
+    case 'tooLate':
+      return error(TOO_LATE_TEXT[result.cause ?? 'unknown'])
+    case 'busy':
+      return error(busyText(result.retryAfterSeconds))
     case 'notFound':
       return error(GONE)
     case 'signedOut':
@@ -49,6 +56,26 @@ export function noticeOfCancel(result: CancelResult): RegistrationNotice {
     case 'failed':
       return error('Não foi possível cancelar a inscrição. Tente de novo.')
   }
+}
+
+/** O 409 da inscrição, por motivo; `unknown` é a recusa genérica, sem `reason` ou com um que o front não conhece. */
+const UNAVAILABLE_TEXT: Readonly<Record<EventClosure | 'unknown', string>> = {
+  full: 'O evento lotou, então não dá mais para se inscrever.',
+  cancelled: 'O evento foi cancelado, então não dá mais para se inscrever.',
+  started: 'O evento já começou, e as inscrições estão fechadas.',
+  ended: 'O evento já terminou, e as inscrições estão fechadas.',
+  unknown: 'Não dá mais para se inscrever: o evento lotou, foi cancelado ou já começou.',
+}
+
+const TOO_LATE_TEXT: Readonly<Record<'started' | 'ended' | 'unknown', string>> = {
+  started: 'O evento já começou, então a inscrição não pode mais ser cancelada.',
+  ended: 'O evento já terminou, então a inscrição não pode mais ser cancelada.',
+  unknown: 'A inscrição não pode mais ser cancelada: o evento já começou ou terminou.',
+}
+
+/** O 503 (evento ocupado) e o 429 (limite da conta) pedem a mesma coisa: esperar. Por isso o texto não aponta o motivo. */
+function busyText(retryAfterSeconds: number | null): string {
+  return `Muitos pedidos de inscrição em pouco tempo. Tente de novo ${waitText(retryAfterSeconds)}.`
 }
 
 /** "em instantes", "em 1 segundo" ou "em N segundos", pelo `Retry-After` da API. */

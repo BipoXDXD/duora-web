@@ -25,9 +25,11 @@ export type DecideBody = DecideRequest
 export type Decision = Readonly<z.output<typeof decisionSchema>>
 
 /**
- * O resultado de decidir. `alreadyDecided` é o 409: a pessoa já tinha escolhido a outra opção, e a decisão é
- * final. `notPaired` é o 404: quem ficou de fora, não estava no sorteio ou pediu uma rodada que não existe.
- * `busy` junta o 503 (a API demorou além do teto) e um 429, com o `Retry-After` quando ele veio.
+ * O resultado de decidir. `alreadyDecided` é o 409 `DECISION_ALREADY_MADE`: a pessoa já tinha escolhido a
+ * outra opção, e a decisão é final. Um 409 sem `reason`, ou com outro, não diz isso e vira `failed`.
+ * `notPaired` é o 404: quem ficou de fora, não estava no sorteio ou pediu uma rodada que não existe.
+ * `busy` junta o 503 (a API demorou além do teto) e o 429 (limite de decisões da conta), com o `Retry-After`
+ * quando ele veio.
  */
 export type DecideResult =
   | { readonly kind: 'decided'; readonly decision: Decision }
@@ -84,7 +86,7 @@ function decideResultOf(error: ApiError): DecideResult {
     case NOT_FOUND:
       return { kind: 'notPaired' }
     case CONFLICT:
-      return { kind: 'alreadyDecided' }
+      return error.refusalReason === 'DECISION_ALREADY_MADE' ? { kind: 'alreadyDecided' } : { kind: 'failed' }
     case TOO_MANY_REQUESTS:
     case SERVICE_UNAVAILABLE:
       return { kind: 'busy', retryAfterSeconds: error.retryAfterSeconds }

@@ -41,6 +41,17 @@ export function problemAnswer(status: number, detail?: string, errors?: unknown)
     )
 }
 
+/** Recusa por regra de negócio (403 ou 409), com o `reason` que a API manda (ADR 0020 da duora-api). */
+export function refusalAnswer(status: number, reason: string): FakeRoute {
+  return () =>
+    Promise.resolve(
+      new Response(JSON.stringify({ title: 'Erro', status, reason }), {
+        status,
+        headers: { 'Content-Type': 'application/problem+json' },
+      }),
+    )
+}
+
 /** Uma resposta por método no mesmo caminho, como GET e PATCH do perfil. Método sem resposta falha alto. */
 export function byMethod(answers: Readonly<Partial<Record<string, FakeRoute>>>): FakeRoute {
   return (init) => {

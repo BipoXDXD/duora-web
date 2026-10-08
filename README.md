@@ -8,7 +8,8 @@ React 19, TypeScript 6 (`strict`), Vite 8 e Tailwind CSS 4. O backend é a
 
 O projeto está no início. Por enquanto ele tem os dois layouts, a identidade visual "Mesa posta" (tokens,
 dois temas e contraste testado), o cliente HTTP compatível com o login da API, o estado de sessão (entrar e
-sair), a landing com a inscrição na **lista de espera**, e as telas de **Meu perfil** e **Contas bloqueadas**.
+sair), a landing com a inscrição na **lista de espera**, as telas de **Meu perfil** e **Contas bloqueadas**, e as de
+**Eventos**: a lista, o evento com a inscrição e a dupla de cada rodada, e **Minhas inscrições**.
 
 ## Pré-requisitos
 
@@ -73,22 +74,26 @@ Firefox, que tratam `localhost` como contexto seguro. O Safari não aceita: use 
 | `/` | Landing e lista de espera | Todos |
 | `/perfil` | Meu perfil: ver e editar | Quem entrou |
 | `/perfil/bloqueios` | Contas bloqueadas: listar e desbloquear | Quem entrou |
+| `/eventos` | Próximos eventos | Quem entrou |
+| `/eventos/{id}` | O evento: inscrição e, durante ele, a dupla da rodada | Quem entrou |
+| `/inscricoes` | Minhas inscrições | Quem entrou |
 | outro | Página não encontrada | Todos |
 
 O roteamento é um módulo pequeno em `src/shared/routing/`, sem biblioteca: `routeOf` transforma o caminho numa
-união de rotas, `usePathname` o lê com `useSyncExternalStore` (como o `useIsDesktop` lê o `matchMedia`) e o
+união discriminada de rotas (`{ page: 'event', eventId }` é a única com parâmetro, e só aceita um UUID), `usePathname` o lê com `useSyncExternalStore` (como o `useIsDesktop` lê o `matchMedia`) e o
 `AppLink` troca de página com `pushState`, sem recarregar. O `AppLink` é um `<a>` de verdade, então Ctrl/Cmd+clique
 e o botão do meio abrem nova aba. Ao abrir uma página, o título (`h1`) recebe o foco, para o leitor de tela
-perceber a troca. Se as rotas passarem a precisar de parâmetros, loaders ou aninhamento, vale trocar por uma
-biblioteca de roteamento.
+perceber a troca. Um parâmetro de id não justificou uma biblioteca; se as rotas passarem a precisar de vários
+parâmetros, query string, loaders ou aninhamento, vale trocar por uma biblioteca de roteamento.
 
-O link para o perfil só aparece para quem entrou: "Meu perfil" no cabeçalho do desktop e a aba "Perfil" na barra
-inferior do celular. As páginas do perfil mostram "Entre para ver…" a quem não entrou, sem chamar a API.
+Os links para "Eventos" e para o perfil só aparecem para quem entrou: no cabeçalho do desktop ("Eventos" e "Meu
+perfil") e na barra inferior do celular ("Eventos" e "Perfil"). "Minhas inscrições" se abre pela página de eventos, e
+"Eventos" fica marcado também nela e em cada evento. As páginas do perfil mostram "Entre para ver…" a quem não entrou, sem chamar a API.
 
-Em produção, o servidor de arquivos estáticos precisa devolver o `index.html` para `/perfil` e
-`/perfil/bloqueios` (SPA fallback), para o recarregar e o link direto funcionarem. O `vite dev` e o `vite
-preview` já fazem isso; no Azure Static Web Apps é o `public/staticwebapp.config.json`
-(veja [Publicação](#publicação-azure-static-web-apps)).
+Em produção, o servidor de arquivos estáticos precisa devolver o `index.html` para `/perfil`,
+`/perfil/bloqueios`, `/eventos`, `/eventos/{id}` e `/inscricoes` (SPA fallback), para o recarregar e o
+link direto funcionarem. O `vite dev` e o `vite preview` já fazem isso; no Azure Static Web Apps é o
+`public/staticwebapp.config.json` (veja [Publicação](#publicação-azure-static-web-apps)).
 
 ### Meu perfil
 
@@ -114,6 +119,25 @@ preview` já fazem isso; no Azure Static Web Apps é o `public/staticwebapp.conf
   `POST /api/accounts/{id}:unblock`. A conta sai das páginas em cache, sem recarregar a lista.
 - A API não manda o nome de quem foi bloqueado, só o id e a data. Cada linha mostra a data e os últimos 8
   caracteres do id (a parte aleatória do UUIDv7).
+
+### Eventos
+
+- `GET /api/events` e `GET /api/me/registrations` são paginados por cursor, com "Carregar mais" como nas contas
+  bloqueadas. Os horários aparecem no fuso de quem usa o app (`Intl`, sem `timeZone`); os testes fixam
+  `America/Sao_Paulo` no `vite.config.ts`.
+- A API guarda só publicado ou cancelado; "em andamento" e "encerrado" saem dos horários
+  (`eventPhaseAt`), no instante em que o evento foi lido. Cada fase tem etiqueta em texto, não só em cor.
+- No evento que ainda vai começar, `GET /api/events/{id}/registration` diz se a pessoa está inscrita.
+  "Quero me inscrever" faz `PUT` (repetir é seguro) e "Cancelar inscrição" pede confirmação antes do `DELETE`.
+  Cada falha esperada tem mensagem própria:
+  - **403**: o perfil precisa estar completo e a pessoa ter 18 anos; o aviso traz o link "Completar meu perfil".
+    O 403 por CSRF não chega a acontecer, porque o cliente HTTP sempre manda o token.
+  - **409**: o evento lotou, foi cancelado ou começou (a API não diz qual); o front relê o evento.
+  - **503**: muita gente se inscrevendo; o aviso diz quantos segundos esperar pelo `Retry-After`.
+  - **404**: o evento sumiu; **401**: "Entrar de novo"; o resto: "Tente de novo".
+- Durante o evento, quem está inscrito digita a rodada que o anfitrião anunciou (1 a 100) e vê a dupla, que ficou
+  de fora, ou que a rodada ainda não começou (404). O front não sabe quantas rodadas existem; "Ver a rodada N+1"
+  avança. A API só manda o id da dupla, então a tela mostra os últimos 8 caracteres, como nas contas bloqueadas.
 
 ## Duas interfaces: desktop e smartphone
 
@@ -352,3 +376,10 @@ gerados da spec, testes com cobertura e build. Também roda o gitleaks sobre tod
 - Como o SWA fala com o BFF (mesma origem, Front Door ou outra saída) está em aberto e depende de decisão do
   usuário; veja [Pendência: SWA e BFF](#pendência-swa-e-bff). A CSP (`connect-src 'self'`) pressupõe a mesma origem.
 - A lista de bloqueios não tem o nome nem a foto de quem foi bloqueado, porque a API não os manda.
+- Eventos: a API não diz quantas rodadas o evento tem nem qual está valendo, então a pessoa digita o número. Um
+  campo `currentRound` (ou a lista de rodadas iniciadas) no evento permitiria mostrar a dupla sem perguntar.
+- A dupla aparece só pelo fim do id da conta, porque a API não manda nome nem foto do par.
+- O 409 da inscrição junta lotado, cancelado e começado; um código por motivo no ProblemDetail deixaria a
+  mensagem exata. A lista também não mostra vagas restantes, que a API não expõe.
+- A fase do evento (em andamento, encerrado) é calculada quando ele é lido; a página não muda sozinha quando o
+  evento começa com ela aberta.

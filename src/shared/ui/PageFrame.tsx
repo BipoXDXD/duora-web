@@ -8,7 +8,8 @@ interface PageFrameProps {
 
 /**
  * Moldura das páginas do app fora da landing: coluna de leitura e o título em foco ao abrir, para quem usa
- * leitor de tela saber que a página mudou.
+ * leitor de tela saber que a página mudou. O título não é um controle e o foco vem do código, não do
+ * teclado: sem o anel (que o Chromium desenharia em volta da coluna inteira ao abrir a página).
  */
 export function PageFrame({ title, children }: PageFrameProps) {
   const headingRef = useFocusOnMount<HTMLHeadingElement>()
@@ -17,7 +18,7 @@ export function PageFrame({ title, children }: PageFrameProps) {
       <h1
         ref={headingRef}
         tabIndex={-1}
-        className="font-display text-4xl leading-tight font-medium tracking-tight text-balance text-fg"
+        className="font-display text-4xl leading-tight font-medium tracking-tight text-balance text-fg focus-visible:outline-hidden"
       >
         {title}
       </h1>

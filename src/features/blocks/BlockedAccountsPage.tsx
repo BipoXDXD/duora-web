@@ -4,6 +4,7 @@ import { isApiFailure, isBug } from '../../shared/api/http.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { PATHS } from '../../shared/routing/routes.ts'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
+import { LoadMore } from '../../shared/ui/LoadMore.tsx'
 import { PageFrame } from '../../shared/ui/PageFrame.tsx'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
@@ -75,7 +76,6 @@ function BlockedAccountsSection() {
 
   const accounts = query.data.pages.flatMap((page) => page.items)
   const hasNoBlocks = accounts.length === 0 && !query.hasNextPage
-  const nextPageFailed = query.isFetchNextPageError && !query.isFetchingNextPage
   return (
     <div className="flex flex-col items-start gap-6">
       {hasUnblocked && <UnblockedNotice />}
@@ -93,21 +93,12 @@ function BlockedAccountsSection() {
           ))}
         </ul>
       )}
-      {nextPageFailed && (
-        <p role="alert" className="font-semibold text-danger">
-          Não foi possível carregar mais. Tente de novo.
-        </p>
-      )}
-      {query.hasNextPage && (
-        <button
-          type="button"
-          onClick={() => void query.fetchNextPage()}
-          disabled={query.isFetchingNextPage}
-          className={SECONDARY_BUTTON}
-        >
-          {query.isFetchingNextPage ? 'Carregando…' : 'Carregar mais'}
-        </button>
-      )}
+      <LoadMore
+        hasNextPage={query.hasNextPage}
+        isFetchingNextPage={query.isFetchingNextPage}
+        hasFailed={query.isFetchNextPageError && !query.isFetchingNextPage}
+        onLoadMore={() => void query.fetchNextPage()}
+      />
     </div>
   )
 }

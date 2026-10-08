@@ -338,6 +338,7 @@ describe('event page', () => {
         [EVENT]: jsonAnswer(DINNER),
         [REGISTRATION]: REGISTERED,
         [`${PAIRING}/1/pairing`]: pairingAnswer(1, '0199a1d2-1111-7aaa-8bbb-cccc1a2b3c4d'),
+        [`${PAIRING}/1/decision`]: problemAnswer(404),
       })
 
       expect(await screen.findByLabelText('Rodada')).toHaveValue('1')
@@ -351,6 +352,7 @@ describe('event page', () => {
         [EVENT]: jsonAnswer(DINNER),
         [REGISTRATION]: REGISTERED,
         [`${PAIRING}/1/pairing`]: pairingAnswer(1, '0199a1d2-1111-7aaa-8bbb-cccc1a2b3c4d'),
+        [`${PAIRING}/1/decision`]: problemAnswer(404),
         [`${PAIRING}/2/pairing`]: pairingAnswer(2, null),
       })
       await user.click(await screen.findByRole('button', { name: 'Ver minha dupla' }))

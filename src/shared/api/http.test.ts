@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { z } from 'zod/mini'
-import type { FieldErrorWire } from './contract.ts'
+import type { FieldErrorWire, RefusalProblemDetailWire } from './contract.ts'
 import {
   ApiError,
   FIELD_ERROR_CODES,
@@ -9,8 +9,11 @@ import {
   isApiFailure,
   isBug,
   type KnownFieldErrorCode,
+  type KnownRefusalReason,
   NetworkError,
   readJsonBody,
+  REFUSAL_REASONS,
+  type RefusalReason,
   sendApiRequest,
 } from './http.ts'
 
@@ -253,6 +256,55 @@ describe('sendApiRequest', () => {
     expect(new ApiError(500, null).fieldErrors).toEqual([])
   })
 
+  it.each(REFUSAL_REASONS)('keeps the refusal reason %s of a business rule refusal', async (reason) => {
+    fetchMock.mockResolvedValue(problemResponse(409, JSON.stringify({ title: 'Conflict', status: 409, reason })))
+
+    const error = await sendApiRequest({ method: 'PUT', path: '/api/events/x/registration' }).catch((e: unknown) => e)
+
+    expect(error).toMatchObject({ status: 409, refusalReason: reason })
+  })
+
+  it('reads a refusal reason the front does not know as UNRECOGNIZED', async () => {
+    fetchMock.mockResolvedValue(problemResponse(409, '{"status":409,"reason":"EVENT_ON_FIRE"}'))
+
+    const error = await sendApiRequest({ method: 'PUT', path: '/api/events/x/registration' }).catch((e: unknown) => e)
+
+    expect(error).toMatchObject({ status: 409, refusalReason: 'UNRECOGNIZED' })
+  })
+
+  it('keeps the detail and the field errors next to a refusal reason', async () => {
+    const body = '{"detail":"event is full","reason":"EVENT_FULL","errors":[{"field":"bio","code":"TOO_LONG"}]}'
+    fetchMock.mockResolvedValue(problemResponse(409, body))
+
+    const error = await sendApiRequest({ method: 'PUT', path: '/api/events/x/registration' }).catch((e: unknown) => e)
+
+    expect(error).toMatchObject({
+      problemDetail: 'event is full',
+      refusalReason: 'EVENT_FULL',
+      fieldErrors: [{ field: 'bio', code: 'TOO_LONG' }],
+    })
+  })
+
+  it.each([
+    ['without a body', null],
+    ['with a body that is not JSON', '<html>erro</html>'],
+    ['without a reason', '{"title":"Conflict","status":409}'],
+    ['with a reason that is null', '{"reason":null}'],
+    ['with a reason that is not text', '{"reason":7}'],
+    ['with a reason that is a list', '{"reason":["EVENT_FULL"]}'],
+  ])('has no refusal reason for an error %s', async (_case, body) => {
+    fetchMock.mockResolvedValue(problemResponse(409, body))
+
+    const error = await sendApiRequest({ method: 'PUT', path: '/api/events/x/registration' }).catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error).toMatchObject({ status: 409, refusalReason: null })
+  })
+
+  it('has no refusal reason when the error has no problem body at all', () => {
+    expect(new ApiError(409, null).refusalReason).toBeNull()
+  })
+
   it('turns a fetch rejection into a NetworkError that keeps the cause', async () => {
     const failure = new TypeError('Failed to fetch')
     fetchMock.mockRejectedValue(failure)
@@ -357,6 +409,16 @@ describe('contract with the generated API types', () => {
   it('knows the same field error codes the spec declares', () => {
     expectTypeOf<KnownFieldErrorCode>().toEqualTypeOf<FieldErrorWire['code']>()
     expect(new Set(FIELD_ERROR_CODES).size).toBe(FIELD_ERROR_CODES.length)
+  })
+
+  it('knows the same refusal reasons the spec declares', () => {
+    expectTypeOf<KnownRefusalReason>().toEqualTypeOf<NonNullable<RefusalProblemDetailWire['reason']>>()
+    expect(new Set(REFUSAL_REASONS).size).toBe(REFUSAL_REASONS.length)
+  })
+
+  it('reads the reason as one of the known ones, UNRECOGNIZED or absent', () => {
+    expectTypeOf<ApiError['refusalReason']>().toEqualTypeOf<RefusalReason | null>()
+    expectTypeOf<RefusalReason>().toEqualTypeOf<KnownRefusalReason | 'UNRECOGNIZED'>()
   })
 
   it('names the field the way the spec does, with null instead of absent', () => {

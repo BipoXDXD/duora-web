@@ -31,6 +31,30 @@ export type KnownFieldErrorCode = (typeof FIELD_ERROR_CODES)[number]
 /** A API pode acrescentar `code` à lista: o que este front não conhece chega como `UNRECOGNIZED`. */
 export type FieldErrorCode = KnownFieldErrorCode | 'UNRECOGNIZED'
 
+/**
+ * Os `reason` que a spec declara para uma recusa por regra de negócio (`RefusalProblemDetail.reason`, ADR 0020
+ * da duora-api); o teste confere com ela.
+ */
+export const REFUSAL_REASONS = [
+  'EVENT_NOT_PUBLISHED',
+  'EVENT_ALREADY_PUBLISHED',
+  'EVENT_CANCELLED',
+  'EVENT_STARTED',
+  'EVENT_ENDED',
+  'EVENT_FULL',
+  'EVENT_NOT_UNDERWAY',
+  'ROUND_OUT_OF_SEQUENCE',
+  'PROFILE_INCOMPLETE',
+  'UNDERAGE',
+  'BIRTH_DATE_ALREADY_SET',
+  'DECISION_ALREADY_MADE',
+] as const
+
+export type KnownRefusalReason = (typeof REFUSAL_REASONS)[number]
+
+/** A API pode ampliar a lista: o `reason` que este front não conhece chega como `UNRECOGNIZED`. */
+export type RefusalReason = KnownRefusalReason | 'UNRECOGNIZED'
+
 /** Um campo que a API recusou num 400. `field` é `null` quando o erro é do corpo inteiro. */
 export interface FieldError {
   readonly field: string | null
@@ -41,21 +65,25 @@ export interface FieldError {
 export interface ProblemBody {
   readonly detail: string | null
   readonly fieldErrors: readonly FieldError[]
+  readonly refusalReason: RefusalReason | null
 }
 
-const NO_PROBLEM_BODY: ProblemBody = { detail: null, fieldErrors: [] }
+const NO_PROBLEM_BODY: ProblemBody = { detail: null, fieldErrors: [], refusalReason: null }
 
 /**
  * Resposta fora de 2xx. `retryAfterSeconds` é `null` quando a API não disse quando tentar de novo.
  * `problemDetail` é o `detail` do ProblemDetail (RFC 9457), em inglês e para o desenvolvedor: nunca vai
  * direto para a tela. `null` quando o corpo não o trouxe. `fieldErrors` é o membro `errors` dos 400 de
  * validação (ADR 0018 da duora-api): é o que diz qual campo errou e por quê. Vazio quando não veio.
+ * `refusalReason` é o membro `reason` das recusas por regra de negócio, 403 e 409 (ADR 0020): é o que diz
+ * qual regra recusou. `null` quando não veio, e então vale a recusa genérica do status.
  */
 export class ApiError extends Error {
   readonly status: number
   readonly retryAfterSeconds: number | null
   readonly problemDetail: string | null
   readonly fieldErrors: readonly FieldError[]
+  readonly refusalReason: RefusalReason | null
 
   constructor(status: number, retryAfterSeconds: number | null, problem: ProblemBody = NO_PROBLEM_BODY) {
     super(`A API respondeu ${status}`)
@@ -64,6 +92,7 @@ export class ApiError extends Error {
     this.retryAfterSeconds = retryAfterSeconds
     this.problemDetail = problem.detail
     this.fieldErrors = problem.fieldErrors
+    this.refusalReason = problem.refusalReason
   }
 }
 
@@ -155,10 +184,12 @@ const fieldErrorsSchema = z.object({
   errors: z.array(z.object({ field: z.optional(z.string()), code: z.string() })),
 })
 
+const refusalReasonSchema = z.object({ reason: z.string() })
+
 /**
  * O corpo de erro é informação extra: sem ele, ou fora do formato, o erro continua sendo o status. Por
- * isso aqui corpo inválido vira vazio, e não InvalidResponseError. `detail` e `errors` são lidos cada um
- * por si: um `errors` malformado não leva o `detail` junto.
+ * isso aqui corpo inválido vira vazio, e não InvalidResponseError. `detail`, `errors` e `reason` são lidos
+ * cada um por si: um `errors` malformado não leva o `detail` junto.
  */
 async function readProblemBody(response: Response): Promise<ProblemBody> {
   let body: unknown
@@ -172,10 +203,21 @@ async function readProblemBody(response: Response): Promise<ProblemBody> {
   }
   const detail = detailSchema.safeParse(body)
   const errors = fieldErrorsSchema.safeParse(body)
+  const refusal = refusalReasonSchema.safeParse(body)
   return {
     detail: detail.success ? (detail.data.detail ?? null) : null,
     fieldErrors: errors.success ? errors.data.errors.map(fieldErrorOf) : [],
+    refusalReason: refusal.success ? refusalReasonOf(refusal.data.reason) : null,
   }
+}
+
+function refusalReasonOf(reason: string): RefusalReason {
+  return isKnownRefusalReason(reason) ? reason : 'UNRECOGNIZED'
+}
+
+function isKnownRefusalReason(reason: string): reason is KnownRefusalReason {
+  const known: readonly string[] = REFUSAL_REASONS
+  return known.includes(reason)
 }
 
 function fieldErrorOf(wire: { readonly field?: string | undefined; readonly code: string }): FieldError {

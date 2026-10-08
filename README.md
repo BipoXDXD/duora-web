@@ -9,7 +9,8 @@ React 19, TypeScript 6 (`strict`), Vite 8 e Tailwind CSS 4. O backend é a
 O projeto está no início. Por enquanto ele tem os dois layouts, a identidade visual "Mesa posta" (tokens,
 dois temas e contraste testado), o cliente HTTP compatível com o login da API, o estado de sessão (entrar e
 sair), a landing com a inscrição na **lista de espera**, as telas de **Meu perfil** e **Contas bloqueadas**, e as de
-**Eventos**: a lista, o evento com a inscrição e a dupla de cada rodada, e **Minhas inscrições**.
+**Eventos**: a lista, o evento com a inscrição, a dupla de cada rodada e a **decisão privada** depois dela, **Minhas
+inscrições** e **Conexões**.
 
 ## Pré-requisitos
 
@@ -77,6 +78,7 @@ Firefox, que tratam `localhost` como contexto seguro. O Safari não aceita: use 
 | `/eventos` | Próximos eventos | Quem entrou |
 | `/eventos/{id}` | O evento: inscrição e, durante ele, a dupla da rodada | Quem entrou |
 | `/inscricoes` | Minhas inscrições | Quem entrou |
+| `/conexoes` | Conexões: quem também quis continuar em contato | Quem entrou |
 | outro | Página não encontrada | Todos |
 
 O roteamento é um módulo pequeno em `src/shared/routing/`, sem biblioteca: `routeOf` transforma o caminho numa
@@ -86,12 +88,12 @@ e o botão do meio abrem nova aba. Ao abrir uma página, o título (`h1`) recebe
 perceber a troca. Um parâmetro de id não justificou uma biblioteca; se as rotas passarem a precisar de vários
 parâmetros, query string, loaders ou aninhamento, vale trocar por uma biblioteca de roteamento.
 
-Os links para "Eventos" e para o perfil só aparecem para quem entrou: no cabeçalho do desktop ("Eventos" e "Meu
-perfil") e na barra inferior do celular ("Eventos" e "Perfil"). "Minhas inscrições" se abre pela página de eventos, e
+Os links para "Eventos", "Conexões" e o perfil só aparecem para quem entrou: no cabeçalho do desktop ("Eventos",
+"Conexões" e "Meu perfil") e na barra inferior do celular ("Eventos", "Conexões" e "Perfil"). "Minhas inscrições" se abre pela página de eventos, e
 "Eventos" fica marcado também nela e em cada evento. As páginas do perfil mostram "Entre para ver…" a quem não entrou, sem chamar a API.
 
 Em produção, o servidor de arquivos estáticos precisa devolver o `index.html` para `/perfil`,
-`/perfil/bloqueios`, `/eventos`, `/eventos/{id}` e `/inscricoes` (SPA fallback), para o recarregar e o
+`/perfil/bloqueios`, `/eventos`, `/eventos/{id}`, `/inscricoes` e `/conexoes` (SPA fallback), para o recarregar e o
 link direto funcionarem. O `vite dev` e o `vite preview` já fazem isso; no Azure Static Web Apps é o
 `public/staticwebapp.config.json` (veja [Publicação](#publicação-azure-static-web-apps)).
 
@@ -138,6 +140,31 @@ link direto funcionarem. O `vite dev` e o `vite preview` já fazem isso; no Azur
 - Durante o evento, quem está inscrito digita a rodada que o anfitrião anunciou (1 a 100) e vê a dupla, que ficou
   de fora, ou que a rodada ainda não começou (404). O front não sabe quantas rodadas existem; "Ver a rodada N+1"
   avança. A API só manda o id da dupla, então a tela mostra os últimos 8 caracteres, como nas contas bloqueadas.
+
+### Decisão privada e conexões
+
+A regra é da API (ADR 0019 da duora-api): depois de uma rodada, cada pessoa diz em privado se quer continuar em
+contato com a dupla; se as duas disserem sim, surge uma conexão.
+
+- Quando a rodada mostra uma dupla, aparece "Continuar em contato?", com a promessa de privacidade e as duas
+  opções, "Quero continuar em contato" e "Não quero", com o mesmo peso visual (botões secundários), para a tela
+  não empurrar nenhuma. Quem ficou de fora ou não estava na rodada não vê o painel, e o front nem pergunta.
+- A escolha pede confirmação ("A decisão é final: depois de confirmar, não dá para mudar"), com o foco no
+  "Confirmar minha decisão"; "Voltar" devolve o foco à opção escolhida. Só a confirmação faz o
+  `PUT .../rounds/{n}/decision` com `{"interested": ...}`.
+- `GET` na mesma rota mostra a decisão já tomada (404 é "ainda não decidiu"), com a data. Depois de um "sim", o
+  texto diz que a conexão aparece em Conexões **se a outra pessoa também quiser**, com o link para a lista.
+- **O front nunca recebe a decisão do par, e a tela depende só da própria.** O schema guarda só `interested` e
+  `decidedAt` (um teste de tipo garante que não há outro campo), a tela da decisão não lê a lista de conexões, e
+  um teste mostra o mesmo texto com campos sobre o par contrabandeados na resposta e com a conexão já na lista.
+- Falhas: **409** (já tinha decidido, com a outra escolha) avisa que a decisão é final e relê a que vale; **404**
+  diz que não há o que decidir nesta rodada; **503** e **429** pedem para esperar o `Retry-After` e mantêm a
+  confirmação para tentar de novo, sem dizer nada sobre o par (o 503 da API vem da espera pela decisão do par, e a
+  mensagem não conta isso); **401** oferece "Entrar de novo"; o resto, "Tente de novo". Erro é `role="alert"`;
+  "Decisão registrada." é `role="status"` e recebe o foco, porque o botão usado some.
+- `/conexoes` lista `GET /api/me/connections` com "Carregar mais", da mais recente para a mais antiga, cada uma
+  pelos últimos 8 caracteres do id da outra conta e pela data. A lista vazia explica como uma conexão surge.
+  Um "sim" registrado invalida a lista em cache, que é relida quando a página abre.
 
 ## Duas interfaces: desktop e smartphone
 
@@ -286,6 +313,7 @@ src/
   features/
     auth/              sessão (GET /api/me), logout, URL de login, os controles dos cabeçalhos e o RequireSession
     blocks/            contas bloqueadas: listagem paginada e desbloqueio
+    connections/       decisão privada depois da rodada e a lista de conexões
     profile/           meu perfil: leitura e edição com ETag, regras do formulário e as telas
     landing/           seções da landing: hero com a frase interativa, como funciona, minijogo, segurança, FAQ
     waitlist/          chamada a POST /api/waitlist e o formulário de inscrição
@@ -383,3 +411,12 @@ gerados da spec, testes com cobertura e build. Também roda o gitleaks sobre tod
   mensagem exata. A lista também não mostra vagas restantes, que a API não expõe.
 - A fase do evento (em andamento, encerrado) é calculada quando ele é lido; a página não muda sozinha quando o
   evento começa com ela aberta.
+- Decisão e conexões (UX, dependem de decisões da API, ADR 0019):
+  - A conexão aparece só pelo fim do id e pela data; nome e foto dependem de uma API publicada do perfil. Também não
+    há como chegar dela à pessoa (chat, desconectar).
+  - Quem disse sim primeiro não é avisado quando a conexão se forma; precisa abrir Conexões. Um aviso depende da
+    outbox e das notificações na API.
+  - A decisão é final e não tem prazo. Se a API passar a aceitar mudança até um prazo, a confirmação e o 409 mudam.
+  - A barra inferior do celular passou a ter cinco abas (Início, Eventos, Conexões, Perfil e Sair). Não foi conferida
+    num navegador em 360px nem no aparelho; se apertar, "Conexões" pode ir para dentro do perfil.
+  - Uma conexão com alguém bloqueado depois continua na lista (a API não filtra).

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { eventPath, isEventsRoute, isProfileRoute, PATHS, routeOf } from './routes.ts'
+import { adminEventPath, eventPath, isEventsRoute, isProfileRoute, PATHS, routeOf } from './routes.ts'
 
 const EVENT_ID = '0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7b'
 
@@ -15,6 +15,8 @@ describe('routeOf', () => {
     ['/inscricoes', 'registrations'],
     ['/conexoes', 'connections'],
     ['/conexoes/', 'connections'],
+    ['/admin/eventos/novo', 'adminNewEvent'],
+    ['/admin/eventos/novo/', 'adminNewEvent'],
   ] as const)('maps %s to the %s page', (pathname, page) => {
     expect(routeOf(pathname)).toEqual({ page })
   })
@@ -25,6 +27,29 @@ describe('routeOf', () => {
     [`/eventos/${EVENT_ID.toUpperCase()}`, EVENT_ID],
   ])('maps %s to the page of the event, with its id in lower case', (pathname, eventId) => {
     expect(routeOf(pathname)).toEqual({ page: 'event', eventId })
+  })
+
+  it.each([
+    [`/admin/eventos/${EVENT_ID}`, EVENT_ID],
+    [`/admin/eventos/${EVENT_ID}/`, EVENT_ID],
+    [`/admin/eventos/${EVENT_ID.toUpperCase()}`, EVENT_ID],
+  ])('maps %s to the admin page of the event, with its id in lower case', (pathname, eventId) => {
+    expect(routeOf(pathname)).toEqual({ page: 'adminEvent', eventId })
+  })
+
+  it.each([
+    '/admin',
+    '/admin/eventos',
+    '/admin/eventos/',
+    '/admin/eventos/123',
+    '/admin/eventos/Novo',
+    '/admin/eventos/novo/outra',
+    `/admin/eventos/${EVENT_ID}x`,
+    `/admin/eventos/${EVENT_ID}/rodadas`,
+    `/admin/eventos//${EVENT_ID}`,
+    `/Admin/eventos/${EVENT_ID}`,
+  ])('maps the unknown admin path %s to the not found page', (pathname) => {
+    expect(routeOf(pathname)).toEqual({ page: 'notFound' })
   })
 
   it.each([
@@ -53,6 +78,10 @@ describe('routeOf', () => {
   it('maps the path of an event back to the event', () => {
     expect(routeOf(eventPath(EVENT_ID))).toEqual({ page: 'event', eventId: EVENT_ID })
   })
+
+  it('maps the admin path of an event back to the event', () => {
+    expect(routeOf(adminEventPath(EVENT_ID))).toEqual({ page: 'adminEvent', eventId: EVENT_ID })
+  })
 })
 
 describe('route groups for the navigation', () => {
@@ -63,6 +92,8 @@ describe('route groups for the navigation', () => {
     [{ page: 'event', eventId: EVENT_ID }, false, true],
     [{ page: 'registrations' }, false, true],
     [{ page: 'home' }, false, false],
+    [{ page: 'adminNewEvent' }, false, false],
+    [{ page: 'adminEvent', eventId: EVENT_ID }, false, false],
     [{ page: 'notFound' }, false, false],
   ] as const)('places %o in the profile: %s, in the events: %s', (route, inProfile, inEvents) => {
     expect(isProfileRoute(route)).toBe(inProfile)

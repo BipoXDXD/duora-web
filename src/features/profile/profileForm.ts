@@ -1,4 +1,5 @@
 import type { EditProfileRequest } from '../../shared/api/contract.ts'
+import { characterCount } from '../../shared/text/characterCount.ts'
 import type { Profile, ProfileField, Region } from './profile.ts'
 
 /** O que está nos campos do formulário: texto como foi digitado, `''` para vazio. */
@@ -113,7 +114,7 @@ function checkDisplayName(typed: string, current: string | null): FieldOutcome<s
   if (name === '') {
     return problem('blank')
   }
-  return lengthOf(name) > DISPLAY_NAME_MAX_LENGTH ? problem('tooLong') : setTo(name)
+  return characterCount(name) > DISPLAY_NAME_MAX_LENGTH ? problem('tooLong') : setTo(name)
 }
 
 /** Vazio apaga a bio, como o `null`. */
@@ -125,7 +126,7 @@ function checkBio(typed: string, current: string | null): FieldOutcome<string | 
   if (bio === '') {
     return setTo(null)
   }
-  return lengthOf(bio) > BIO_MAX_LENGTH ? problem('tooLong') : setTo(bio)
+  return characterCount(bio) > BIO_MAX_LENGTH ? problem('tooLong') : setTo(bio)
 }
 
 /** Informada uma vez, a data não muda: depois disso o campo nunca entra no PATCH. */
@@ -166,11 +167,6 @@ function partsOf(isoDate: string): { year: number; month: number; day: number } 
   const date = new Date(Date.UTC(year, month - 1, day))
   const exists = date.getUTCMonth() === month - 1 && date.getUTCDate() === day
   return exists ? { year, month, day } : null
-}
-
-/** Em caracteres, como a API conta (code points depois do NFC), e não em unidades UTF-16. */
-function lengthOf(text: string): number {
-  return [...text.normalize('NFC')].length
 }
 
 function setTo<T>(value: T): FieldOutcome<T> {

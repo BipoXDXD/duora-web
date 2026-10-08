@@ -9,23 +9,37 @@ export const PATHS = {
   events: '/eventos',
   registrations: '/inscricoes',
   connections: '/conexoes',
+  adminNewEvent: '/admin/eventos/novo',
 } as const
 
 type FixedPage = keyof typeof PATHS
 
-/** A página aberta. Só a do evento tem parâmetro: o id, sempre em minúsculas. */
+/** A página aberta. Só as de um evento têm parâmetro: o id, sempre em minúsculas. */
 export type Route =
   | { readonly page: FixedPage }
   | { readonly page: 'event'; readonly eventId: string }
+  | { readonly page: 'adminEvent'; readonly eventId: string }
   | { readonly page: 'notFound' }
 
 /** Toda página de PATHS; o teste confere que nenhuma ficou de fora. */
-const FIXED_PAGES: readonly FixedPage[] = ['home', 'profile', 'blockedAccounts', 'events', 'registrations', 'connections']
+const FIXED_PAGES: readonly FixedPage[] = [
+  'home',
+  'profile',
+  'blockedAccounts',
+  'events',
+  'registrations',
+  'connections',
+  'adminNewEvent',
+]
 
 const TRAILING_SLASH = /(?<=.)\/$/
 
 /** `/eventos/{id}`, com o id no formato UUID que a API usa; outro texto no lugar do id é página inexistente. */
-const EVENT_PATH = /^\/eventos\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i
+const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+const EVENT_PATH = new RegExp(`^/eventos/(${UUID})$`, 'i')
+
+/** `/admin/eventos/{id}`: o evento visto pela equipe. Quem pode abrir é decidido pela API, nunca por esta rota. */
+const ADMIN_EVENT_PATH = new RegExp(`^/admin/eventos/(${UUID})$`, 'i')
 
 export function routeOf(pathname: string): Route {
   const path = pathname.replace(TRAILING_SLASH, '')
@@ -34,11 +48,19 @@ export function routeOf(pathname: string): Route {
     return { page: fixedPage }
   }
   const eventId = EVENT_PATH.exec(path)?.[1]
-  return eventId === undefined ? { page: 'notFound' } : { page: 'event', eventId: eventId.toLowerCase() }
+  if (eventId !== undefined) {
+    return { page: 'event', eventId: eventId.toLowerCase() }
+  }
+  const adminEventId = ADMIN_EVENT_PATH.exec(path)?.[1]
+  return adminEventId === undefined ? { page: 'notFound' } : { page: 'adminEvent', eventId: adminEventId.toLowerCase() }
 }
 
 export function eventPath(eventId: string): string {
   return `${PATHS.events}/${eventId}`
+}
+
+export function adminEventPath(eventId: string): string {
+  return `/admin/eventos/${eventId}`
 }
 
 /** O perfil e as páginas dentro dele, para a navegação marcar "Meu perfil" como a página atual. */

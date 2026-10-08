@@ -64,6 +64,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/events/{eventId}/rounds/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lê uma rodada do evento
+         * @description Quantos pares se formaram e quantas pessoas ficaram de fora, nunca quem.
+         */
+        get: operations["getRound"];
+        /**
+         * Inicia uma rodada de pareamento do evento
+         * @description Sem corpo. Sorteia os pares entre os inscritos: o máximo de pares possível, sem par bloqueado nem par que já se formou no evento, com prioridade para quem ficou de fora mais vezes. Idempotente pela chave evento + número: repetir, inclusive ao mesmo tempo, devolve a mesma rodada, por isso dispensa If-Match e Idempotency-Key (docs/adr/0017). A rodada N exige a N-1, e o evento precisa estar publicado e em andamento.
+         */
+        put: operations["startRound"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/events/{id}": {
         parameters: {
             query?: never;
@@ -187,6 +211,26 @@ export interface paths {
          * @description Idempotente: sem inscrição, também responde 204. Só até o evento começar.
          */
         delete: operations["cancelMyRegistration"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/rounds/{number}/pairing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lê o próprio par na rodada
+         * @description O id da conta do par, ou null se quem chama ficou de fora nesta rodada. Sem lugar na rodada, 404, exista o evento ou a rodada ou não.
+         */
+        get: operations["getMyPairing"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -416,6 +460,33 @@ export interface components {
             /** @description Título, em uma linha */
             title: string;
         };
+        AdminRoundResponse: {
+            /**
+             * Format: uuid
+             * @description Id do evento
+             */
+            eventId: string;
+            /**
+             * Format: int32
+             * @description Número da rodada no evento
+             */
+            number: number;
+            /**
+             * Format: int32
+             * @description Quantos pares se formaram
+             */
+            pairCount: number;
+            /**
+             * Format: int32
+             * @description Quantas pessoas ficaram sem par nesta rodada
+             */
+            sittingOutCount: number;
+            /**
+             * Format: date-time
+             * @description Quando a rodada começou, em UTC; não muda nas repetições do PUT
+             */
+            startedAt: string;
+        };
         BlockedAccount: {
             /**
              * Format: uuid
@@ -504,6 +575,16 @@ export interface components {
             /** @description Título, em uma linha */
             title: string;
         };
+        /** @description Um campo recusado e o motivo. Trate um code desconhecido como erro genérico do campo. */
+        FieldError: {
+            /**
+             * @description REQUIRED: ausente, null, vazio ou apagado onde é obrigatório. TOO_SHORT e TOO_LONG: abaixo de minLength ou acima de maxLength. BELOW_MINIMUM e ABOVE_MAXIMUM: número ou instante fora da faixa (em birthDate, ABOVE_MAXIMUM é menor de idade e BELOW_MINIMUM idade implausível). INVALID_FORMAT: tipo ou formato errado. UNSUPPORTED_VALUE: fora da lista fechada. FORBIDDEN_CHARACTER: controle, invisível ou espaço especial. SELF_REFERENCE: a própria conta. UNKNOWN_FIELD: chave que o corpo não aceita. MALFORMED_BODY: o corpo não é um objeto JSON legível.
+             * @enum {string}
+             */
+            code: "REQUIRED" | "TOO_SHORT" | "TOO_LONG" | "BELOW_MINIMUM" | "ABOVE_MAXIMUM" | "INVALID_FORMAT" | "UNSUPPORTED_VALUE" | "FORBIDDEN_CHARACTER" | "SELF_REFERENCE" | "UNKNOWN_FIELD" | "MALFORMED_BODY";
+            /** @description Nome da propriedade no corpo JSON, como o cliente a enviou. Ausente quando o erro é do corpo inteiro (MALFORMED_BODY) ou numa chave desconhecida fora do formato de nome. */
+            field?: string;
+        };
         FileReportRequest: {
             /** @description Relato livre em parágrafos, sem caracteres invisíveis; obrigatório com o motivo OTHER. Vazio ou só com espaços conta como ausente. */
             description?: string | null;
@@ -574,6 +655,23 @@ export interface components {
             /** @description Token da próxima página, ou null na última */
             nextPageToken: string | null;
         };
+        PairingResponse: {
+            /**
+             * Format: uuid
+             * @description Id do evento
+             */
+            eventId: string;
+            /**
+             * Format: uuid
+             * @description Id da conta do par nesta rodada, ou null se quem chama ficou de fora
+             */
+            partnerAccountId: string | null;
+            /**
+             * Format: int32
+             * @description Número da rodada no evento
+             */
+            roundNumber: number;
+        };
         /** @description Erro no formato RFC 9457. Sem stack trace, SQL nem nome de classe. */
         ProblemDetail: {
             detail?: string;
@@ -642,6 +740,21 @@ export interface components {
              * @enum {string}
              */
             status: "OPEN";
+        };
+        /** @description Erro de validação do corpo no formato RFC 9457. Além do detail, em inglês e para pessoas, errors diz a máquinas qual campo falhou e por quê, sem repetir o valor. */
+        ValidationProblemDetail: {
+            detail?: string;
+            /** @description Um item por campo recusado, ordenados por campo */
+            errors?: components["schemas"]["FieldError"][];
+            /** Format: uri-reference */
+            instance?: string;
+            /** @description Correlation ID, o mesmo do header X-Request-Id; vem nos erros inesperados (500) */
+            requestId?: string;
+            /** Format: int32 */
+            status: number;
+            title: string;
+            /** Format: uri-reference */
+            type?: string;
         };
         WaitlistStatsResponse: {
             /**
@@ -828,7 +941,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                    "application/problem+json": components["schemas"]["ValidationProblemDetail"];
                 };
             };
             /** @description Sem credencial válida */
@@ -864,6 +977,192 @@ export interface operations {
             /** @description Erro inesperado */
             500: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    getRound: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id do evento */
+                eventId: string;
+                /** @description Número da rodada no evento, a partir de 1 */
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A rodada */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRoundResponse"];
+                };
+            };
+            /** @description Id que não é UUID, ou número fora de 1 a 100 */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem o papel ADMIN */
+            403: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description O evento não tem rodada com esse número */
+            404: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    startRound: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id do evento */
+                eventId: string;
+                /** @description Número da rodada no evento, a partir de 1 */
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A rodada que já existia */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRoundResponse"];
+                };
+            };
+            /** @description A rodada criada */
+            201: {
+                headers: {
+                    /** @description Endereço da rodada */
+                    Location: string;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRoundResponse"];
+                };
+            };
+            /** @description Id que não é UUID, ou número fora de 1 a 100 */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem o papel ADMIN */
+            403: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Não há evento com esse id */
+            404: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description O evento não está em andamento (rascunho, cancelado, antes do início ou depois do fim), ou a rodada anterior ainda não começou */
+            409: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Outro pedido está iniciando a mesma rodada; nada foi gravado */
+            503: {
+                headers: {
+                    /** @description Segundos até tentar de novo */
+                    "Retry-After": number;
                     "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
@@ -1476,6 +1775,72 @@ export interface operations {
             };
         };
     };
+    getMyPairing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id do evento */
+                eventId: string;
+                /** @description Número da rodada no evento, a partir de 1 */
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description O lugar de quem chama na rodada */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairingResponse"];
+                };
+            };
+            /** @description Id que não é UUID, ou número fora de 1 a 100 */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Quem chama não estava no sorteio dessa rodada */
+            404: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     getEvent: {
         parameters: {
             query?: never;
@@ -1715,7 +2080,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                    "application/problem+json": components["schemas"]["ValidationProblemDetail"];
                 };
             };
             /** @description Sem credencial válida */
@@ -1878,7 +2243,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                    "application/problem+json": components["schemas"]["ValidationProblemDetail"];
                 };
             };
             /** @description Sem credencial válida */
@@ -2047,7 +2412,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                    "application/problem+json": components["schemas"]["ValidationProblemDetail"];
                 };
             };
             /** @description Corpo em outro formato que não application/json */

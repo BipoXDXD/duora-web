@@ -225,9 +225,12 @@ describe('profile page', () => {
     expect(region).toHaveValue('BR-SP')
   })
 
-  it('points a field the API refused to that field', async () => {
+  it('points a field the API refused to that field, in words for each code', async () => {
     const { user } = renderProfilePage(
-      byMethod({ GET: profileAnswer(ANA, 4), PATCH: problemAnswer(400, 'bio contains a forbidden character') }),
+      byMethod({
+        GET: profileAnswer(ANA, 4),
+        PATCH: problemAnswer(400, 'bio contains a forbidden character', [{ field: 'bio', code: 'FORBIDDEN_CHARACTER' }]),
+      }),
     )
     const form = await openEditor(user)
     const bio = within(form).getByLabelText('Apresentação')
@@ -237,10 +240,69 @@ describe('profile page', () => {
 
     await waitFor(() => expect(bio).toHaveAttribute('aria-invalid', 'true'))
     expect(bio).toHaveAccessibleDescription(expect.stringContaining('caracteres que não são aceitos'))
+    expect(bio).toHaveFocus()
+    expect(within(form).queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('shows a refusal that names no field on the whole form', async () => {
-    const { user } = renderProfilePage(byMethod({ GET: profileAnswer(ANA, 4), PATCH: problemAnswer(400) }))
+  it('shows every refused field at once and focuses the first one on the screen', async () => {
+    const { user } = renderProfilePage(
+      byMethod({
+        GET: profileAnswer(ANA, 4),
+        PATCH: problemAnswer(400, undefined, [
+          { field: 'bio', code: 'TOO_LONG' },
+          { field: 'displayName', code: 'FORBIDDEN_CHARACTER' },
+        ]),
+      }),
+    )
+    const form = await openEditor(user)
+    const name = within(form).getByLabelText('Nome')
+    const bio = within(form).getByLabelText('Apresentação')
+
+    await user.type(bio, ' Mais.')
+    await user.click(within(form).getByRole('button', { name: 'Salvar' }))
+
+    await waitFor(() => expect(name).toHaveAttribute('aria-invalid', 'true'))
+    expect(name).toHaveAccessibleDescription(expect.stringContaining('Use uma linha só, sem caracteres invisíveis.'))
+    expect(bio).toHaveAccessibleDescription(expect.stringContaining('Use no máximo 300 caracteres.'))
+    expect(name).toHaveFocus()
+  })
+
+  it('also warns on the whole form when part of the refusal is not about a field of the form', async () => {
+    const { user } = renderProfilePage(
+      byMethod({
+        GET: profileAnswer(ANA, 4),
+        PATCH: problemAnswer(400, undefined, [
+          { field: 'bio', code: 'TOO_LONG' },
+          { field: 'nickname', code: 'UNKNOWN_FIELD' },
+        ]),
+      }),
+    )
+    const form = await openEditor(user)
+    const bio = within(form).getByLabelText('Apresentação')
+
+    await user.type(bio, ' Mais.')
+    await user.click(within(form).getByRole('button', { name: 'Salvar' }))
+
+    expect(await within(form).findByRole('alert')).toHaveTextContent('Confira os dados do perfil e tente de novo.')
+    expect(bio).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('marks the field as refused, without a reason, for a code the front does not know', async () => {
+    const { user } = renderProfilePage(
+      byMethod({ GET: profileAnswer(ANA, 4), PATCH: problemAnswer(400, undefined, [{ field: 'bio', code: 'TOO_SPICY' }]) }),
+    )
+    const form = await openEditor(user)
+    const bio = within(form).getByLabelText('Apresentação')
+
+    await user.type(bio, ' Mais.')
+    await user.click(within(form).getByRole('button', { name: 'Salvar' }))
+
+    await waitFor(() => expect(bio).toHaveAttribute('aria-invalid', 'true'))
+    expect(bio).toHaveAccessibleDescription(expect.stringContaining('Confira a apresentação.'))
+  })
+
+  it('shows a refusal without field errors on the whole form, even if the English detail names a field', async () => {
+    const { user } = renderProfilePage(byMethod({ GET: profileAnswer(ANA, 4), PATCH: problemAnswer(400, 'bio is too long') }))
     const form = await openEditor(user)
 
     await user.type(within(form).getByLabelText('Apresentação'), ' Mais.')

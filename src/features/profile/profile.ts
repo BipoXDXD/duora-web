@@ -1,6 +1,13 @@
 import { z } from 'zod/mini'
 import type { EditProfileRequest } from '../../shared/api/contract.ts'
-import { ApiError, InvalidResponseError, isApiFailure, readJsonBody, sendApiRequest } from '../../shared/api/http.ts'
+import {
+  ApiError,
+  type FieldError,
+  InvalidResponseError,
+  isApiFailure,
+  readJsonBody,
+  sendApiRequest,
+} from '../../shared/api/http.ts'
 
 const PROFILE_PATH = '/api/me/profile'
 
@@ -71,11 +78,20 @@ export interface VersionedProfile {
 
 export type ProfileField = keyof EditProfileRequest
 
+/** Os campos do perfil na ordem em que aparecem na tela; o teste confere com `EditProfileRequest` da spec. */
+export const PROFILE_FIELDS = ['displayName', 'birthDate', 'region', 'bio'] as const satisfies readonly ProfileField[]
+
+export function isProfileField(name: string): name is ProfileField {
+  const fields: readonly string[] = PROFILE_FIELDS
+  return fields.includes(name)
+}
+
 export type EditProfileResult =
   | { readonly kind: 'saved'; readonly saved: VersionedProfile }
   | { readonly kind: 'outdated' }
   | { readonly kind: 'birthDateLocked' }
-  | { readonly kind: 'invalid'; readonly field: ProfileField | null }
+  /** O 400 da API, com os campos que ela recusou; vazio quando não os disse. */
+  | { readonly kind: 'invalid'; readonly fieldErrors: readonly FieldError[] }
   | { readonly kind: 'signedOut' }
   | { readonly kind: 'failed' }
 
@@ -83,12 +99,6 @@ const BAD_REQUEST = 400
 const UNAUTHORIZED = 401
 const CONFLICT = 409
 const PRECONDITION_FAILED = 412
-
-/**
- * A duora-api começa o `detail` do 400 pelo nome do campo ("bio must have at most 300 characters"). Não
- * está na spec, então um detail diferente só perde o campo: o erro aparece no formulário inteiro.
- */
-const FIELD_IN_DETAIL = /^(displayName|birthDate|bio|region)\b/
 
 export async function fetchProfile(): Promise<VersionedProfile> {
   return versionedProfileIn(await sendApiRequest({ method: 'GET', path: PROFILE_PATH }))
@@ -124,7 +134,7 @@ async function versionedProfileIn(response: Response): Promise<VersionedProfile>
 function resultOf(error: ApiError): EditProfileResult {
   switch (error.status) {
     case BAD_REQUEST:
-      return { kind: 'invalid', field: fieldIn(error.problemDetail) }
+      return { kind: 'invalid', fieldErrors: error.fieldErrors }
     case UNAUTHORIZED:
       return { kind: 'signedOut' }
     case CONFLICT:
@@ -133,18 +143,5 @@ function resultOf(error: ApiError): EditProfileResult {
       return { kind: 'outdated' }
     default:
       return { kind: 'failed' }
-  }
-}
-
-function fieldIn(detail: string | null): ProfileField | null {
-  const field = detail?.match(FIELD_IN_DETAIL)?.[1]
-  switch (field) {
-    case 'displayName':
-    case 'birthDate':
-    case 'bio':
-    case 'region':
-      return field
-    default:
-      return null
   }
 }

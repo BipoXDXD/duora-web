@@ -1,7 +1,16 @@
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import type { EditProfileRequest, ProfileResponse } from '../../shared/api/contract.ts'
 import { InvalidResponseError } from '../../shared/api/http.ts'
-import { editProfile, fetchProfile, type ProfileWire, REGION_NAMES, type Region } from './profile.ts'
+import {
+  editProfile,
+  fetchProfile,
+  isProfileField,
+  PROFILE_FIELDS,
+  type ProfileField,
+  type ProfileWire,
+  REGION_NAMES,
+  type Region,
+} from './profile.ts'
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -29,8 +38,8 @@ function profileAnswer(body: unknown, etag: string | null = '"4"', status = 200)
   return new Response(JSON.stringify(body), { status, headers })
 }
 
-function problemAnswer(status: number, detail?: string): Response {
-  return new Response(JSON.stringify({ title: 'Erro', status, detail }), {
+function problemAnswer(status: number, detail?: string, errors?: unknown): Response {
+  return new Response(JSON.stringify({ title: 'Erro', status, detail, errors }), {
     status,
     headers: { 'Content-Type': 'application/problem+json' },
   })
@@ -137,25 +146,36 @@ describe('editProfile', () => {
     await expect(editProfile('"4"', { birthDate: '1991-01-01' })).resolves.toEqual({ kind: 'birthDateLocked' })
   })
 
-  it.each([
-    ['displayName contains a forbidden character', 'displayName'],
-    ['birthDate must be at least 18 years ago', 'birthDate'],
-    ['bio must have at most 300 characters', 'bio'],
-    ['region must be the ISO 3166-2 code of a Brazilian state, like BR-SP', 'region'],
-  ] as const)('points a 400 saying "%s" to the %s field', async (detail, field) => {
-    fetchMock.mockResolvedValue(problemAnswer(400, detail))
+  it('reports a 400 with the fields the API refused, in the order it listed them', async () => {
+    fetchMock.mockResolvedValue(
+      problemAnswer(400, 'bio must have at most 300 characters', [
+        { field: 'bio', code: 'TOO_LONG' },
+        { field: 'region', code: 'UNSUPPORTED_VALUE' },
+      ]),
+    )
 
-    await expect(editProfile('"4"', {})).resolves.toEqual({ kind: 'invalid', field })
+    await expect(editProfile('"4"', {})).resolves.toEqual({
+      kind: 'invalid',
+      fieldErrors: [
+        { field: 'bio', code: 'TOO_LONG' },
+        { field: 'region', code: 'UNSUPPORTED_VALUE' },
+      ],
+    })
+  })
+
+  it('does not read the field from the English detail, which is for developers', async () => {
+    fetchMock.mockResolvedValue(problemAnswer(400, 'bio must have at most 300 characters'))
+
+    await expect(editProfile('"4"', {})).resolves.toEqual({ kind: 'invalid', fieldErrors: [] })
   })
 
   it.each([
-    ['a detail about no field', 'JSON parse error'],
-    ['a detail that only starts like a field', 'bioData is wrong'],
-    ['no detail', undefined],
-  ])('reports a 400 with %s without a field', async (_case, detail) => {
-    fetchMock.mockResolvedValue(problemAnswer(400, detail))
+    ['no detail', undefined, undefined],
+    ['errors out of the format', 'bio is too long', 'bio'],
+  ])('reports a 400 with %s without any field', async (_case, detail, errors) => {
+    fetchMock.mockResolvedValue(problemAnswer(400, detail, errors))
 
-    await expect(editProfile('"4"', {})).resolves.toEqual({ kind: 'invalid', field: null })
+    await expect(editProfile('"4"', {})).resolves.toEqual({ kind: 'invalid', fieldErrors: [] })
   })
 
   it('reports an expired session on 401', async () => {
@@ -190,6 +210,20 @@ describe('editProfile', () => {
   })
 })
 
+describe('profile fields', () => {
+  it('lists the fields of the form in screen order', () => {
+    expect(PROFILE_FIELDS).toEqual(['displayName', 'birthDate', 'region', 'bio'])
+  })
+
+  it.each(PROFILE_FIELDS)('recognizes %s', (field) => {
+    expect(isProfileField(field)).toBe(true)
+  })
+
+  it.each(['', 'email', 'DisplayName', 'bio ', '__proto__', 'complete'])('does not recognize %j', (name) => {
+    expect(isProfileField(name)).toBe(false)
+  })
+})
+
 describe('regions', () => {
   it('names every Brazilian state and the Federal District', () => {
     expect(Object.keys(REGION_NAMES)).toHaveLength(27)
@@ -203,6 +237,11 @@ describe('contract with the generated API types', () => {
   // mudar, `npm run api:types` muda `schema.d.ts` e este teste deixa de compilar.
   it('reads the profile the way the spec declares it', () => {
     expectTypeOf<ProfileWire>().toEqualTypeOf<ProfileResponse>()
+  })
+
+  it('lists exactly the fields the edit accepts', () => {
+    expectTypeOf<(typeof PROFILE_FIELDS)[number]>().toEqualTypeOf<ProfileField>()
+    expectTypeOf<ProfileField>().toEqualTypeOf<keyof EditProfileRequest>()
   })
 
   it('knows the same regions the edit accepts', () => {

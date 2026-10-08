@@ -10,7 +10,14 @@ export interface ProfileFormValues {
   readonly region: Region | ''
 }
 
-export type FieldProblem = 'blank' | 'tooLong' | 'notADate' | 'underage' | 'implausibleAge' | 'rejected'
+export type FieldProblem =
+  | 'blank'
+  | 'tooLong'
+  | 'notADate'
+  | 'underage'
+  | 'implausibleAge'
+  | 'forbiddenCharacter'
+  | 'rejected'
 
 export type FieldProblems = Readonly<Partial<Record<ProfileField, FieldProblem>>>
 

@@ -87,12 +87,13 @@ export function RegistrationPanel({ eventId }: RegistrationPanelProps) {
       {shown !== null && <NoticeMessage key={shown.id} notice={shown.notice} />}
       {query.data === null ? (
         <>
+          {/* Com um próximo passo no aviso (completar o perfil, entrar), ele é o botão primário da tela. */}
           <p className="text-fg">As inscrições estão abertas.</p>
           <button
             type="button"
             onClick={() => registerMutation.mutate()}
             disabled={registerMutation.isPending}
-            className={PRIMARY_BUTTON}
+            className={shown?.notice.action != null ? SECONDARY_BUTTON : PRIMARY_BUTTON}
           >
             {registerMutation.isPending ? 'Inscrevendo…' : 'Quero me inscrever'}
           </button>

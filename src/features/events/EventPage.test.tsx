@@ -15,6 +15,7 @@ import {
   type FakeRoute,
 } from '../../test/fakeApi.ts'
 import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
 const EVENT = `/api/events/${DINNER.id}`
@@ -164,6 +165,46 @@ describe('event page', () => {
       expect(alert).toHaveTextContent('só para maiores de 18 anos')
       await user.click(screen.getByRole('link', { name: 'Completar meu perfil' }))
       expect(window.location.pathname).toBe('/perfil')
+    })
+
+    it('keeps a single primary button: the next step in the notice outranks "Quero me inscrever"', async () => {
+      const { user } = renderEventPage({
+        [EVENT]: jsonAnswer(DINNER),
+        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: problemAnswer(403) }),
+        '/api/me/profile': neverAnswer(),
+      })
+      const register = await screen.findByRole('button', { name: 'Quero me inscrever' })
+      expect(register.className).toBe(PRIMARY_BUTTON)
+
+      await user.click(register)
+
+      const next = await screen.findByRole('link', { name: 'Completar meu perfil' })
+      expect(next.className).toBe(PRIMARY_BUTTON)
+      expect(screen.getByRole('button', { name: 'Quero me inscrever' }).className).toBe(SECONDARY_BUTTON)
+    })
+
+    it('demotes "Quero me inscrever" while the notice asks to sign in again', async () => {
+      const { user } = renderEventPage({
+        [EVENT]: jsonAnswer(DINNER),
+        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: statusAnswer(401) }),
+      })
+
+      await user.click(await screen.findByRole('button', { name: 'Quero me inscrever' }))
+
+      expect((await screen.findByRole('link', { name: 'Entrar de novo' })).className).toBe(PRIMARY_BUTTON)
+      expect(screen.getByRole('button', { name: 'Quero me inscrever' }).className).toBe(SECONDARY_BUTTON)
+    })
+
+    it('keeps "Quero me inscrever" primary when the notice has no next step', async () => {
+      const { user } = renderEventPage({
+        [EVENT]: jsonAnswer(DINNER),
+        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: BUSY }),
+      })
+
+      await user.click(await screen.findByRole('button', { name: 'Quero me inscrever' }))
+
+      await screen.findByRole('alert')
+      expect(screen.getByRole('button', { name: 'Quero me inscrever' }).className).toBe(PRIMARY_BUTTON)
     })
 
     it('explains a full, cancelled or started event on 409 and reads the event again', async () => {

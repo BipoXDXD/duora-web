@@ -65,6 +65,7 @@ export function DecisionPanel({ eventId, roundNumber }: DecisionPanelProps) {
         decision={query.data}
         hasFailed={query.isError}
         isSaving={mutation.isPending}
+        hasNextStep={shown?.notice.action != null}
         onRetry={() => void query.refetch()}
         onConfirm={(interested) => mutation.mutate(interested)}
       />
@@ -77,11 +78,13 @@ interface DecisionBodyProps {
   readonly decision: Decision | null | undefined
   readonly hasFailed: boolean
   readonly isSaving: boolean
+  /** O aviso mostrado traz um passo a seguir (entrar de novo), que passa a ser o botão primário. */
+  readonly hasNextStep: boolean
   readonly onRetry: () => void
   readonly onConfirm: (interested: boolean) => void
 }
 
-function DecisionBody({ decision, hasFailed, isSaving, onRetry, onConfirm }: DecisionBodyProps) {
+function DecisionBody({ decision, hasFailed, isSaving, hasNextStep, onRetry, onConfirm }: DecisionBodyProps) {
   if (decision === undefined) {
     return hasFailed ? (
       <LoadFailure message="Não foi possível ver sua decisão." onRetry={onRetry} />
@@ -92,7 +95,7 @@ function DecisionBody({ decision, hasFailed, isSaving, onRetry, onConfirm }: Dec
     )
   }
   if (decision === null) {
-    return <Choice isSaving={isSaving} onConfirm={onConfirm} />
+    return <Choice isSaving={isSaving} hasNextStep={hasNextStep} onConfirm={onConfirm} />
   }
   return <Decided decision={decision} />
 }
@@ -133,6 +136,7 @@ type ChoiceStep =
 
 interface ChoiceProps {
   readonly isSaving: boolean
+  readonly hasNextStep: boolean
   readonly onConfirm: (interested: boolean) => void
 }
 
@@ -140,7 +144,7 @@ interface ChoiceProps {
  * Escolher e depois confirmar, porque a decisão é final. As duas opções têm o mesmo peso visual: a tela não
  * empurra para nenhuma.
  */
-function Choice({ isSaving, onConfirm }: ChoiceProps) {
+function Choice({ isSaving, hasNextStep, onConfirm }: ChoiceProps) {
   const [step, setStep] = useState<ChoiceStep>({ kind: 'choosing', focusOn: null })
 
   if (step.kind === 'confirming') {
@@ -148,6 +152,7 @@ function Choice({ isSaving, onConfirm }: ChoiceProps) {
       <ConfirmChoice
         interested={step.interested}
         isSaving={isSaving}
+        hasNextStep={hasNextStep}
         onConfirm={() => onConfirm(step.interested)}
         onBack={() => setStep({ kind: 'choosing', focusOn: step.interested })}
       />
@@ -191,18 +196,25 @@ function ChoiceButton({ label, hasFocus, onClick }: ChoiceButtonProps) {
 interface ConfirmChoiceProps {
   readonly interested: boolean
   readonly isSaving: boolean
+  readonly hasNextStep: boolean
   readonly onConfirm: () => void
   readonly onBack: () => void
 }
 
-function ConfirmChoice({ interested, isSaving, onConfirm, onBack }: ConfirmChoiceProps) {
+function ConfirmChoice({ interested, isSaving, hasNextStep, onConfirm, onBack }: ConfirmChoiceProps) {
   const confirmRef = useFocusOnMount<HTMLButtonElement>()
   return (
     <div className="flex flex-col items-start gap-3">
       <p className="font-semibold text-fg">{`Você escolheu: ${chosenText(interested)}.`}</p>
       <p className="text-fg">A decisão é final: depois de confirmar, não dá para mudar. Ela continua só sua.</p>
       <div className="flex flex-wrap gap-4">
-        <button ref={confirmRef} type="button" onClick={onConfirm} disabled={isSaving} className={PRIMARY_BUTTON}>
+        <button
+          ref={confirmRef}
+          type="button"
+          onClick={onConfirm}
+          disabled={isSaving}
+          className={hasNextStep ? SECONDARY_BUTTON : PRIMARY_BUTTON}
+        >
           {isSaving ? 'Registrando…' : 'Confirmar minha decisão'}
         </button>
         <button type="button" onClick={onBack} disabled={isSaving} className={SECONDARY_BUTTON}>

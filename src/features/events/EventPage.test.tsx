@@ -509,6 +509,17 @@ describe('event page', () => {
       expect(screen.getByText('Nenhuma rodada começou ainda.')).toBeInTheDocument()
     })
 
+    it('says it is checking, and blocks a second click, while the event is read again', async () => {
+      const { user } = renderEventPage({
+        [EVENT]: inSequence(inRound(null), neverAnswer()),
+        [REGISTRATION]: REGISTERED,
+      })
+
+      await user.click(await screen.findByRole('button', { name: 'Ver se a primeira rodada começou' }))
+
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Verificando…' })).toBeDisabled())
+    })
+
     it('shows the partner of the current round by default, by the end of the account id', async () => {
       const { fetchMock } = renderEventPage({
         [EVENT]: inRound(2),

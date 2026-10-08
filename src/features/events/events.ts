@@ -1,5 +1,6 @@
 import { z } from 'zod/mini'
 import { ApiError, readJsonBody, sendApiRequest } from '../../shared/api/http.ts'
+import { FIRST_ROUND, LAST_ROUND } from './pairing.ts'
 
 /** Instante com fuso, como a API manda; vira `Date` já na fronteira. */
 export const instantSchema = z.pipe(
@@ -17,6 +18,8 @@ const eventSchema = z.object({
   startsAt: instantSchema,
   endsAt: instantSchema,
   status: z.enum(EVENT_STATUSES),
+  /** A última rodada iniciada, ou `null` antes da primeira. Na lista a API manda sempre `null`. */
+  currentRound: z.nullable(z.int().check(z.gte(FIRST_ROUND), z.lte(LAST_ROUND))),
 })
 
 const eventPageSchema = z.object({

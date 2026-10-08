@@ -8,6 +8,7 @@ export const DINNER = {
   startsAt: '2026-10-10T22:00:00Z',
   endsAt: '2026-10-11T01:00:00Z',
   status: 'PUBLISHED',
+  currentRound: null,
 } as const
 
 export const WINE = {
@@ -17,6 +18,7 @@ export const WINE = {
   startsAt: '2026-10-17T22:00:00Z',
   endsAt: '2026-10-18T01:00:00Z',
   status: 'PUBLISHED',
+  currentRound: null,
 } as const
 
 export const PICNIC = {
@@ -26,6 +28,7 @@ export const PICNIC = {
   startsAt: '2026-10-24T15:00:00Z',
   endsAt: '2026-10-24T18:00:00Z',
   status: 'PUBLISHED',
+  currentRound: null,
 } as const
 
 export const SESSION = { '/api/me': jsonAnswer({ displayName: 'Ana Souza', profileComplete: true }) }

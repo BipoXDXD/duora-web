@@ -51,7 +51,8 @@ export function noticeOfCancel(result: CancelResult): RegistrationNotice {
   }
 }
 
-function waitText(retryAfterSeconds: number | null): string {
+/** "em instantes", "em 1 segundo" ou "em N segundos", pelo `Retry-After` da API. */
+export function waitText(retryAfterSeconds: number | null): string {
   if (retryAfterSeconds === null || retryAfterSeconds === 0) {
     return 'em instantes'
   }

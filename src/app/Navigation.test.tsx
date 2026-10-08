@@ -11,6 +11,7 @@ const PAGES = {
   '/api/me/blocked-accounts': neverAnswer(),
   '/api/events': neverAnswer(),
   '/api/me/registrations': neverAnswer(),
+  '/api/me/connections': neverAnswer(),
   '/api/events/0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7b': neverAnswer(),
 }
 
@@ -54,6 +55,24 @@ describe.each([
 
     await screen.findAllByRole('link', { name: 'Entrar' })
     expect(within(navigation).queryByRole('link', { name: profileLinkName })).not.toBeInTheDocument()
+  })
+
+  it('takes a logged in user to the connections and marks them as the current page', async () => {
+    const { user, navigation } = renderAt('/')
+
+    await user.click(await within(navigation).findByRole('link', { name: 'Conexões' }))
+
+    expect(window.location.pathname).toBe('/conexoes')
+    expect(screen.getByRole('heading', { level: 1, name: 'Conexões' })).toBeInTheDocument()
+    expect(within(navigation).getByRole('link', { name: 'Conexões' })).toHaveAttribute('aria-current', 'page')
+    expect(within(navigation).getByRole('link', { name: 'Eventos' })).not.toHaveAttribute('aria-current')
+  })
+
+  it('offers no connections link to a visitor who is not logged in', async () => {
+    const { navigation } = renderAt('/', ANONYMOUS_SESSION)
+
+    await screen.findAllByRole('link', { name: 'Entrar' })
+    expect(within(navigation).queryByRole('link', { name: 'Conexões' })).not.toBeInTheDocument()
   })
 
   it('takes a logged in user to the events and marks them as the current page', async () => {

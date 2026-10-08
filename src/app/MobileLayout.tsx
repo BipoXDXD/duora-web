@@ -34,6 +34,12 @@ export function MobileLayout({ route, children }: MobileLayoutProps) {
           Início
         </AppLink>
         <MemberLink to={PATHS.events} label="Eventos" className={TAB_CLASS} isCurrent={isEventsRoute(route)} />
+        <MemberLink
+          to={PATHS.connections}
+          label="Conexões"
+          className={TAB_CLASS}
+          isCurrent={route.page === 'connections'}
+        />
         <MemberLink to={PATHS.profile} label="Perfil" className={TAB_CLASS} isCurrent={isProfileRoute(route)} />
         <SessionTab tabClassName={TAB_CLASS} />
       </nav>

@@ -13,6 +13,8 @@ describe('routeOf', () => {
     ['/eventos', 'events'],
     ['/eventos/', 'events'],
     ['/inscricoes', 'registrations'],
+    ['/conexoes', 'connections'],
+    ['/conexoes/', 'connections'],
   ] as const)('maps %s to the %s page', (pathname, page) => {
     expect(routeOf(pathname)).toEqual({ page })
   })
@@ -31,6 +33,7 @@ describe('routeOf', () => {
     '/bloqueios',
     '/perfil//bloqueios',
     '/index.html',
+    '/conexoes/outra',
     '/eventos/123',
     `/eventos/${EVENT_ID}x`,
     `/eventos/${EVENT_ID.slice(1)}`,

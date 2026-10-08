@@ -78,7 +78,7 @@ export interface paths {
         get: operations["getRound"];
         /**
          * Inicia uma rodada de pareamento do evento
-         * @description Sem corpo. Sorteia os pares entre os inscritos: o máximo de pares possível, sem par bloqueado nem par que já se formou no evento, com prioridade para quem ficou de fora mais vezes. Idempotente pela chave evento + número: repetir, inclusive ao mesmo tempo, devolve a mesma rodada, por isso dispensa If-Match e Idempotency-Key (docs/adr/0017). A rodada N exige a N-1, e o evento precisa estar publicado e em andamento.
+         * @description Sem corpo. Sorteia os pares entre os inscritos: o máximo de pares possível, sem par bloqueado nem par que já se formou no evento, com prioridade para quem ficou de fora mais vezes. Idempotente pela chave evento + número: repetir, inclusive ao mesmo tempo, devolve a mesma rodada, por isso dispensa If-Match e Idempotency-Key (docs/adr/0017). A rodada N exige a N-1, e o evento precisa estar publicado e em andamento. Cada chamada, repetida ou não, gasta o limite da conta ADMIN: 30 por hora, repostas aos poucos.
          */
         put: operations["startRound"];
         post?: never;
@@ -202,15 +202,39 @@ export interface paths {
         get: operations["getMyRegistration"];
         /**
          * Inscreve quem chama no evento
-         * @description Sem corpo. Idempotente pela chave evento + conta: repetir devolve a mesma inscrição, com a mesma data, por isso dispensa If-Match e Idempotency-Key (docs/adr/0016). Exige perfil completo e 18 anos.
+         * @description Sem corpo. Idempotente pela chave evento + conta: repetir devolve a mesma inscrição, com a mesma data, por isso dispensa If-Match e Idempotency-Key (docs/adr/0016). Exige perfil completo e 18 anos. Cada chamada, repetida ou não, gasta o limite da conta, compartilhado com cancelMyRegistration: 60 por hora, repostas aos poucos.
          */
         put: operations["registerForEvent"];
         post?: never;
         /**
          * Cancela a própria inscrição no evento
-         * @description Idempotente: sem inscrição, também responde 204. Só até o evento começar.
+         * @description Idempotente: sem inscrição, também responde 204. Só até o evento começar. Cada chamada gasta o limite da conta, compartilhado com registerForEvent: 60 por hora, repostas aos poucos.
          */
         delete: operations["cancelMyRegistration"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/rounds/{number}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lê a própria decisão sobre o par da rodada
+         * @description Só a de quem chama. Sem decisão gravada, 404, tenha a pessoa formado par ou não.
+         */
+        get: operations["getMyDecision"];
+        /**
+         * Decide se continua em contato com o par da rodada
+         * @description Uma decisão por pessoa e rodada, e final: repetir a mesma escolha devolve a mesma decisão (200); a outra escolha é recusada (409). A resposta é a mesma qualquer que seja a decisão do par; se os dois disserem sim, a conexão aparece em listMyConnections.
+         */
+        put: operations["decideAboutMyPartner"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -288,6 +312,26 @@ export interface paths {
          * @description Do bloqueio mais recente para o mais antigo, paginado por cursor. A última página vem com nextPageToken null.
          */
         get: operations["listBlockedAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lista as próprias conexões
+         * @description Pessoas com quem houve interesse mútuo depois de uma rodada, da conexão mais recente para a mais antiga, paginadas por cursor. A última página vem com nextPageToken null.
+         */
+        get: operations["listMyConnections"];
         put?: never;
         post?: never;
         delete?: never;
@@ -505,6 +549,24 @@ export interface components {
             /** @description Token da próxima página, ou null na última */
             nextPageToken: string | null;
         };
+        Connection: {
+            /**
+             * Format: uuid
+             * @description Id da outra conta
+             */
+            accountId: string;
+            /**
+             * Format: date-time
+             * @description Quando a conexão se formou
+             */
+            connectedAt: string;
+        };
+        ConnectionsResponse: {
+            /** @description Conexões da mais recente para a mais antiga */
+            items: components["schemas"]["Connection"][];
+            /** @description Token da próxima página, ou null na última */
+            nextPageToken: string | null;
+        };
         CreateEventRequest: {
             /**
              * Format: int32
@@ -531,6 +593,29 @@ export interface components {
             displayName: string | null;
             /** @description Se o perfil já tem o necessário para usar o Duora; se não, o front leva ao cadastro */
             profileComplete: boolean;
+        };
+        DecideRequest: {
+            /** @description true para continuar em contato com o par da rodada, false para não */
+            interested: boolean;
+        };
+        DecisionResponse: {
+            /**
+             * Format: date-time
+             * @description Quando a decisão foi gravada
+             */
+            decidedAt: string;
+            /**
+             * Format: uuid
+             * @description Id do evento
+             */
+            eventId: string;
+            /** @description A escolha de quem chama: true para continuar em contato */
+            interested: boolean;
+            /**
+             * Format: int32
+             * @description Número da rodada no evento
+             */
+            roundNumber: number;
         };
         /** @description Só os campos a mudar. Campo ausente não muda; null apaga. */
         EditProfileRequest: {
@@ -1148,6 +1233,18 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetail"];
                 };
             };
+            /** @description Limite de rodadas desta conta ADMIN esgotado */
+            429: {
+                headers: {
+                    /** @description Segundos até a próxima chamada ficar disponível */
+                    "Retry-After": number;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
             /** @description Erro inesperado */
             500: {
                 headers: {
@@ -1158,7 +1255,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetail"];
                 };
             };
-            /** @description Outro pedido está iniciando a mesma rodada; nada foi gravado */
+            /** @description Outro pedido está iniciando a mesma rodada, ou o limite desta conta não pôde ser contado; nada foi gravado */
             503: {
                 headers: {
                     /** @description Segundos até tentar de novo */
@@ -1669,6 +1766,18 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetail"];
                 };
             };
+            /** @description Limite de inscrições e cancelamentos desta conta esgotado */
+            429: {
+                headers: {
+                    /** @description Segundos até a próxima chamada ficar disponível */
+                    "Retry-After": number;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
             /** @description Erro inesperado */
             500: {
                 headers: {
@@ -1679,7 +1788,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetail"];
                 };
             };
-            /** @description O evento está ocupado com outras inscrições; nada foi gravado */
+            /** @description O evento está ocupado com outras inscrições, ou o limite desta conta não pôde ser contado; nada foi gravado */
             503: {
                 headers: {
                     /** @description Segundos até tentar de novo */
@@ -1763,9 +1872,223 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetail"];
                 };
             };
+            /** @description Limite de inscrições e cancelamentos desta conta esgotado */
+            429: {
+                headers: {
+                    /** @description Segundos até a próxima chamada ficar disponível */
+                    "Retry-After": number;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
             /** @description Erro inesperado */
             500: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description O limite desta conta não pôde ser contado; nada foi feito */
+            503: {
+                headers: {
+                    /** @description Segundos até tentar de novo */
+                    "Retry-After": number;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    getMyDecision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id do evento */
+                eventId: string;
+                /** @description Número da rodada no evento, a partir de 1 */
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A decisão de quem chama */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionResponse"];
+                };
+            };
+            /** @description Id que não é UUID, ou número fora de 1 a 100 */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Quem chama não decidiu nessa rodada */
+            404: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    decideAboutMyPartner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id do evento */
+                eventId: string;
+                /** @description Número da rodada no evento, a partir de 1 */
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecideRequest"];
+            };
+        };
+        responses: {
+            /** @description A decisão que já existia, com a mesma escolha */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionResponse"];
+                };
+            };
+            /** @description A decisão gravada */
+            201: {
+                headers: {
+                    /** @description Endereço da decisão */
+                    Location: string;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionResponse"];
+                };
+            };
+            /** @description Id que não é UUID, número fora de 1 a 100, interested ausente ou que não é booleano, JSON malformado ou campo desconhecido */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ValidationProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sessão web sem o token CSRF no header X-XSRF-TOKEN */
+            403: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Quem chama não formou par nessa rodada: ficou de fora, não estava no sorteio ou a rodada não existe */
+            404: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Quem chama já decidiu nessa rodada, com a outra escolha */
+            409: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Corpo em outro formato que não application/json */
+            415: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description A decisão do par na mesma rodada demorou além do teto; nada foi gravado */
+            503: {
+                headers: {
+                    /** @description Segundos até tentar de novo */
+                    "Retry-After": number;
                     "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
@@ -1968,6 +2291,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BlockedAccountsResponse"];
+                };
+            };
+            /** @description maxPageSize fora de 1 a 100, ou pageToken que a API não gerou */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    listMyConnections: {
+        parameters: {
+            query?: {
+                /** @description Quantas conexões no máximo nesta página */
+                maxPageSize?: number;
+                /** @description O nextPageToken da página anterior; ausente na primeira */
+                pageToken?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Uma página das conexões */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionsResponse"];
                 };
             };
             /** @description maxPageSize fora de 1 a 100, ou pageToken que a API não gerou */

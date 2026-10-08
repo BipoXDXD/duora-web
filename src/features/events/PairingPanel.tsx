@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useId, useState, type FormEvent } from 'react'
+import { DecisionPanel } from '../connections/DecisionPanel.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { FIELD_CONTROL, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
 import { EVENT_KEYS, READ_OPTIONS } from './eventQueries.ts'
@@ -84,6 +85,7 @@ export function PairingPanel({ eventId }: PairingPanelProps) {
       <div aria-live="polite" className="flex w-full flex-col items-start gap-4">
         {round !== null && (
           <RoundResult
+            eventId={eventId}
             round={round}
             pairing={query.data}
             isLoading={query.isFetching}
@@ -98,6 +100,7 @@ export function PairingPanel({ eventId }: PairingPanelProps) {
 }
 
 interface RoundResultProps {
+  readonly eventId: string
   readonly round: number
   readonly pairing: Pairing | undefined
   readonly isLoading: boolean
@@ -106,7 +109,7 @@ interface RoundResultProps {
   readonly onNextRound: () => void
 }
 
-function RoundResult({ round, pairing, isLoading, hasFailed, onRetry, onNextRound }: RoundResultProps) {
+function RoundResult({ eventId, round, pairing, isLoading, hasFailed, onRetry, onNextRound }: RoundResultProps) {
   if (isLoading) {
     return <p className="text-fg-muted">{`Procurando sua dupla na rodada ${round}…`}</p>
   }
@@ -116,6 +119,7 @@ function RoundResult({ round, pairing, isLoading, hasFailed, onRetry, onNextRoun
   return (
     <>
       <p className="w-full rounded-lg bg-surface p-4 text-lg text-fg shadow-raised">{pairingText(round, pairing)}</p>
+      {pairing.kind === 'paired' && <DecisionPanel key={round} eventId={eventId} roundNumber={round} />}
       {round < LAST_ROUND && (
         <button type="button" onClick={onNextRound} className={SECONDARY_BUTTON}>
           {`Ver a rodada ${round + 1}`}

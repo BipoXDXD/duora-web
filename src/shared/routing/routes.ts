@@ -8,6 +8,7 @@ export const PATHS = {
   blockedAccounts: '/perfil/bloqueios',
   events: '/eventos',
   registrations: '/inscricoes',
+  connections: '/conexoes',
 } as const
 
 type FixedPage = keyof typeof PATHS
@@ -19,7 +20,7 @@ export type Route =
   | { readonly page: 'notFound' }
 
 /** Toda página de PATHS; o teste confere que nenhuma ficou de fora. */
-const FIXED_PAGES: readonly FixedPage[] = ['home', 'profile', 'blockedAccounts', 'events', 'registrations']
+const FIXED_PAGES: readonly FixedPage[] = ['home', 'profile', 'blockedAccounts', 'events', 'registrations', 'connections']
 
 const TRAILING_SLASH = /(?<=.)\/$/
 

@@ -21,18 +21,18 @@ const SECTION_LINKS = [
 ] as const
 
 const NAV_LINK_CLASS =
-  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg whitespace-nowrap text-fg-muted hover:text-fg aria-[current=page]:text-fg-accent'
+  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg whitespace-nowrap text-fg-muted max-lg:text-sm hover:text-fg aria-[current=page]:text-fg-accent'
 
 export function DesktopLayout({ route, children }: DesktopLayoutProps) {
   return (
     <div className="min-h-dvh">
       <header className="border-b border-divider bg-canvas">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-6 lg:gap-8 lg:px-8">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 md:px-6 lg:gap-8 lg:px-8">
           <AppLink to={PATHS.home} className="group inline-flex min-h-11 min-w-11 shrink-0 items-center rounded-lg text-fg">
             <Logo className="h-8 w-auto" />
           </AppLink>
-          <div className="flex items-center gap-4 lg:gap-6">
-            <nav aria-label="Principal" className="flex items-center gap-4 lg:gap-6">
+          <div className="flex items-center gap-3 lg:gap-6">
+            <nav aria-label="Principal" className="flex items-center gap-3 lg:gap-6">
               {SECTION_LINKS.map((link) => (
                 <a key={link.href} href={link.href} className={NAV_LINK_CLASS}>
                   {link.label}

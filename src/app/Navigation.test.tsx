@@ -6,7 +6,13 @@ import { stubMatchMedia } from '../test/fakeMatchMedia.ts'
 import { App } from './App.tsx'
 
 const SESSION = { '/api/me': jsonAnswer({ displayName: 'Ana Souza', profileComplete: true }) }
-const PAGES = { '/api/me/profile': neverAnswer(), '/api/me/blocked-accounts': neverAnswer() }
+const PAGES = {
+  '/api/me/profile': neverAnswer(),
+  '/api/me/blocked-accounts': neverAnswer(),
+  '/api/events': neverAnswer(),
+  '/api/me/registrations': neverAnswer(),
+  '/api/events/0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7b': neverAnswer(),
+}
 
 afterEach(() => {
   window.history.replaceState(null, '', '/')
@@ -50,6 +56,38 @@ describe.each([
     expect(within(navigation).queryByRole('link', { name: profileLinkName })).not.toBeInTheDocument()
   })
 
+  it('takes a logged in user to the events and marks them as the current page', async () => {
+    const { user, navigation } = renderAt('/')
+
+    await user.click(await within(navigation).findByRole('link', { name: 'Eventos' }))
+
+    expect(window.location.pathname).toBe('/eventos')
+    expect(screen.getByRole('heading', { level: 1, name: 'Eventos' })).toBeInTheDocument()
+    expect(within(navigation).getByRole('link', { name: 'Eventos' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('marks the events as the current page also on an event', async () => {
+    const { navigation } = renderAt('/eventos/0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7b')
+
+    expect(await within(navigation).findByRole('link', { name: 'Eventos' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('offers no events link to a visitor who is not logged in', async () => {
+    const { navigation } = renderAt('/', ANONYMOUS_SESSION)
+
+    await screen.findAllByRole('link', { name: 'Entrar' })
+    expect(within(navigation).queryByRole('link', { name: 'Eventos' })).not.toBeInTheDocument()
+  })
+
+  it('goes from the events to the own registrations', async () => {
+    const { user } = renderAt('/eventos')
+
+    await user.click(await within(screen.getByRole('main')).findByRole('link', { name: 'Minhas inscrições' }))
+
+    expect(window.location.pathname).toBe('/inscricoes')
+    expect(screen.getByRole('heading', { level: 1, name: 'Minhas inscrições' })).toBeInTheDocument()
+  })
+
   it('goes from the profile to the blocked accounts', async () => {
     const { user } = renderAt('/perfil')
 
@@ -67,6 +105,21 @@ describe.each([
 
     expect(window.location.pathname).toBe('/')
     expect(screen.queryByRole('heading', { level: 1, name: 'Página não encontrada' })).not.toBeInTheDocument()
+  })
+})
+
+describe.each([
+  ['desktop', true, 'Principal'],
+  ['mobile', false, 'Atalhos'],
+])('link "Eventos" (%s)', (_layout, isDesktop, navigationName) => {
+  it('is the current page also on the registrations, which are reached from the events', async () => {
+    stubMatchMedia(isDesktop)
+    window.history.replaceState(null, '', '/inscricoes')
+    stubApi({ ...SESSION, ...PAGES })
+    render(<App />)
+    const navigation = screen.getByRole('navigation', { name: navigationName })
+
+    expect(await within(navigation).findByRole('link', { name: 'Eventos' })).toHaveAttribute('aria-current', 'page')
   })
 })
 

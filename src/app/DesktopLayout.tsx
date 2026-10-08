@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react'
-import { HeaderSessionControls, ProfileLink } from '../features/auth/SessionControls.tsx'
+import { HeaderSessionControls, MemberLink } from '../features/auth/SessionControls.tsx'
 import { FAQ_ANCHOR } from '../features/landing/FaqSection.tsx'
 import { HOW_IT_WORKS_ANCHOR } from '../features/landing/HowItWorksSection.tsx'
 import { SAFETY_ANCHOR } from '../features/landing/SafetySection.tsx'
 import { Logo } from '../shared/brand/Logo.tsx'
 import { AppLink } from '../shared/routing/AppLink.tsx'
-import { isProfileRoute, PATHS, type Route } from '../shared/routing/routes.ts'
+import { isEventsRoute, isProfileRoute, PATHS, type Route } from '../shared/routing/routes.ts'
 import { ThemeToggle } from './theme/ThemeToggle.tsx'
 
 interface DesktopLayoutProps {
@@ -38,7 +38,18 @@ export function DesktopLayout({ route, children }: DesktopLayoutProps) {
                   {link.label}
                 </a>
               ))}
-              <ProfileLink label="Meu perfil" className={NAV_LINK_CLASS} isCurrent={isProfileRoute(route)} />
+              <MemberLink
+                to={PATHS.events}
+                label="Eventos"
+                className={NAV_LINK_CLASS}
+                isCurrent={isEventsRoute(route)}
+              />
+              <MemberLink
+                to={PATHS.profile}
+                label="Meu perfil"
+                className={NAV_LINK_CLASS}
+                isCurrent={isProfileRoute(route)}
+              />
             </nav>
             <HeaderSessionControls />
             <ThemeToggle />

@@ -58,7 +58,7 @@ describe('route groups for the navigation', () => {
     [{ page: 'blockedAccounts' }, true, false],
     [{ page: 'events' }, false, true],
     [{ page: 'event', eventId: EVENT_ID }, false, true],
-    [{ page: 'registrations' }, false, false],
+    [{ page: 'registrations' }, false, true],
     [{ page: 'home' }, false, false],
     [{ page: 'notFound' }, false, false],
   ] as const)('places %o in the profile: %s, in the events: %s', (route, inProfile, inEvents) => {

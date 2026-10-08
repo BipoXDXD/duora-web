@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
-import { HeaderGreeting, ProfileLink, SessionTab } from '../features/auth/SessionControls.tsx'
+import { HeaderGreeting, MemberLink, SessionTab } from '../features/auth/SessionControls.tsx'
 import { Logo } from '../shared/brand/Logo.tsx'
 import { AppLink } from '../shared/routing/AppLink.tsx'
-import { isProfileRoute, PATHS, type Route } from '../shared/routing/routes.ts'
+import { isEventsRoute, isProfileRoute, PATHS, type Route } from '../shared/routing/routes.ts'
 import { ThemeToggle } from './theme/ThemeToggle.tsx'
 
 interface MobileLayoutProps {
@@ -33,7 +33,8 @@ export function MobileLayout({ route, children }: MobileLayoutProps) {
         <AppLink to={PATHS.home} className={TAB_CLASS} aria-current={route.page === 'home' ? 'page' : undefined}>
           Início
         </AppLink>
-        <ProfileLink label="Perfil" className={TAB_CLASS} isCurrent={isProfileRoute(route)} />
+        <MemberLink to={PATHS.events} label="Eventos" className={TAB_CLASS} isCurrent={isEventsRoute(route)} />
+        <MemberLink to={PATHS.profile} label="Perfil" className={TAB_CLASS} isCurrent={isProfileRoute(route)} />
         <SessionTab tabClassName={TAB_CLASS} />
       </nav>
     </div>

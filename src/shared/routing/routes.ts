@@ -45,7 +45,10 @@ export function isProfileRoute(route: Route): boolean {
   return route.page === 'profile' || route.page === 'blockedAccounts'
 }
 
-/** A lista de eventos e cada evento, para a navegação marcar "Eventos" como a página atual. */
+/**
+ * Os eventos, cada evento e as próprias inscrições (que se abrem a partir dos eventos), para a navegação
+ * marcar "Eventos" como a página atual.
+ */
 export function isEventsRoute(route: Route): boolean {
-  return route.page === 'events' || route.page === 'event'
+  return route.page === 'events' || route.page === 'event' || route.page === 'registrations'
 }

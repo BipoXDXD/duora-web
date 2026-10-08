@@ -18,7 +18,7 @@ export function PageFrame({ title, children }: PageFrameProps) {
       <h1
         ref={headingRef}
         tabIndex={-1}
-        className="font-display text-4xl leading-tight font-medium tracking-tight text-balance text-fg focus-visible:outline-hidden"
+        className="font-display text-3xl leading-tight md:text-4xl font-medium tracking-tight text-balance text-fg focus-visible:outline-hidden"
       >
         {title}
       </h1>

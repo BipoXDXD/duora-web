@@ -30,7 +30,7 @@ export function HeaderSessionControls() {
     case 'authenticated':
       return (
         <div className="flex items-center gap-4">
-          <UserGreeting user={session.user} className="max-w-48 truncate border-l border-divider pl-6 text-fg-muted" />
+          <UserGreeting user={session.user} className="text-fg-muted max-lg:sr-only lg:max-w-48 lg:truncate lg:border-l lg:border-divider lg:pl-6" />
           <LogoutButton className={HEADER_CONTROL_CLASS} alertClassName="text-sm font-semibold text-danger" />
         </div>
       )

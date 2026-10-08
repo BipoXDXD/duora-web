@@ -66,7 +66,7 @@ function EventDetails({ eventId }: EventPageProps) {
   return (
     <PageFrame key="event" title={query.data.title}>
       <EventSummary event={query.data} phase={phase} />
-      <EventParticipation eventId={eventId} phase={phase} />
+      <EventParticipation eventId={eventId} phase={phase} currentRound={query.data.currentRound} />
       <BackToEvents />
     </PageFrame>
   )
@@ -82,12 +82,18 @@ function EventSummary({ event, phase }: { readonly event: SocialEvent; readonly 
   )
 }
 
-function EventParticipation({ eventId, phase }: { readonly eventId: string; readonly phase: EventPhase }) {
+interface EventParticipationProps {
+  readonly eventId: string
+  readonly phase: EventPhase
+  readonly currentRound: number | null
+}
+
+function EventParticipation({ eventId, phase, currentRound }: EventParticipationProps) {
   switch (phase) {
     case 'upcoming':
       return <RegistrationPanel eventId={eventId} />
     case 'inProgress':
-      return <InProgress eventId={eventId} />
+      return <InProgress eventId={eventId} currentRound={currentRound} />
     case 'ended':
       return <p className="text-lg text-fg">Este evento já terminou.</p>
     case 'cancelled':
@@ -96,7 +102,7 @@ function EventParticipation({ eventId, phase }: { readonly eventId: string; read
 }
 
 /** Com o evento em andamento, só quem está inscrito tem dupla; as inscrições já fecharam. */
-function InProgress({ eventId }: { readonly eventId: string }) {
+function InProgress({ eventId, currentRound }: { readonly eventId: string; readonly currentRound: number | null }) {
   const query = useQuery({
     queryKey: EVENT_KEYS.registration(eventId),
     queryFn: () => fetchRegistration(eventId),
@@ -114,7 +120,7 @@ function InProgress({ eventId }: { readonly eventId: string }) {
   if (query.data === null) {
     return <p className="text-lg text-fg">O evento já começou, e as inscrições estão fechadas.</p>
   }
-  return <PairingPanel eventId={eventId} />
+  return <PairingPanel eventId={eventId} currentRound={currentRound} />
 }
 
 function BackToEvents() {

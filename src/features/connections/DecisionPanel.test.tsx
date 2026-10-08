@@ -53,15 +53,18 @@ afterEach(() => {
   document.cookie = 'XSRF-TOKEN=; path=/; max-age=0'
 })
 
-/** Abre o evento em andamento, como inscrita, com a rodada 1 já pedida. */
-async function openRound(decision: FakeRoute, more: Readonly<Record<string, FakeRoute>> = {},
+/** Abre o evento em andamento, como inscrita, na rodada atual (a 1, salvo `currentRound`). */
+async function openRound(
+  decision: FakeRoute,
+  more: Readonly<Record<string, FakeRoute>> = {},
   partner: string | null = PARTNER_ID,
+  currentRound = 1,
 ) {
   stubMatchMedia(false)
   window.history.replaceState(null, '', `/eventos/${DINNER.id}`)
   const fetchMock = stubApi({
     ...SESSION,
-    [EVENT]: jsonAnswer(DINNER),
+    [EVENT]: jsonAnswer({ ...DINNER, currentRound }),
     [`${EVENT}/registration`]: jsonAnswer({ eventId: DINNER.id, registeredAt: '2026-10-05T12:00:00Z' }),
     [`${ROUNDS}/1/pairing`]: jsonAnswer({ eventId: DINNER.id, roundNumber: 1, partnerAccountId: partner }),
     [`${ROUNDS}/2/pairing`]: jsonAnswer({ eventId: DINNER.id, roundNumber: 2, partnerAccountId: PARTNER_ID }),
@@ -71,7 +74,7 @@ async function openRound(decision: FakeRoute, more: Readonly<Record<string, Fake
   })
   render(<App />)
   const user = userEvent.setup()
-  await user.click(await screen.findByRole('button', { name: 'Ver minha dupla' }))
+  await screen.findByText(/Sua dupla na rodada|você ficou de fora/)
   return { fetchMock, user }
 }
 
@@ -202,13 +205,15 @@ describe('private decision after a round', () => {
   })
 
   it('reads the decision of each round on its own', async () => {
-    const { user } = await openRound(decisionAnswer(true))
-    await within(await findPanel()).findByText('Sua decisão: você quer continuar em contato.')
-
-    await user.click(screen.getByRole('button', { name: 'Ver a rodada 2' }))
-
+    const { user } = await openRound(decisionAnswer(true), {}, PARTNER_ID, 2)
     expect(await within(await findPanel()).findByRole('button', { name: 'Não quero' })).toBeInTheDocument()
-    expect(screen.queryByText('Sua decisão: você quer continuar em contato.')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Rodada anterior' }))
+
+    expect(
+      await within(await findPanel()).findByText('Sua decisão: você quer continuar em contato.'),
+    ).toBeInTheDocument()
+    expect(within(panel()).queryByRole('button', { name: 'Não quero' })).not.toBeInTheDocument()
   })
 
   describe('failures when recording', () => {

@@ -34,6 +34,15 @@ function pairingAnswer(roundNumber: number, partnerAccountId: string | null): Fa
   return jsonAnswer({ eventId: DINNER.id, roundNumber, partnerAccountId })
 }
 
+/** O evento com a rodada que o anfitrião iniciou por último (`null` antes da primeira). */
+function inRound(currentRound: number | null): FakeRoute {
+  return jsonAnswer({ ...DINNER, currentRound })
+}
+
+function roundRequests(fetchMock: ReturnType<typeof stubApi>) {
+  return fetchMock.mock.calls.filter(([path]) => String(path).includes('/rounds/'))
+}
+
 /** Durante o jantar (19:00 às 22:00 em Brasília). */
 const DURING_EVENT = new Date('2026-10-10T23:00:00Z')
 const AFTER_EVENT = new Date('2026-10-11T02:00:00Z')
@@ -454,81 +463,158 @@ describe('event page', () => {
       expect(await screen.findByText('Não foi possível verificar sua inscrição.')).toBeInTheDocument()
       await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
 
-      expect(await screen.findByRole('button', { name: 'Ver minha dupla' })).toBeInTheDocument()
+      expect(await screen.findByText('Nenhuma rodada começou ainda.')).toBeInTheDocument()
     })
 
-    it('shows the partner of the round the person asks for, by the end of the account id', async () => {
+    const PARTNER = '0199a1d2-1111-7aaa-8bbb-cccc1a2b3c4d'
+
+    function pairingRoutes(rounds: readonly number[]): Record<string, FakeRoute> {
+      return Object.fromEntries(
+        rounds.flatMap((round) => [
+          [`${PAIRING}/${round}/pairing`, pairingAnswer(round, PARTNER)],
+          [`${PAIRING}/${round}/decision`, problemAnswer(404)],
+        ]),
+      )
+    }
+
+    it('says no round started yet, without asking for a number or for any pairing', async () => {
+      const { fetchMock } = renderEventPage({ [EVENT]: inRound(null), [REGISTRATION]: REGISTERED })
+
+      expect(await screen.findByText('Nenhuma rodada começou ainda.')).toBeInTheDocument()
+      expect(screen.queryByLabelText('Rodada')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Ver minha dupla' })).not.toBeInTheDocument()
+      expect(roundRequests(fetchMock)).toEqual([])
+    })
+
+    it('shows the pairing when the host starts the first round and the person checks again', async () => {
       const { user } = renderEventPage({
-        [EVENT]: jsonAnswer(DINNER),
+        [EVENT]: inSequence(inRound(null), inRound(1)),
         [REGISTRATION]: REGISTERED,
-        [`${PAIRING}/1/pairing`]: pairingAnswer(1, '0199a1d2-1111-7aaa-8bbb-cccc1a2b3c4d'),
-        [`${PAIRING}/1/decision`]: problemAnswer(404),
+        ...pairingRoutes([1]),
       })
 
-      expect(await screen.findByLabelText('Rodada')).toHaveValue('1')
-      await user.click(screen.getByRole('button', { name: 'Ver minha dupla' }))
+      await user.click(await screen.findByRole('button', { name: 'Ver se a primeira rodada começou' }))
 
       expect(await screen.findByText('Sua dupla na rodada 1 é a conta 1a2b3c4d.')).toBeInTheDocument()
+      expect(screen.queryByText('Nenhuma rodada começou ainda.')).not.toBeInTheDocument()
     })
 
-    it('goes to the next round and says when the person sits it out', async () => {
-      const { user } = renderEventPage({
-        [EVENT]: jsonAnswer(DINNER),
+    it('keeps saying no round started when checking again finds none', async () => {
+      const { fetchMock, user } = renderEventPage({ [EVENT]: inRound(null), [REGISTRATION]: REGISTERED })
+
+      await user.click(await screen.findByRole('button', { name: 'Ver se a primeira rodada começou' }))
+
+      await waitFor(() => expect(callsTo(fetchMock, EVENT, 'GET')).toHaveLength(2))
+      expect(await screen.findByRole('button', { name: 'Ver se a primeira rodada começou' })).toBeEnabled()
+      expect(screen.getByText('Nenhuma rodada começou ainda.')).toBeInTheDocument()
+    })
+
+    it('shows the partner of the current round by default, by the end of the account id', async () => {
+      const { fetchMock } = renderEventPage({
+        [EVENT]: inRound(2),
         [REGISTRATION]: REGISTERED,
-        [`${PAIRING}/1/pairing`]: pairingAnswer(1, '0199a1d2-1111-7aaa-8bbb-cccc1a2b3c4d'),
-        [`${PAIRING}/1/decision`]: problemAnswer(404),
+        ...pairingRoutes([1, 2]),
+      })
+
+      expect(await screen.findByText('Sua dupla na rodada 2 é a conta 1a2b3c4d.')).toBeInTheDocument()
+      expect(screen.getByText('Rodada atual: 2.')).toBeInTheDocument()
+      expect(screen.queryByLabelText('Rodada')).not.toBeInTheDocument()
+      expect(callsTo(fetchMock, `${PAIRING}/1/pairing`, 'GET')).toHaveLength(0)
+    })
+
+    it('goes back to an earlier round and forward to the current one again', async () => {
+      const { user } = renderEventPage({
+        [EVENT]: inRound(2),
+        [REGISTRATION]: REGISTERED,
+        ...pairingRoutes([1]),
         [`${PAIRING}/2/pairing`]: pairingAnswer(2, null),
       })
-      await user.click(await screen.findByRole('button', { name: 'Ver minha dupla' }))
+      await screen.findByText(/Na rodada 2 você ficou de fora/)
+      expect(screen.getByRole('button', { name: 'Rodada seguinte' })).toBeDisabled()
 
-      await user.click(await screen.findByRole('button', { name: 'Ver a rodada 2' }))
+      await user.click(screen.getByRole('button', { name: 'Rodada anterior' }))
 
-      expect(
-        await screen.findByText('Na rodada 2 você ficou de fora. Na próxima, quem ficou de fora tem prioridade.'),
-      ).toBeInTheDocument()
-      expect(screen.getByLabelText('Rodada')).toHaveValue('2')
+      expect(await screen.findByText('Sua dupla na rodada 1 é a conta 1a2b3c4d.')).toBeInTheDocument()
+      expect(screen.getByText('Rodada 1. A rodada atual é a 2.')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Rodada anterior' })).toBeDisabled()
+
+      await user.click(screen.getByRole('button', { name: 'Rodada seguinte' }))
+
+      expect(await screen.findByText(/Na rodada 2 você ficou de fora/)).toBeInTheDocument()
+      expect(screen.getByText('Rodada atual: 2.')).toBeInTheDocument()
     })
 
-    it('says a round has not started or did not include the person on 404, and asks again on a new click', async () => {
-      const { fetchMock, user } = renderEventPage({
-        [EVENT]: jsonAnswer(DINNER),
+    it('can walk back from round 3 to round 1 one round at a time', async () => {
+      const { user } = renderEventPage({
+        [EVENT]: inRound(3),
         [REGISTRATION]: REGISTERED,
-        [`${PAIRING}/3/pairing`]: inSequence(problemAnswer(404), pairingAnswer(3, null)),
+        ...pairingRoutes([1, 2, 3]),
       })
-      const field = await screen.findByLabelText('Rodada')
-      await user.clear(field)
-      await user.type(field, '3')
-      await user.click(screen.getByRole('button', { name: 'Ver minha dupla' }))
-      expect(await screen.findByText('A rodada 3 ainda não começou, ou você não estava nela.')).toBeInTheDocument()
+      await screen.findByText('Sua dupla na rodada 3 é a conta 1a2b3c4d.')
 
-      await user.click(screen.getByRole('button', { name: 'Ver minha dupla' }))
+      await user.click(screen.getByRole('button', { name: 'Rodada anterior' }))
+      expect(await screen.findByText('Sua dupla na rodada 2 é a conta 1a2b3c4d.')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Rodada anterior' }))
 
-      expect(await screen.findByText(/Na rodada 3 você ficou de fora/)).toBeInTheDocument()
-      expect(callsTo(fetchMock, `${PAIRING}/3/pairing`, 'GET')).toHaveLength(2)
+      expect(await screen.findByText('Sua dupla na rodada 1 é a conta 1a2b3c4d.')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Rodada anterior' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Rodada seguinte' })).toBeEnabled()
     })
 
-    it.each(['0', '101', '', 'um'])('refuses the round %j without asking the API', async (text) => {
-      const { fetchMock, user } = renderEventPage({ [EVENT]: jsonAnswer(DINNER), [REGISTRATION]: REGISTERED })
-      const field = await screen.findByLabelText('Rodada')
-      await user.clear(field)
-      if (text !== '') {
-        await user.type(field, text)
-      }
+    it('offers no round to choose while there is only the first', async () => {
+      renderEventPage({ [EVENT]: inRound(1), [REGISTRATION]: REGISTERED, ...pairingRoutes([1]) })
 
-      await user.click(screen.getByRole('button', { name: 'Ver minha dupla' }))
+      expect(await screen.findByText('Sua dupla na rodada 1 é a conta 1a2b3c4d.')).toBeInTheDocument()
+      expect(screen.queryByRole('group', { name: 'Escolher a rodada' })).not.toBeInTheDocument()
+    })
 
-      expect(field).toHaveAttribute('aria-invalid', 'true')
-      expect(field).toHaveAccessibleDescription('Informe um número de rodada de 1 a 100.')
-      expect(fetchMock.mock.calls.some(([path]) => String(path).includes('/rounds/'))).toBe(false)
+    it('follows the current round when the event moves on', async () => {
+      const { user } = renderEventPage({
+        [EVENT]: inSequence(inRound(1), inRound(2)),
+        [REGISTRATION]: REGISTERED,
+        ...pairingRoutes([1, 2]),
+      })
+      await screen.findByText('Sua dupla na rodada 1 é a conta 1a2b3c4d.')
+
+      await user.click(screen.getByRole('button', { name: 'Ver se começou outra rodada' }))
+
+      expect(await screen.findByText('Sua dupla na rodada 2 é a conta 1a2b3c4d.')).toBeInTheDocument()
+      expect(screen.getByText('Rodada atual: 2.')).toBeInTheDocument()
+    })
+
+    it('stays on the earlier round the person chose when the event moves on', async () => {
+      const { user } = renderEventPage({
+        [EVENT]: inSequence(inRound(2), inRound(3)),
+        [REGISTRATION]: REGISTERED,
+        ...pairingRoutes([1, 2]),
+      })
+      await screen.findByText('Sua dupla na rodada 2 é a conta 1a2b3c4d.')
+      await user.click(screen.getByRole('button', { name: 'Rodada anterior' }))
+      await screen.findByText('Sua dupla na rodada 1 é a conta 1a2b3c4d.')
+
+      await user.click(screen.getByRole('button', { name: 'Ver se começou outra rodada' }))
+
+      expect(await screen.findByText('Rodada 1. A rodada atual é a 3.')).toBeInTheDocument()
+      expect(screen.getByText('Sua dupla na rodada 1 é a conta 1a2b3c4d.')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Rodada seguinte' })).toBeEnabled()
+    })
+
+    it('says the person was not in a round that already started', async () => {
+      renderEventPage({
+        [EVENT]: inRound(2),
+        [REGISTRATION]: REGISTERED,
+        [`${PAIRING}/2/pairing`]: problemAnswer(404),
+      })
+
+      expect(await screen.findByText('Você não estava na rodada 2.')).toBeInTheDocument()
     })
 
     it('offers to try again when the pairing could not be read', async () => {
       const { user } = renderEventPage({
-        [EVENT]: jsonAnswer(DINNER),
+        [EVENT]: inRound(1),
         [REGISTRATION]: REGISTERED,
         [`${PAIRING}/1/pairing`]: inSequence(problemAnswer(500), pairingAnswer(1, null)),
       })
-      await user.click(await screen.findByRole('button', { name: 'Ver minha dupla' }))
 
       expect(await screen.findByText('Não foi possível ver sua dupla na rodada 1.')).toBeInTheDocument()
       await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
@@ -537,25 +623,28 @@ describe('event page', () => {
     })
 
     it('says it is looking for the partner while the API answers', async () => {
-      const { user } = renderEventPage({
-        [EVENT]: jsonAnswer(DINNER),
+      renderEventPage({
+        [EVENT]: inRound(1),
         [REGISTRATION]: REGISTERED,
         [`${PAIRING}/1/pairing`]: neverAnswer(),
       })
 
-      await user.click(await screen.findByRole('button', { name: 'Ver minha dupla' }))
-
       expect(await screen.findByText('Procurando sua dupla na rodada 1…')).toBeInTheDocument()
     })
 
+    it('refuses a current round outside 1 to 100 as an event out of the contract', async () => {
+      renderEventPage({ [EVENT]: inRound(101), [REGISTRATION]: REGISTERED })
+
+      expect(await screen.findByText('Não foi possível carregar o evento.')).toBeInTheDocument()
+    })
+
     it('gives every link, button and field a 44px touch target', async () => {
-      const { user } = renderEventPage({
-        [EVENT]: jsonAnswer(DINNER),
+      renderEventPage({
+        [EVENT]: inRound(2),
         [REGISTRATION]: REGISTERED,
-        [`${PAIRING}/1/pairing`]: pairingAnswer(1, null),
+        ...pairingRoutes([2]),
       })
-      await user.click(await screen.findByRole('button', { name: 'Ver minha dupla' }))
-      await screen.findByRole('button', { name: 'Ver a rodada 2' })
+      await screen.findByText('Sua dupla na rodada 2 é a conta 1a2b3c4d.')
 
       expect(elementsWithoutTouchTarget(screen.getByRole('main'))).toEqual([])
     })

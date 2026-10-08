@@ -17,3 +17,6 @@ export type EventsPageResponse = components['schemas']['PageResponseEventRespons
 export type RegistrationResponse = components['schemas']['RegistrationResponse']
 export type MyRegistrationsPageResponse = components['schemas']['PageResponseMyRegistrationResponse']
 export type PairingResponse = components['schemas']['PairingResponse']
+export type DecideRequest = components['schemas']['DecideRequest']
+export type DecisionResponse = components['schemas']['DecisionResponse']
+export type ConnectionsResponse = components['schemas']['ConnectionsResponse']

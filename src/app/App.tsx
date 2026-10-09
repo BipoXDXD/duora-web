@@ -1,5 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
+import { AdminEventPage } from '../features/admin/AdminEventPage.tsx'
+import { AdminNewEventPage } from '../features/admin/AdminNewEventPage.tsx'
 import { ConnectionsPage } from '../features/connections/ConnectionsPage.tsx'
 import { BlockedAccountsPage } from '../features/blocks/BlockedAccountsPage.tsx'
 import { EventPage } from '../features/events/EventPage.tsx'
@@ -51,6 +53,10 @@ function Page({ route }: { readonly route: Route }) {
       return <MyRegistrationsPage />
     case 'connections':
       return <ConnectionsPage />
+    case 'adminNewEvent':
+      return <AdminNewEventPage />
+    case 'adminEvent':
+      return <AdminEventPage eventId={route.eventId} />
     case 'notFound':
       return <NotFoundPage />
   }

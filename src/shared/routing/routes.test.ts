@@ -65,6 +65,7 @@ describe('routeOf', () => {
     `/eventos/${EVENT_ID}/rodadas`,
     `/eventos//${EVENT_ID}`,
     `/x/eventos/${EVENT_ID}`,
+    `/Eventos/${EVENT_ID}`,
   ])('maps the unknown path %s to the not found page', (pathname) => {
     expect(routeOf(pathname)).toEqual({ page: 'notFound' })
   })

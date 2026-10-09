@@ -34,12 +34,13 @@ const FIXED_PAGES: readonly FixedPage[] = [
 
 const TRAILING_SLASH = /(?<=.)\/$/
 
-/** `/eventos/{id}`, com o id no formato UUID que a API usa; outro texto no lugar do id é página inexistente. */
-const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
-const EVENT_PATH = new RegExp(`^/eventos/(${UUID})$`, 'i')
+/** O id no formato UUID que a API usa; outro texto no lugar do id é página inexistente. */
+const UUID = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+/** `/eventos/{id}`: o evento. Só o id aceita maiúsculas; o resto do caminho é exato. */
+const EVENT_PATH = new RegExp(`^/eventos/(${UUID})$`)
 
 /** `/admin/eventos/{id}`: o evento visto pela equipe. Quem pode abrir é decidido pela API, nunca por esta rota. */
-const ADMIN_EVENT_PATH = new RegExp(`^/admin/eventos/(${UUID})$`, 'i')
+const ADMIN_EVENT_PATH = new RegExp(`^/admin/eventos/(${UUID})$`)
 
 export function routeOf(pathname: string): Route {
   const path = pathname.replace(TRAILING_SLASH, '')

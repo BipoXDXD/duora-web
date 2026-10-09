@@ -10,8 +10,14 @@ import { RequireSession } from '../auth/RequireSession.tsx'
 import { eventProblemsFromApi } from './adminEventApiProblems.ts'
 import {
   checkEventForm,
+  DESCRIPTION_MAX_LENGTH,
   EMPTY_EVENT_FORM,
   EVENT_FIELDS,
+  MAX_CAPACITY,
+  MAX_DAYS_AHEAD,
+  MAX_DURATION_HOURS,
+  MIN_CAPACITY,
+  TITLE_MAX_LENGTH,
   userTimeZone,
   type EventField,
   type EventFieldProblems,
@@ -125,7 +131,7 @@ function NewEventForm() {
       className="flex flex-col gap-6"
     >
       {shown !== null && <AdminNoticeMessage key={shown.id} notice={shown.notice} takesFocus={shown.takesFocus} />}
-      <FormField label="Título" hint="Uma linha, até 80 caracteres." problem={messageOf('title', problems)}>
+      <FormField label="Título" hint={`Uma linha, até ${TITLE_MAX_LENGTH} caracteres.`} problem={messageOf('title', problems)}>
         {(control) => (
           <input
             {...control}
@@ -140,7 +146,7 @@ function NewEventForm() {
       </FormField>
       <FormField
         label="Descrição"
-        hint="Até 500 caracteres. Separe os parágrafos com uma linha em branco."
+        hint={`Até ${DESCRIPTION_MAX_LENGTH} caracteres. Separe os parágrafos com uma linha em branco.`}
         problem={messageOf('description', problems)}
       >
         {(control) => (
@@ -156,7 +162,7 @@ function NewEventForm() {
       </FormField>
       <FormField
         label="Início"
-        hint={`${timeZoneHint} No futuro e em até 365 dias.`}
+        hint={`${timeZoneHint} No futuro e em até ${MAX_DAYS_AHEAD} dias.`}
         problem={messageOf('startsAt', problems)}
       >
         {(control) => (
@@ -172,7 +178,7 @@ function NewEventForm() {
       </FormField>
       <FormField
         label="Fim"
-        hint={`${timeZoneHint} Depois do início e em até 12 horas dele.`}
+        hint={`${timeZoneHint} Depois do início e em até ${MAX_DURATION_HOURS} horas dele.`}
         problem={messageOf('endsAt', problems)}
       >
         {(control) => (
@@ -186,7 +192,7 @@ function NewEventForm() {
           />
         )}
       </FormField>
-      <FormField label="Capacidade" hint="De 2 a 200 pessoas." problem={messageOf('capacity', problems)}>
+      <FormField label="Capacidade" hint={`De ${MIN_CAPACITY} a ${MAX_CAPACITY} pessoas.`} problem={messageOf('capacity', problems)}>
         {(control) => (
           <input
             {...control}

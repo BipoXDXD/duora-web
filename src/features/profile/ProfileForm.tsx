@@ -17,6 +17,7 @@ import {
   type VersionedProfile,
 } from './profile.ts'
 import {
+  BIO_MAX_LENGTH,
   checkProfileForm,
   formValuesOf,
   rebaseFormValues,
@@ -185,7 +186,7 @@ export function ProfileForm({ initial, onSaved, onCancel }: ProfileFormProps) {
           </select>
         )}
       </FormField>
-      <FormField label="Apresentação" hint="Opcional. Até 300 caracteres." problem={messageOf('bio', problems)}>
+      <FormField label="Apresentação" hint={`Opcional. Até ${BIO_MAX_LENGTH} caracteres.`} problem={messageOf('bio', problems)}>
         {(control) => (
           <textarea
             {...control}

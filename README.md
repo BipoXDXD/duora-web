@@ -235,7 +235,8 @@ depois. O código está em `src/features/chat/`.
   contador fica embaixo do campo, e texto vazio ou longo demais não sai. O 400 devolve o texto ao campo com o motivo
   lido de `errors[]` (`TOO_LONG`, `FORBIDDEN_CHARACTER`, o resto como recusa genérica), a menos que a pessoa já tenha
   começado outro.
-- **Acessibilidade.** A lista é `role="log"` com `aria-live="polite"` e `aria-relevant="additions"`: a mensagem nova
+- **Acessibilidade.** A lista (`<ol>`) fica dentro de um `<div role="log">` com `aria-live="polite"` e
+  `aria-relevant="additions"` (o papel no próprio `<ol>` tiraria a semântica de lista dos `<li>`): a mensagem nova
   é anunciada, e a própria, que continua no mesmo item quando é gravada, não é anunciada de novo. Cada mensagem diz
   quem escreveu ("Você", "Sua dupla"). O campo tem rótulo ("Sua mensagem") e o contador como descrição; **Enter
   envia, Shift+Enter quebra a linha** (Enter durante a composição de um caractere não envia). O foco fica no campo
@@ -616,11 +617,6 @@ traces das falhas saem como artefato). Também roda o gitleaks sobre todo o hist
 
 ## Pendências
 
-- **Acessibilidade da lista de mensagens do chat** (achado do axe nos E2E, regra `listitem`, impacto "serious"): a
-  lista é `<ol role="log">`, e o papel `log` tira os `<li>` de dentro de uma lista. A correção é de produção: um
-  `<div role="log" aria-live="polite" aria-relevant="additions">` em volta de um `<ol>`. Até lá os E2E das telas do
-  chat deixam só essa regra de fora (`expectUsableChatLayout`, em `e2e/support/checks.ts`); remova a exceção junto
-  com a correção.
 - Área da equipe (pendências para a **duora-api**):
   - **`Idempotency-Key` na criação do rascunho**, para repetir depois de uma falha de rede não criar um segundo.
   - Não há como editar um rascunho (título, horário, capacidade): errou, cancela e cria outro.

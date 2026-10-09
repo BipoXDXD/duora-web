@@ -90,36 +90,33 @@ interface MessageLogProps {
 
 /**
  * `aria-relevant="additions"`: o leitor de tela anuncia o item novo e não o fim do "Enviando…". A mensagem
- * própria continua no mesmo item depois de gravada, então não é anunciada de novo.
+ * própria continua no mesmo item depois de gravada, então não é anunciada de novo. O `log` é um `div` em volta do
+ * `<ol>`: com `role="log"` no próprio `<ol>`, os `<li>` perdem a semântica de lista (regra `listitem` do axe).
  */
 function MessageLog({ isKnownEmpty, messages, outgoing, onRetry, reports }: MessageLogProps) {
   const isEmpty = isKnownEmpty && outgoing.length === 0
   return (
     <>
       {isEmpty && <p className="text-fg-muted">Nenhuma mensagem ainda.</p>}
-      <ol
-        role="log"
-        aria-live="polite"
-        aria-relevant="additions"
-        aria-label="Mensagens"
-        className="flex w-full flex-col gap-3"
-      >
-        {/* Uma lista só: a chave do item pendente reaparece entre as gravadas, e o React mantém o mesmo nó. */}
-        {[
-          ...messages.map(({ key, message }) => (
-            <MessageItem key={key} fromMe={message.fromMe} text={message.text}>
-              <SentTime message={message} />
-              {/* Só a mensagem do par pode ser denunciada; a própria nunca oferece a ação. */}
-              {!message.fromMe && <ReportAction reports={reports} message={message} />}
-            </MessageItem>
-          )),
-          ...outgoing.map((pending) => (
-            <MessageItem key={pending.key} fromMe text={pending.text}>
-              <PendingStatus pending={pending} onRetry={() => onRetry(pending)} />
-            </MessageItem>
-          )),
-        ]}
-      </ol>
+      <div role="log" aria-live="polite" aria-relevant="additions" aria-label="Mensagens" className="w-full">
+        <ol className="flex w-full flex-col gap-3">
+          {/* Uma lista só: a chave do item pendente reaparece entre as gravadas, e o React mantém o mesmo nó. */}
+          {[
+            ...messages.map(({ key, message }) => (
+              <MessageItem key={key} fromMe={message.fromMe} text={message.text}>
+                <SentTime message={message} />
+                {/* Só a mensagem do par pode ser denunciada; a própria nunca oferece a ação. */}
+                {!message.fromMe && <ReportAction reports={reports} message={message} />}
+              </MessageItem>
+            )),
+            ...outgoing.map((pending) => (
+              <MessageItem key={pending.key} fromMe text={pending.text}>
+                <PendingStatus pending={pending} onRetry={() => onRetry(pending)} />
+              </MessageItem>
+            )),
+          ]}
+        </ol>
+      </div>
     </>
   )
 }

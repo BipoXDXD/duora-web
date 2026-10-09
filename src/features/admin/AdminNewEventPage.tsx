@@ -1,20 +1,9 @@
-import { useQueryClient } from '@tanstack/react-query'
-import { useRef, useState, type FormEvent } from 'react'
-import { goTo } from '../../shared/routing/history.ts'
-import { adminEventPath } from '../../shared/routing/routes.ts'
 import { FormField } from '../../shared/ui/FormField.tsx'
 import { PageFrame } from '../../shared/ui/PageFrame.tsx'
-import { focusFirstProblem } from '../../shared/ui/focusFirstProblem.ts'
-import { errorNotice } from '../../shared/ui/notice.ts'
 import { FIELD_CONTROL, PRIMARY_BUTTON } from '../../shared/ui/styles.ts'
-import { useShownNotice } from '../../shared/ui/useShownNotice.ts'
 import { RequireSession } from '../auth/RequireSession.tsx'
-import { eventProblemsFromApi } from './adminEventApiProblems.ts'
 import {
-  checkEventForm,
   DESCRIPTION_MAX_LENGTH,
-  EMPTY_EVENT_FORM,
-  EVENT_FIELDS,
   MAX_CAPACITY,
   MAX_DAYS_AHEAD,
   MAX_DURATION_HOURS,
@@ -23,13 +12,10 @@ import {
   userTimeZone,
   type EventField,
   type EventFieldProblems,
-  type EventFormValues,
 } from './adminEventForm.ts'
-import { createEvent, type CreateEventResult } from './adminEvents.ts'
-import { noticeOfCreateFailure, type AdminNotice } from './adminNotices.ts'
 import { AdminNoticeMessage } from './AdminNoticeMessage.tsx'
-import { ADMIN_KEYS } from './adminQueries.ts'
 import { problemMessage, STAFF_ONLY_TEXT } from './adminText.ts'
+import { useNewEventForm } from './useNewEventForm.ts'
 
 /** "Novo evento": o formulário do rascunho. A API decide quem pode criar; o front não esconde nem concede nada. */
 export function AdminNewEventPage() {
@@ -42,63 +28,8 @@ export function AdminNewEventPage() {
   )
 }
 
-const REJECTED_FORM_TEXT = 'Confira os dados do evento e tente de novo.'
-
 function NewEventForm() {
-  const queryClient = useQueryClient()
-  const [values, setValues] = useState<EventFormValues>(EMPTY_EVENT_FORM)
-  const [problems, setProblems] = useState<EventFieldProblems>({})
-  const { shown, show: showNotice, hide: hideNotice } = useShownNotice<{ readonly notice: AdminNotice; readonly takesFocus: boolean }>()
-  const [isForbidden, setIsForbidden] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const formRef = useRef<HTMLFormElement>(null)
-
-  function showProblems(found: EventFieldProblems) {
-    setProblems(found)
-    focusFirstProblem(formRef.current, EVENT_FIELDS, found)
-  }
-
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    hideNotice()
-    const check = checkEventForm(values, currentInstant())
-    if (check.kind === 'invalid') {
-      showProblems(check.problems)
-      return
-    }
-    setProblems({})
-    setIsSaving(true)
-    const result = await createEvent(check.event)
-    setIsSaving(false)
-    apply(result)
-  }
-
-  function apply(result: CreateEventResult) {
-    switch (result.kind) {
-      case 'created':
-        queryClient.setQueryData(ADMIN_KEYS.event(result.event.id), { kind: 'found', event: result.event })
-        void queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.lists })
-        goTo(adminEventPath(result.event.id))
-        return
-      case 'invalid': {
-        const { problems: refused, hasUnplacedProblem } = eventProblemsFromApi(result.fieldErrors)
-        showProblems(refused)
-        if (hasUnplacedProblem) {
-          showNotice({ notice: errorNotice(REJECTED_FORM_TEXT), takesFocus: Object.keys(refused).length === 0 })
-        }
-        return
-      }
-      case 'forbidden':
-        setIsForbidden(true)
-        return
-      default:
-        showNotice({ notice: noticeOfCreateFailure(result.kind), takesFocus: true })
-    }
-  }
-
-  function edit(field: EventField, value: string) {
-    setValues((current) => ({ ...current, [field]: value }))
-  }
+  const { formRef, values, problems, shown, isForbidden, isSaving, edit, save } = useNewEventForm()
 
   if (isForbidden) {
     return (
@@ -201,11 +132,6 @@ function NewEventForm() {
       </div>
     </form>
   )
-}
-
-/** O instante em que a pessoa envia o formulário; as regras de data valem para ele. */
-function currentInstant(): Date {
-  return new Date()
 }
 
 function messageOf(field: EventField, problems: EventFieldProblems): string | null {

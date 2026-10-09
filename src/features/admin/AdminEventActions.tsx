@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useId, useState } from 'react'
 import { isBug } from '../../shared/api/http.ts'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
-import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
+import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
+import { PRIMARY_BUTTON } from '../../shared/ui/styles.ts'
 import { EVENT_KEYS } from '../events/eventQueries.ts'
 import { cancelEvent, canCancelAt, publishEvent, type AdminEvent, type EventActionResult } from './adminEvents.ts'
 import { noticeOfChange, type AdminNotice, type EventChange } from './adminNotices.ts'
@@ -96,39 +96,23 @@ export function AdminEventActions({ event, now }: AdminEventActionsProps) {
       ) : (
         <div className="flex flex-wrap gap-4">
           {canPublish && (
-            <ChangeButton
-              label="Publicar evento"
+            <FocusReturnButton
               className={PRIMARY_BUTTON}
               hasFocus={returnFocusTo === 'publish'}
               onClick={() => setConfirming('publish')}
-            />
+            >
+              Publicar evento
+            </FocusReturnButton>
           )}
           {canCancel && (
-            <ChangeButton
-              label="Cancelar evento"
-              className={SECONDARY_BUTTON}
-              hasFocus={returnFocusTo === 'cancel'}
-              onClick={() => setConfirming('cancel')}
-            />
+            <FocusReturnButton hasFocus={returnFocusTo === 'cancel'} onClick={() => setConfirming('cancel')}>
+              Cancelar evento
+            </FocusReturnButton>
           )}
           {!canPublish && !canCancel && <p className="text-fg-muted">{closedText(event)}</p>}
         </div>
       )}
     </section>
-  )
-}
-
-function ChangeButton(props: {
-  readonly label: string
-  readonly className: string
-  readonly hasFocus: boolean
-  readonly onClick: () => void
-}) {
-  const ref = useFocusOnMount<HTMLButtonElement>()
-  return (
-    <button ref={props.hasFocus ? ref : undefined} type="button" onClick={props.onClick} className={props.className}>
-      {props.label}
-    </button>
   )
 }
 

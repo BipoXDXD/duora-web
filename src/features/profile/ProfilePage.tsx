@@ -3,9 +3,10 @@ import { useState } from 'react'
 import { READ_OPTIONS } from '../../shared/api/readOptions.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { PATHS } from '../../shared/routing/routes.ts'
+import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { PageFrame } from '../../shared/ui/PageFrame.tsx'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
+import { PRIMARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
 import { RequireSession } from '../auth/RequireSession.tsx'
 import { REGION_NAMES, type Profile } from './profile.ts'
@@ -78,7 +79,9 @@ function ProfileView({ profile, returned, onEdit }: ProfileViewProps) {
       <div className="flex flex-col items-start gap-4">
         <p className="text-lg font-semibold text-fg">Seu perfil ainda está vazio.</p>
         <p className="text-fg-muted">Preencha nome, data de nascimento e estado para começar a usar o Duora.</p>
-        <EditButton label="Preencher perfil" className={PRIMARY_BUTTON} hasFocus={returned === 'cancelled'} onEdit={onEdit} />
+        <FocusReturnButton className={PRIMARY_BUTTON} hasFocus={returned === 'cancelled'} onClick={onEdit}>
+          Preencher perfil
+        </FocusReturnButton>
       </div>
     )
   }
@@ -97,7 +100,9 @@ function ProfileView({ profile, returned, onEdit }: ProfileViewProps) {
         <ProfileDetail term="Estado" value={profile.region === null ? null : REGION_NAMES[profile.region]} />
         <ProfileDetail term="Apresentação" value={profile.bio} />
       </dl>
-      <EditButton label="Editar perfil" className={SECONDARY_BUTTON} hasFocus={returned === 'cancelled'} onEdit={onEdit} />
+      <FocusReturnButton hasFocus={returned === 'cancelled'} onClick={onEdit}>
+        Editar perfil
+      </FocusReturnButton>
     </div>
   )
 }
@@ -117,22 +122,6 @@ function SavedNotice() {
     >
       Perfil salvo.
     </p>
-  )
-}
-
-interface EditButtonProps {
-  readonly label: string
-  readonly className: string
-  readonly hasFocus: boolean
-  readonly onEdit: () => void
-}
-
-function EditButton({ label, className, hasFocus, onEdit }: EditButtonProps) {
-  const ref = useFocusOnMount<HTMLButtonElement>()
-  return (
-    <button ref={hasFocus ? ref : undefined} type="button" onClick={onEdit} className={className}>
-      {label}
-    </button>
   )
 }
 

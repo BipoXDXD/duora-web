@@ -6,6 +6,7 @@ import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { PATHS } from '../../shared/routing/routes.ts'
 import { accountCode } from '../../shared/text/accountCode.ts'
 import { formatDay } from '../../shared/text/dateFormat.ts'
+import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { LoadMore } from '../../shared/ui/LoadMore.tsx'
 import { PageFrame } from '../../shared/ui/PageFrame.tsx'
@@ -153,36 +154,13 @@ function BlockedAccountItem({ account, onUnblocked }: BlockedAccountItemProps) {
               Não foi possível desbloquear. Tente de novo.
             </p>
           )}
-          <UnblockButton
-            hasFocus={wasCancelled}
-            describedBy={descriptionId}
-            onClick={() => setState('confirming')}
-          />
+          {/* Ação secundária: o desbloqueio só vira primário no passo de confirmação. */}
+          <FocusReturnButton hasFocus={wasCancelled} describedBy={descriptionId} onClick={() => setState('confirming')}>
+            Desbloquear
+          </FocusReturnButton>
         </div>
       )}
     </li>
-  )
-}
-
-interface UnblockButtonProps {
-  readonly hasFocus: boolean
-  readonly describedBy: string
-  readonly onClick: () => void
-}
-
-/** Ação secundária: o desbloqueio só vira primário no passo de confirmação. */
-function UnblockButton({ hasFocus, describedBy, onClick }: UnblockButtonProps) {
-  const ref = useFocusOnMount<HTMLButtonElement>()
-  return (
-    <button
-      ref={hasFocus ? ref : undefined}
-      type="button"
-      aria-describedby={describedBy}
-      onClick={onClick}
-      className={SECONDARY_BUTTON}
-    >
-      Desbloquear
-    </button>
   )
 }
 

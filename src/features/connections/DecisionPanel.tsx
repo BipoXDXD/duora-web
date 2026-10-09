@@ -5,6 +5,7 @@ import { READ_OPTIONS } from '../../shared/api/readOptions.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { PATHS } from '../../shared/routing/routes.ts'
 import { formatDay } from '../../shared/text/dateFormat.ts'
+import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
@@ -167,30 +168,16 @@ function Choice({ isSaving, hasNextStep, onConfirm }: ChoiceProps) {
       </p>
       <div className="flex flex-wrap gap-4">
         {CHOICES.map((choice) => (
-          <ChoiceButton
+          <FocusReturnButton
             key={choice.button}
-            label={choice.button}
             hasFocus={step.focusOn === choice.interested}
             onClick={() => setStep({ kind: 'confirming', interested: choice.interested })}
-          />
+          >
+            {choice.button}
+          </FocusReturnButton>
         ))}
       </div>
     </>
-  )
-}
-
-interface ChoiceButtonProps {
-  readonly label: string
-  readonly hasFocus: boolean
-  readonly onClick: () => void
-}
-
-function ChoiceButton({ label, hasFocus, onClick }: ChoiceButtonProps) {
-  const ref = useFocusOnMount<HTMLButtonElement>()
-  return (
-    <button ref={hasFocus ? ref : undefined} type="button" onClick={onClick} className={SECONDARY_BUTTON}>
-      {label}
-    </button>
   )
 }
 

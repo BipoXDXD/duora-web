@@ -5,6 +5,7 @@ import { READ_OPTIONS } from '../../shared/api/readOptions.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { PATHS } from '../../shared/routing/routes.ts'
 import { formatDay } from '../../shared/text/dateFormat.ts'
+import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
@@ -162,18 +163,11 @@ function Registered({ registration, isCancelling, onCancel }: RegisteredProps) {
       {isConfirming || isCancelling ? (
         <ConfirmCancel isCancelling={isCancelling} onConfirm={onCancel} onKeep={keep} />
       ) : (
-        <CancelButton hasFocus={wasKept} onClick={() => setIsConfirming(true)} />
+        <FocusReturnButton hasFocus={wasKept} onClick={() => setIsConfirming(true)}>
+          Cancelar inscrição
+        </FocusReturnButton>
       )}
     </>
-  )
-}
-
-function CancelButton({ hasFocus, onClick }: { readonly hasFocus: boolean; readonly onClick: () => void }) {
-  const ref = useFocusOnMount<HTMLButtonElement>()
-  return (
-    <button ref={hasFocus ? ref : undefined} type="button" onClick={onClick} className={SECONDARY_BUTTON}>
-      Cancelar inscrição
-    </button>
   )
 }
 

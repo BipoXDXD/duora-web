@@ -223,6 +223,31 @@ depois. O código está em `src/features/chat/`.
   depois de enviar e volta a ele depois de "Tentar enviar de novo". Botões e link com 44px.
 - O texto é mostrado como texto comum, com as quebras de linha, nunca como HTML ou link.
 
+#### Denúncia de mensagem
+
+Fatias 3 e 4 da ADR 0021 da duora-api. Código em `src/features/chat/` (`messageReport.ts`, `reportForm.ts`,
+`useMessageReports.ts` e `MessageReport.tsx`) e `blockAccount` em `src/features/blocks/blockedAccounts.ts`.
+
+- Cada mensagem **do par** tem "Denunciar", também com o chat fechado (quem bloqueou ainda pode denunciar). A
+  própria mensagem e a pendente nunca oferecem a ação. O nome acessível do botão cita o começo da mensagem
+  ("Denunciar a mensagem “Oi! Me passa…”", até 40 caracteres).
+- O formulário abre abaixo da lista, fora da região viva, com o foco no título. Mostra a mensagem e avisa que uma
+  cópia dela vai para a moderação e que denunciar não bloqueia. **Motivo** é uma lista fechada (a mesma de
+  `fileReport`), com nome e explicação curta em português. **Descrição** é opcional e obrigatória em "Outro motivo".
+  O contador conta como a API (code points depois do NFC, sem o espaço das pontas), até 1000. Só espaços vai como
+  `null`.
+- **"Também bloquear esta pessoa"** vem desmarcada. Marcada, o botão vira "Enviar denúncia e bloquear", e o
+  `POST /api/accounts/{id}:block` sai **depois** do 201, com o `reportedAccountId` da resposta. Se o bloqueio falhar,
+  a denúncia continua feita: um alerta diz isso e oferece "Tentar bloquear de novo" (401 pede para entrar de novo).
+- **Sucesso:** a confirmação é `role="status"` e recebe o foco. A mensagem ganha a marca "Denunciada por você" e
+  perde o botão. A marca vale **só nesta tela**, porque a API não diz o que a pessoa já denunciou. A troca do botão
+  pela marca não é anunciada de novo pela lista (`aria-relevant="additions"`).
+- **Erros:** 400 com `errors[]` vai para o campo (`description`: `REQUIRED`, `TOO_LONG`, `FORBIDDEN_CHARACTER`;
+  `reason`), com o foco nele. Um 400 sem campo do formulário, 404, 429, 503, 401 e falha de rede são `role="alert"` e
+  mantêm o formulário. O 429 é a cota diária (10, somando as denúncias de perfil): "Você atingiu o limite de
+  denúncias de hoje. Você poderá denunciar de novo em N horas", pelo `Retry-After`. Cancelar devolve o foco ao botão
+  da mensagem.
+
 ### Área da equipe (ADMIN)
 
 O piloto precisa que a equipe opere eventos sem `curl`. As rotas são `/admin/eventos`, `/admin/eventos/novo` e
@@ -518,7 +543,13 @@ gerados da spec, testes com cobertura e build. Também roda o gitleaks sobre tod
 - Conversa da rodada (ADR 0021 da duora-api):
   - **SSE** (`GET /api/me/stream`, opção (b) da ADR) no lugar do polling, quando a API tiver o stream. O protocolo de
     reconexão (cursor `afterSeq`) continua o mesmo; muda a latência.
-  - **Denúncia de mensagem** (fatia da API com `Reports.fileWithEvidence`): não há botão ainda.
+  - Denúncia de mensagem: a marca "Denunciada por você" some ao recarregar a página, porque a API não lista as
+    denúncias da pessoa. Depois do bloqueio pela denúncia, o campo de envio continua até a próxima leitura do `open`
+    (envio com 409, volta à aba); o SSE resolve isso também.
+  - Denúncia de mensagem: com o 401 no bloqueio, depois de entrar de novo não há onde bloquear a pessoa (a marca
+    some e denunciar de novo gasta a cota). Um "Bloquear" próprio no chat depende de decisão de UX.
+  - Os círculos e as caixas de marcar ficam no tamanho nativo (20px); o alvo de 44px é a linha inteira com o
+    rótulo. Não foi conferido num navegador nem no celular.
   - O `open` é relido só ao abrir, ao voltar à aba e num 409. Quem só lê não vê o chat fechar quando começa a rodada
     seguinte até tentar enviar ou voltar à aba; o SSE resolve isso.
   - Se uma leitura trouxer a própria mensagem antes da resposta do envio, ela aparece por um instante duas vezes

@@ -169,7 +169,7 @@ export function useRoundChat(eventId: string, roundNumber: number): RoundChat {
  * Erro fora de um render (num `await` do polling ou do envio) não chega ao error boundary sozinho. Jogá-lo de
  * dentro de um `setState` faz o React relançá-lo no próximo render, como qualquer bug de tela.
  */
-function useRethrowInRender(): (error: unknown) => void {
+export function useRethrowInRender(): (error: unknown) => void {
   const [, setCrash] = useState<null>(null)
   return useCallback((error: unknown) => {
     setCrash(() => {

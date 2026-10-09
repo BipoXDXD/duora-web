@@ -30,3 +30,8 @@ export async function fetchBlockedPage(pageToken: string | null): Promise<Blocke
 export async function unblockAccount(accountId: string): Promise<void> {
   await sendApiRequest({ method: 'POST', path: `/api/accounts/${encodeURIComponent(accountId)}:unblock` })
 }
+
+/** Bloqueia a conta. A API é idempotente: bloquear de novo, ou quem já bloqueou você, também dá certo. */
+export async function blockAccount(accountId: string): Promise<void> {
+  await sendApiRequest({ method: 'POST', path: `/api/accounts/${encodeURIComponent(accountId)}:block` })
+}

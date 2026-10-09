@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import type { BlockedAccountsResponse } from '../../shared/api/contract.ts'
 import { InvalidResponseError } from '../../shared/api/http.ts'
-import { type BlockedPageWire, fetchBlockedPage, unblockAccount } from './blockedAccounts.ts'
+import { blockAccount, type BlockedPageWire, fetchBlockedPage, unblockAccount } from './blockedAccounts.ts'
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -94,6 +94,26 @@ describe('unblockAccount', () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 403 }))
 
     await expect(unblockAccount(BEA.accountId)).rejects.toMatchObject({ name: 'ApiError', status: 403 })
+  })
+})
+
+describe('blockAccount', () => {
+  it('posts to the block action of the account, with the CSRF token', async () => {
+    document.cookie = 'XSRF-TOKEN=csrf-123; path=/'
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
+
+    await blockAccount(BEA.accountId)
+
+    const { path, init } = sentRequest()
+    expect(path).toBe(`/api/accounts/${BEA.accountId}:block`)
+    expect(init.method).toBe('POST')
+    expect(new Headers(init.headers).get('X-XSRF-TOKEN')).toBe('csrf-123')
+  })
+
+  it('fails with the API status when the block is refused', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 404 }))
+
+    await expect(blockAccount(BEA.accountId)).rejects.toMatchObject({ name: 'ApiError', status: 404 })
   })
 })
 

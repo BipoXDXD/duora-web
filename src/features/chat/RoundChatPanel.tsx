@@ -4,6 +4,8 @@ import { LOGIN_URL } from '../auth/loginUrl.ts'
 import type { ChatMessage } from './chat.ts'
 import { draftProblemOf, MESSAGE_MAX_LENGTH, messageLength, type DraftProblem } from './chatDraft.ts'
 import type { Pending, Received } from './chatLog.ts'
+import { ReportAction, ReportFlow } from './MessageReport.tsx'
+import { useMessageReports, type MessageReports } from './useMessageReports.ts'
 import { useRoundChat } from './useRoundChat.ts'
 
 interface RoundChatPanelProps {
@@ -17,6 +19,7 @@ interface RoundChatPanelProps {
  */
 export function RoundChatPanel({ eventId, roundNumber }: RoundChatPanelProps) {
   const chat = useRoundChat(eventId, roundNumber)
+  const reports = useMessageReports()
   const headingId = useId()
   const fieldRef = useRef<HTMLTextAreaElement>(null)
   const { log } = chat
@@ -50,7 +53,8 @@ export function RoundChatPanel({ eventId, roundNumber }: RoundChatPanelProps) {
               Esta conversa não recebe mais mensagens. O que foi dito continua aqui para ler.
             </p>
           )}
-          <MessageLog messages={log.messages} outgoing={log.outgoing} onRetry={retry} />
+          <MessageLog messages={log.messages} outgoing={log.outgoing} onRetry={retry} reports={reports} />
+          <ReportFlow eventId={eventId} roundNumber={roundNumber} reports={reports} />
           {log.open && <Composer fieldRef={fieldRef} onSend={chat.send} />}
         </>
       )}
@@ -62,13 +66,14 @@ interface MessageLogProps {
   readonly messages: readonly Received[]
   readonly outgoing: readonly Pending[]
   readonly onRetry: (pending: Pending) => void
+  readonly reports: MessageReports
 }
 
 /**
  * `aria-relevant="additions"`: o leitor de tela anuncia o item novo e não o fim do "Enviando…". A mensagem
  * própria continua no mesmo item depois de gravada, então não é anunciada de novo.
  */
-function MessageLog({ messages, outgoing, onRetry }: MessageLogProps) {
+function MessageLog({ messages, outgoing, onRetry, reports }: MessageLogProps) {
   const isEmpty = messages.length === 0 && outgoing.length === 0
   return (
     <>
@@ -85,6 +90,8 @@ function MessageLog({ messages, outgoing, onRetry }: MessageLogProps) {
           ...messages.map(({ key, message }) => (
             <MessageItem key={key} fromMe={message.fromMe} text={message.text}>
               <SentTime message={message} />
+              {/* Só a mensagem do par pode ser denunciada; a própria nunca oferece a ação. */}
+              {!message.fromMe && <ReportAction reports={reports} message={message} />}
             </MessageItem>
           )),
           ...outgoing.map((pending) => (

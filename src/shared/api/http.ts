@@ -48,6 +48,8 @@ export const REFUSAL_REASONS = [
   'UNDERAGE',
   'BIRTH_DATE_ALREADY_SET',
   'DECISION_ALREADY_MADE',
+  'CHAT_CLOSED',
+  'IDEMPOTENCY_KEY_REUSED',
 ] as const
 
 export type KnownRefusalReason = (typeof REFUSAL_REASONS)[number]

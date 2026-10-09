@@ -216,6 +216,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/events/{eventId}/rounds/{number}/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lê o chat com o par da rodada
+         * @description Se o chat aceita mensagens agora e a posição da última. Abre ao sorteio e fecha para envio quando a rodada seguinte começa ou o evento acaba; fechado, continua legível pelos dois até 24 h depois do fim do evento. Leia de novo ao abrir a tela, ao voltar à aba e ao receber 409 no envio.
+         */
+        get: operations["getMyRoundChat"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/rounds/{number}/chat/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lista as mensagens do chat da rodada
+         * @description As mensagens depois de afterSeq, em ordem crescente de posição. Peça de novo com o nextAfterSeq até ele vir null; depois, faça polling com afterSeq igual à maior posição já vista. Uma lacuna nas posições quer dizer mensagem perdida: peça de novo.
+         */
+        get: operations["listMyRoundChatMessages"];
+        put?: never;
+        /**
+         * Envia uma mensagem ao par da rodada
+         * @description Gere a Idempotency-Key ao criar o rascunho e reutilize-a em todo reenvio (rede caiu, timeout, aba recarregada): a mesma chave com o mesmo texto devolve a mesma mensagem (200), mesmo depois de o chat fechar. Com o chat fechado, pelo motivo que for, a resposta é 409 com reason CHAT_CLOSED; leia o chat de novo. Cada chamada, repetida ou não, gasta o limite da conta: 20 por minuto, repostas aos poucos.
+         */
+        post: operations["sendRoundChatMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/rounds/{number}/chat/messages/{seq}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lê uma mensagem do chat da rodada
+         * @description A mensagem numa posição do chat de quem chama.
+         */
+        get: operations["getMyRoundChatMessage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events/{eventId}/rounds/{number}/decision": {
         parameters: {
             query?: never;
@@ -549,6 +613,45 @@ export interface components {
             /** @description Token da próxima página, ou null na última */
             nextPageToken: string | null;
         };
+        Chat: {
+            /**
+             * Format: uuid
+             * @description Id opaco do chat, para casar avisos de tempo real com a tela
+             */
+            chatId: string;
+            /**
+             * Format: int32
+             * @description A posição da última mensagem, ou 0 sem nenhuma: a versão do chat
+             */
+            lastSeq: number;
+            /** @description Se aceita mensagens agora. Fechado, só leitura, pelo motivo que for: a rodada seguinte começou, o evento acabou, o chat chegou a 300 mensagens ou há um bloqueio */
+            open: boolean;
+        };
+        ChatMessage: {
+            /** @description Se quem chama enviou a mensagem */
+            fromMe: boolean;
+            /**
+             * Format: date-time
+             * @description Quando o servidor gravou a mensagem; não define a ordem
+             */
+            sentAt: string;
+            /**
+             * Format: int32
+             * @description A posição da mensagem no chat, sem lacunas: a ordem de chegada ao servidor
+             */
+            seq: number;
+            /** @description O texto como foi gravado; mostre como texto comum, nunca como HTML ou link */
+            text: string;
+        };
+        ChatMessages: {
+            /** @description Mensagens depois de afterSeq, em ordem crescente de posição */
+            items: components["schemas"]["ChatMessage"][];
+            /**
+             * Format: int32
+             * @description O afterSeq da próxima página, ou null quando esta chega à última mensagem
+             */
+            nextAfterSeq: number | null;
+        };
         Connection: {
             /**
              * Format: uuid
@@ -799,10 +902,10 @@ export interface components {
             /** Format: uri-reference */
             instance?: string;
             /**
-             * @description EVENT_NOT_PUBLISHED: o evento é rascunho. EVENT_ALREADY_PUBLISHED: já publicado. EVENT_CANCELLED: cancelado. EVENT_STARTED: já começou. EVENT_ENDED: já acabou. EVENT_FULL: sem vagas. EVENT_NOT_UNDERWAY: fora do horário ou não publicado, para iniciar rodada. ROUND_OUT_OF_SEQUENCE: a rodada anterior não existe. PROFILE_INCOMPLETE (403): falta nome, data de nascimento ou região. UNDERAGE (403): menor de 18 anos. BIRTH_DATE_ALREADY_SET: a data de nascimento não muda.
+             * @description EVENT_NOT_PUBLISHED: o evento é rascunho. EVENT_ALREADY_PUBLISHED: já publicado. EVENT_CANCELLED: cancelado. EVENT_STARTED: já começou. EVENT_ENDED: já acabou. EVENT_FULL: sem vagas. EVENT_NOT_UNDERWAY: fora do horário ou não publicado, para iniciar rodada. ROUND_OUT_OF_SEQUENCE: a rodada anterior não existe. PROFILE_INCOMPLETE (403): falta nome, data de nascimento ou região. UNDERAGE (403): menor de 18 anos. BIRTH_DATE_ALREADY_SET: a data de nascimento não muda. DECISION_ALREADY_MADE: a decisão da rodada é final. CHAT_CLOSED: o chat da rodada não aceita mais mensagens, sem dizer por quê. IDEMPOTENCY_KEY_REUSED: a Idempotency-Key já foi usada com outro conteúdo.
              * @enum {string}
              */
-            reason?: "EVENT_NOT_PUBLISHED" | "EVENT_ALREADY_PUBLISHED" | "EVENT_CANCELLED" | "EVENT_STARTED" | "EVENT_ENDED" | "EVENT_FULL" | "EVENT_NOT_UNDERWAY" | "ROUND_OUT_OF_SEQUENCE" | "PROFILE_INCOMPLETE" | "UNDERAGE" | "BIRTH_DATE_ALREADY_SET" | "DECISION_ALREADY_MADE";
+            reason?: "EVENT_NOT_PUBLISHED" | "EVENT_ALREADY_PUBLISHED" | "EVENT_CANCELLED" | "EVENT_STARTED" | "EVENT_ENDED" | "EVENT_FULL" | "EVENT_NOT_UNDERWAY" | "ROUND_OUT_OF_SEQUENCE" | "PROFILE_INCOMPLETE" | "UNDERAGE" | "BIRTH_DATE_ALREADY_SET" | "DECISION_ALREADY_MADE" | "CHAT_CLOSED" | "IDEMPOTENCY_KEY_REUSED";
             /** @description Correlation ID, o mesmo do header X-Request-Id; vem nos erros inesperados (500) */
             requestId?: string;
             /** Format: int32 */
@@ -848,6 +951,10 @@ export interface components {
              * @enum {string}
              */
             status: "OPEN";
+        };
+        SendMessageRequest: {
+            /** @description O texto, em parágrafos, sem caracteres invisíveis nem de controle. Espaço nas pontas é removido e o texto é normalizado em NFC antes de contar os caracteres. Link e marcação são texto comum. */
+            text: string;
         };
         /** @description Erro de validação do corpo no formato RFC 9457. Além do detail, em inglês e para pessoas, errors diz a máquinas qual campo falhou e por quê, sem repetir o valor. */
         ValidationProblemDetail: {
@@ -1931,6 +2038,350 @@ export interface operations {
             };
         };
     };
+    getMyRoundChat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id do evento */
+                eventId: string;
+                /** @description Número da rodada no evento, a partir de 1 */
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description O chat de quem chama na rodada */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Chat"];
+                };
+            };
+            /** @description Id que não é UUID, ou número fora de 1 a 100 */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Quem chama não formou par nessa rodada: ficou de fora, não estava no sorteio, ou a rodada ou o evento não existem */
+            404: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    listMyRoundChatMessages: {
+        parameters: {
+            query?: {
+                /** @description Só mensagens com posição maior que esta; ausente na primeira leitura */
+                afterSeq?: number;
+                /** @description Quantas mensagens no máximo nesta página */
+                maxPageSize?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Id do evento */
+                eventId: string;
+                /** @description Número da rodada no evento, a partir de 1 */
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Uma página das mensagens */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessages"];
+                };
+            };
+            /** @description Id que não é UUID, ou número fora de 1 a 100, afterSeq fora de 0 a 300 ou maxPageSize fora de 1 a 100 */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Quem chama não formou par nessa rodada: ficou de fora, não estava no sorteio, ou a rodada ou o evento não existem */
+            404: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    sendRoundChatMessage: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Gerada pelo cliente para o rascunho e repetida em todo reenvio dele */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description Id do evento */
+                eventId: string;
+                /** @description Número da rodada no evento, a partir de 1 */
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description A mensagem que a mesma Idempotency-Key já tinha gravado, com o mesmo texto */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessage"];
+                };
+            };
+            /** @description A mensagem gravada */
+            201: {
+                headers: {
+                    /** @description Endereço da mensagem */
+                    Location: string;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessage"];
+                };
+            };
+            /** @description Id que não é UUID, ou número fora de 1 a 100, Idempotency-Key ausente ou que não é UUID, texto vazio, com mais de 500 caracteres ou com caractere proibido, JSON malformado ou campo desconhecido */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ValidationProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sessão web sem o token CSRF no header X-XSRF-TOKEN */
+            403: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Quem chama não formou par nessa rodada: ficou de fora, não estava no sorteio, ou a rodada ou o evento não existem */
+            404: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description O chat não aceita mensagens (reason CHAT_CLOSED), ou a Idempotency-Key já gravou outro texto (reason IDEMPOTENCY_KEY_REUSED); nada foi gravado */
+            409: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["RefusalProblemDetail"];
+                };
+            };
+            /** @description Corpo em outro formato que não application/json */
+            415: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Limite de mensagens desta conta esgotado; nada foi gravado */
+            429: {
+                headers: {
+                    /** @description Segundos até a próxima mensagem ficar disponível */
+                    "Retry-After": number;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Outra mensagem ao mesmo chat demorou além do teto, ou o limite desta conta não pôde ser contado; nada foi gravado, e reenviar com a mesma Idempotency-Key é seguro */
+            503: {
+                headers: {
+                    /** @description Segundos até tentar de novo */
+                    "Retry-After": number;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    getMyRoundChatMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id do evento */
+                eventId: string;
+                /** @description Número da rodada no evento, a partir de 1 */
+                number: number;
+                /** @description A posição da mensagem no chat */
+                seq: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A mensagem */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessage"];
+                };
+            };
+            /** @description Id que não é UUID, ou número fora de 1 a 100, ou posição fora de 1 a 300 */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Não há mensagem nessa posição, ou quem chama não formou par nessa rodada */
+            404: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     getMyDecision: {
         parameters: {
             query?: never;
@@ -2725,6 +3176,8 @@ export interface operations {
             /** @description Cota indisponível; a denúncia é recusada */
             503: {
                 headers: {
+                    /** @description Segundos até tentar de novo */
+                    "Retry-After": number;
                     "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };

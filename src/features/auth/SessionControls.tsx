@@ -1,6 +1,6 @@
 import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { LOGIN_URL } from './loginUrl.ts'
-import type { CurrentUser } from './session.ts'
+import type { CurrentUser, Role } from './session.ts'
 import { useLogout, useSession } from './useSession.ts'
 
 const LOGOUT_FAILED = 'Não foi possível sair. Tente de novo.'
@@ -61,12 +61,20 @@ interface MemberLinkProps {
   readonly className: string
   /** Se a página aberta é a do link ou uma página dentro dela, como as contas bloqueadas no perfil. */
   readonly isCurrent: boolean
+  /**
+   * Papel que a sessão precisa ter para o link aparecer. Só decide o que mostrar: a página e a API conferem o
+   * papel de novo, então esconder o link não protege nada.
+   */
+  readonly requiredRole?: Role
 }
 
-/** Link para uma página que só faz sentido para quem entrou, como "Meu perfil" e "Eventos". */
-export function MemberLink({ to, label, className, isCurrent }: MemberLinkProps) {
+/** Link para uma página que só faz sentido para quem entrou (e, se pedir, tem o papel), como "Meu perfil" e "Equipe". */
+export function MemberLink({ to, label, className, isCurrent, requiredRole }: MemberLinkProps) {
   const session = useSession()
   if (session.kind !== 'authenticated') {
+    return null
+  }
+  if (requiredRole !== undefined && !session.user.roles.includes(requiredRole)) {
     return null
   }
   return (

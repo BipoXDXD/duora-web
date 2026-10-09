@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { HeaderGreeting, MemberLink, SessionTab } from '../features/auth/SessionControls.tsx'
 import { Logo } from '../shared/brand/Logo.tsx'
 import { AppLink } from '../shared/routing/AppLink.tsx'
-import { isEventsRoute, isProfileRoute, PATHS, type Route } from '../shared/routing/routes.ts'
+import { isEventsRoute, isProfileRoute, isStaffRoute, PATHS, type Route } from '../shared/routing/routes.ts'
 import { ThemeToggle } from './theme/ThemeToggle.tsx'
 
 interface MobileLayoutProps {
@@ -41,6 +41,13 @@ export function MobileLayout({ route, children }: MobileLayoutProps) {
           isCurrent={route.page === 'connections'}
         />
         <MemberLink to={PATHS.profile} label="Perfil" className={TAB_CLASS} isCurrent={isProfileRoute(route)} />
+        <MemberLink
+          to={PATHS.adminEvents}
+          label="Equipe"
+          className={TAB_CLASS}
+          isCurrent={isStaffRoute(route)}
+          requiredRole="ADMIN"
+        />
         <SessionTab tabClassName={TAB_CLASS} />
       </nav>
     </div>

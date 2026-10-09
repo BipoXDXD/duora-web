@@ -5,7 +5,7 @@ import { HOW_IT_WORKS_ANCHOR } from '../features/landing/HowItWorksSection.tsx'
 import { SAFETY_ANCHOR } from '../features/landing/SafetySection.tsx'
 import { Logo } from '../shared/brand/Logo.tsx'
 import { AppLink } from '../shared/routing/AppLink.tsx'
-import { isEventsRoute, isProfileRoute, PATHS, type Route } from '../shared/routing/routes.ts'
+import { isEventsRoute, isProfileRoute, isStaffRoute, PATHS, type Route } from '../shared/routing/routes.ts'
 import { ThemeToggle } from './theme/ThemeToggle.tsx'
 
 interface DesktopLayoutProps {
@@ -55,6 +55,13 @@ export function DesktopLayout({ route, children }: DesktopLayoutProps) {
                 label="Meu perfil"
                 className={NAV_LINK_CLASS}
                 isCurrent={isProfileRoute(route)}
+              />
+              <MemberLink
+                to={PATHS.adminEvents}
+                label="Equipe"
+                className={NAV_LINK_CLASS}
+                isCurrent={isStaffRoute(route)}
+                requiredRole="ADMIN"
               />
             </nav>
             <HeaderSessionControls />

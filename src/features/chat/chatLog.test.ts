@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ChatMessage } from './chat.ts'
-import { chatLogReducer, cursorOf, INITIAL_CHAT_LOG, type ChatLog, type Received } from './chatLog.ts'
+import { chatLogReducer, INITIAL_CHAT_LOG, type ChatLog, type Received } from './chatLog.ts'
 
 const SENT_AT = new Date('2026-10-10T23:05:00Z')
 
@@ -19,18 +19,6 @@ function ready(overrides: Partial<Extract<ChatLog, { kind: 'ready' }>> = {}): Ch
 function seqsOf(log: ChatLog): number[] {
   return log.kind === 'ready' ? log.messages.map(({ message: { seq } }) => seq) : []
 }
-
-describe('cursorOf', () => {
-  it.each([
-    ['no message', [], 0],
-    ['one message', [1], 1],
-    ['several in a row', [1, 2, 3], 3],
-    ['a gap after the first ones', [1, 2, 4], 2],
-    ['a gap at the start', [2, 3], 0],
-  ])('is the last position before a gap, with %s', (_case, seqs, cursor) => {
-    expect(cursorOf(seqs.map(received))).toBe(cursor)
-  })
-})
 
 describe('chatLogReducer', () => {
   describe('access', () => {

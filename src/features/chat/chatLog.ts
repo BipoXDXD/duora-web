@@ -46,31 +46,13 @@ export type ChatLogAction =
 
 export const INITIAL_CHAT_LOG: ChatLog = { kind: 'loading' }
 
-const NO_MESSAGES = 0
-
-/**
- * O cursor da próxima leitura: a última posição antes da primeira lacuna. As posições não têm lacunas na API,
- * então uma lacuna aqui é mensagem que a leitura ainda não trouxe, como a do par gravada logo antes da que a
- * pessoa enviou. Usar a maior posição pularia essa mensagem.
- */
-export function cursorOf(messages: readonly Received[]): number {
-  let cursor = NO_MESSAGES
-  for (const { message } of messages) {
-    if (message.seq !== cursor + 1) {
-      break
-    }
-    cursor = message.seq
-  }
-  return cursor
-}
-
 export function chatLogReducer(log: ChatLog, action: ChatLogAction): ChatLog {
   switch (action.type) {
     case 'accessRead':
       return withAccess(log, action.access)
     case 'pageReceived':
       return log.kind === 'ready'
-        ? { ...log, messages: merge(log.messages, action.items.map((message) => ({ key: `seq-${message.seq}`, message }))) }
+        ? { ...log, messages: merge(log.messages, action.items.map((message) => ({ key: keyOf(message), message }))) }
         : log
     case 'sendStarted':
       return log.kind === 'ready' ? { ...log, outgoing: withSending(log.outgoing, action.outgoing) } : log
@@ -85,6 +67,10 @@ function withAccess(log: ChatLog, access: ChatAccess): ChatLog {
   }
   const open = access.kind === 'open'
   return log.kind === 'ready' ? { ...log, open } : { kind: 'ready', open, messages: [], outgoing: [] }
+}
+
+function keyOf(message: ChatMessage): string {
+  return `seq-${message.seq}`
 }
 
 /** Junta por posição: a cópia que já estava fica, para a chave do item no React não mudar. */

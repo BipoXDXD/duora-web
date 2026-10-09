@@ -26,7 +26,8 @@ export interface Pending extends Outgoing {
 
 /**
  * O chat como a tela o mostra. `messages` fica em ordem de `seq`, sem repetição; `outgoing` vem depois, na
- * ordem em que a pessoa escreveu.
+ * ordem em que a pessoa escreveu. `hasReadMessages` é falso até uma leitura de mensagens responder, mesmo
+ * vazia: sem isso, `messages` vazio não distingue "sem mensagens" de "ainda não sei".
  */
 export type ChatLog =
   | { readonly kind: 'loading' }
@@ -34,6 +35,7 @@ export type ChatLog =
   | {
       readonly kind: 'ready'
       readonly open: boolean
+      readonly hasReadMessages: boolean
       readonly messages: readonly Received[]
       readonly outgoing: readonly Pending[]
     }
@@ -52,7 +54,11 @@ export function chatLogReducer(log: ChatLog, action: ChatLogAction): ChatLog {
       return withAccess(log, action.access)
     case 'pageReceived':
       return log.kind === 'ready'
-        ? { ...log, messages: merge(log.messages, action.items.map((message) => ({ key: keyOf(message), message }))) }
+        ? {
+            ...log,
+            hasReadMessages: true,
+            messages: merge(log.messages, action.items.map((message) => ({ key: keyOf(message), message }))),
+          }
         : log
     case 'sendStarted':
       return log.kind === 'ready' ? { ...log, outgoing: withSending(log.outgoing, action.outgoing) } : log
@@ -66,7 +72,9 @@ function withAccess(log: ChatLog, access: ChatAccess): ChatLog {
     return { kind: 'notPaired' }
   }
   const open = access.kind === 'open'
-  return log.kind === 'ready' ? { ...log, open } : { kind: 'ready', open, messages: [], outgoing: [] }
+  return log.kind === 'ready'
+    ? { ...log, open }
+    : { kind: 'ready', open, hasReadMessages: false, messages: [], outgoing: [] }
 }
 
 function keyOf(message: ChatMessage): string {

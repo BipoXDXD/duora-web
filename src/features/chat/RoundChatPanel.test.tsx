@@ -419,6 +419,28 @@ describe('RoundChatPanel', () => {
     })
   })
 
+  describe('messages not read yet', () => {
+    const NO_MESSAGES = 'Nenhuma mensagem ainda.'
+    const LOST_CONNECTION = 'Sem conexão com a conversa. Tentando de novo…'
+
+    it('does not say there are no messages when the first read of them failed', async () => {
+      renderChat({ [CHAT]: OPEN, [after(0)]: problemAnswer(500) })
+
+      expect(await screen.findByText(LOST_CONNECTION)).toBeInTheDocument()
+      expect(screen.queryByText(NO_MESSAGES)).not.toBeInTheDocument()
+    })
+
+    it('says there are no messages only once a read confirmed it', async () => {
+      renderChat({ [CHAT]: OPEN, [after(0)]: inSequence(problemAnswer(500), EMPTY) })
+      await screen.findByText(LOST_CONNECTION)
+
+      await wait(4000)
+
+      expect(screen.getByText(NO_MESSAGES)).toBeInTheDocument()
+      expect(screen.queryByText(LOST_CONNECTION)).not.toBeInTheDocument()
+    })
+  })
+
   describe('closed chat', () => {
     it('shows the messages without the field and with a notice that does not say why', async () => {
       renderChat({ [CHAT]: CLOSED, [after(0)]: page([message(1, 'Oi!'), message(2, 'Até!', true)]) })

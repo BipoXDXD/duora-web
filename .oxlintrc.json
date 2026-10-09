@@ -28,6 +28,18 @@
       "error",
       "interface"
     ],
+    "vitest/expect-expect": [
+      "error",
+      {
+        "assertFunctionNames": [
+          "expect",
+          "expectTypeOf",
+          "assert",
+          "expectPrimaryAction",
+          "expectSecondaryAction"
+        ]
+      }
+    ],
     "react/react-in-jsx-scope": "off"
   }
 }

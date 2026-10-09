@@ -16,8 +16,8 @@ import {
   statusAnswer,
   stubApi,
 } from '../../test/fakeApi.ts'
+import { expectPrimaryAction, expectSecondaryAction } from '../../test/buttonHierarchy.ts'
 import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
 const EVENT = `/api/events/${DINNER.id}`
@@ -188,7 +188,7 @@ describe('event page', () => {
       const alert = await screen.findByRole('alert')
       expect(alert).toHaveTextContent('Os eventos do Duora são só para maiores de 18 anos')
       expect(screen.queryByRole('link', { name: 'Completar meu perfil' })).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Quero me inscrever' }).className).toBe(PRIMARY_BUTTON)
+      expectPrimaryAction(screen.getByRole('button', { name: 'Quero me inscrever' }))
     })
 
     it.each([
@@ -215,13 +215,13 @@ describe('event page', () => {
         '/api/me/profile': neverAnswer(),
       })
       const register = await screen.findByRole('button', { name: 'Quero me inscrever' })
-      expect(register.className).toBe(PRIMARY_BUTTON)
+      expectPrimaryAction(register)
 
       await user.click(register)
 
       const next = await screen.findByRole('link', { name: 'Completar meu perfil' })
-      expect(next.className).toBe(PRIMARY_BUTTON)
-      expect(screen.getByRole('button', { name: 'Quero me inscrever' }).className).toBe(SECONDARY_BUTTON)
+      expectPrimaryAction(next)
+      expectSecondaryAction(screen.getByRole('button', { name: 'Quero me inscrever' }))
     })
 
     it('demotes "Quero me inscrever" while the notice asks to sign in again', async () => {
@@ -232,8 +232,8 @@ describe('event page', () => {
 
       await user.click(await screen.findByRole('button', { name: 'Quero me inscrever' }))
 
-      expect((await screen.findByRole('link', { name: 'Entrar de novo' })).className).toBe(PRIMARY_BUTTON)
-      expect(screen.getByRole('button', { name: 'Quero me inscrever' }).className).toBe(SECONDARY_BUTTON)
+      expectPrimaryAction(await screen.findByRole('link', { name: 'Entrar de novo' }))
+      expectSecondaryAction(screen.getByRole('button', { name: 'Quero me inscrever' }))
     })
 
     it('keeps "Quero me inscrever" primary when the notice has no next step', async () => {
@@ -245,7 +245,7 @@ describe('event page', () => {
       await user.click(await screen.findByRole('button', { name: 'Quero me inscrever' }))
 
       await screen.findByRole('alert')
-      expect(screen.getByRole('button', { name: 'Quero me inscrever' }).className).toBe(PRIMARY_BUTTON)
+      expectPrimaryAction(screen.getByRole('button', { name: 'Quero me inscrever' }))
     })
 
     it('explains a cancelled event on 409 EVENT_CANCELLED and reads the event again', async () => {

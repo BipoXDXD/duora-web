@@ -15,8 +15,8 @@ import {
   stubApi,
   type FakeRoute,
 } from '../../test/fakeApi.ts'
+import { expectPrimaryAction, expectSecondaryAction } from '../../test/buttonHierarchy.ts'
 import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
 const EVENT = `/api/events/${DINNER.id}`
@@ -288,12 +288,12 @@ describe('private decision after a round', () => {
     it('keeps a single primary button while the notice asks to sign in again', async () => {
       const { user } = await openRound(byMethod({ GET: NOT_DECIDED, PUT: statusAnswer(401) }))
       await user.click(await within(await findPanel()).findByRole('button', { name: 'Não quero' }))
-      expect(within(panel()).getByRole('button', { name: 'Confirmar minha decisão' }).className).toBe(PRIMARY_BUTTON)
+      expectPrimaryAction(within(panel()).getByRole('button', { name: 'Confirmar minha decisão' }))
 
       await user.click(within(panel()).getByRole('button', { name: 'Confirmar minha decisão' }))
 
-      expect((await within(panel()).findByRole('link', { name: 'Entrar de novo' })).className).toBe(PRIMARY_BUTTON)
-      expect(within(panel()).getByRole('button', { name: 'Confirmar minha decisão' }).className).toBe(SECONDARY_BUTTON)
+      expectPrimaryAction(await within(panel()).findByRole('link', { name: 'Entrar de novo' }))
+      expectSecondaryAction(within(panel()).getByRole('button', { name: 'Confirmar minha decisão' }))
     })
 
     it.each([

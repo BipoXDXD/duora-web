@@ -1,12 +1,17 @@
+import { backoffDelayMs } from '../../shared/api/backoffDelay.ts'
+
 /** Intervalo da releitura do evento em andamento, com a aba visível. */
 export const EVENT_REFRESH_INTERVAL_MS = 15_000
 
 /** Teto da espera depois de falhas seguidas, antes do espalhamento. */
 export const MAX_REFRESH_BACKOFF_MS = 120_000
 
-/** Para mais ou para menos, sorteado, para os clientes que abriram juntos não lerem juntos. */
-const JITTER = 0.2
-const MS_PER_SECOND = 1000
+/** Para mais ou para menos, sorteado, em toda espera: os clientes que abriram juntos não leem juntos. */
+const REFRESH_BACKOFF = {
+  intervalMs: EVENT_REFRESH_INTERVAL_MS,
+  capMs: MAX_REFRESH_BACKOFF_MS,
+  spread: { down: 0.2, up: 0.2 },
+} as const
 
 /**
  * A espera antes de ler o evento de novo. Sem falha, o intervalo normal; depois de `failures` falhas seguidas, o
@@ -14,10 +19,5 @@ const MS_PER_SECOND = 1000
  * `random` devolve um número em [0, 1).
  */
 export function refreshDelayMs(failures: number, retryAfterSeconds: number | null, random: () => number): number {
-  const base =
-    failures === 0
-      ? EVENT_REFRESH_INTERVAL_MS
-      : Math.min(EVENT_REFRESH_INTERVAL_MS * 2 ** failures, MAX_REFRESH_BACKOFF_MS)
-  const spread = base * (1 - JITTER + 2 * JITTER * random())
-  return Math.max(spread, (retryAfterSeconds ?? 0) * MS_PER_SECOND)
+  return backoffDelayMs(REFRESH_BACKOFF, failures, retryAfterSeconds, random)
 }

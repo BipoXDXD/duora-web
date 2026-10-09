@@ -7,6 +7,7 @@ import {
   eventPhaseAt,
   fetchEvent,
   fetchEventsPage,
+  nextPhaseChange,
   type SocialEvent,
 } from './events.ts'
 
@@ -139,6 +140,37 @@ describe('eventPhaseAt', () => {
       expect(eventPhaseAt({ ...event, status: 'CANCELLED' }, new Date(now))).toBe('cancelled')
     },
   )
+})
+
+describe('nextPhaseChange', () => {
+  const startsAt = new Date('2026-10-10T22:00:00Z')
+  const endsAt = new Date('2026-10-11T01:00:00Z')
+  const event: SocialEvent = { ...DINNER, startsAt, endsAt }
+
+  it.each([
+    ['2026-10-10T21:00:00Z', startsAt],
+    ['2026-10-10T21:59:59.999Z', startsAt],
+    ['2026-10-10T22:00:00Z', endsAt],
+    ['2026-10-11T00:59:59.999Z', endsAt],
+    ['2026-10-11T01:00:00Z', null],
+    ['2026-10-11T02:00:00Z', null],
+  ] as const)('at %s the next change of a published event is %s', (now, change) => {
+    expect(nextPhaseChange(event, new Date(now))).toEqual(change)
+  })
+
+  it.each(['2026-10-10T21:00:00Z', '2026-10-10T23:00:00Z', '2026-10-11T02:00:00Z'])(
+    'a cancelled event does not change phase again, at %s',
+    (now) => {
+      expect(nextPhaseChange({ ...event, status: 'CANCELLED' }, new Date(now))).toBeNull()
+    },
+  )
+
+  it('agrees with eventPhaseAt: the limit it names is the first instant of the next phase', () => {
+    const limit = nextPhaseChange(event, new Date('2026-10-10T21:00:00Z'))
+    expect(limit).not.toBeNull()
+    expect(eventPhaseAt(event, new Date((limit?.getTime() ?? 0) - 1))).toBe('upcoming')
+    expect(eventPhaseAt(event, limit ?? new Date(0))).toBe('inProgress')
+  })
 })
 
 describe('contract with the generated API types', () => {

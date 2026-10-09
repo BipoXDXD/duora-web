@@ -7,12 +7,13 @@ import { TEXT_LINK } from '../../shared/ui/styles.ts'
 import { RequireSession } from '../auth/RequireSession.tsx'
 import { useSession } from '../auth/useSession.ts'
 import { EVENT_KEYS, READ_OPTIONS } from './eventQueries.ts'
-import { eventPhaseAt, fetchEvent, type EventPhase, type SocialEvent } from './events.ts'
+import { fetchEvent, type EventPhase, type SocialEvent } from './events.ts'
 import { formatEventTime } from './eventText.ts'
 import { PairingPanel } from './PairingPanel.tsx'
 import { PhaseBadge } from './PhaseBadge.tsx'
 import { RegistrationPanel } from './RegistrationPanel.tsx'
 import { fetchRegistration } from './registrations.ts'
+import { useEventPhase } from './useEventPhase.ts'
 
 const GENERIC_TITLE = 'Evento'
 
@@ -61,12 +62,23 @@ function EventDetails({ eventId }: EventPageProps) {
       </PageFrame>
     )
   }
-  // A fase vale para o instante da leitura: reler o evento (depois de um 409, por exemplo) a atualiza.
-  const phase = eventPhaseAt(query.data, new Date(query.dataUpdatedAt))
+  return <LiveEvent eventId={eventId} event={query.data} readAt={query.dataUpdatedAt} />
+}
+
+interface LiveEventProps {
+  readonly eventId: string
+  readonly event: SocialEvent
+  /** O instante da última leitura do evento (`dataUpdatedAt` da consulta). */
+  readonly readAt: number
+}
+
+/** O evento com a página aberta: a fase muda sozinha nos horários de início e fim. */
+function LiveEvent({ eventId, event, readAt }: LiveEventProps) {
+  const phase = useEventPhase(event, readAt)
   return (
-    <PageFrame key="event" title={query.data.title}>
-      <EventSummary event={query.data} phase={phase} />
-      <EventParticipation eventId={eventId} phase={phase} currentRound={query.data.currentRound} />
+    <PageFrame key="event" title={event.title}>
+      <EventSummary event={event} phase={phase} />
+      <EventParticipation eventId={eventId} phase={phase} currentRound={event.currentRound} />
       <BackToEvents />
     </PageFrame>
   )

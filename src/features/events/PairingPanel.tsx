@@ -1,12 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useId, useState } from 'react'
 import { READ_OPTIONS } from '../../shared/api/readOptions.ts'
+import { accountCode } from '../../shared/text/accountCode.ts'
 import { RoundChatPanel } from '../chat/RoundChatPanel.tsx'
 import { DecisionPanel } from '../connections/DecisionPanel.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
 import { EVENT_KEYS } from './eventQueries.ts'
-import { accountCode } from './eventText.ts'
 import { fetchPairing, FIRST_ROUND, type Pairing } from './pairing.ts'
 import { useRoundAnnouncement } from './useRoundAnnouncement.ts'
 

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useId, useRef, useState, type FormEvent } from 'react'
 import { isBug } from '../../shared/api/http.ts'
 import { READ_OPTIONS } from '../../shared/api/readOptions.ts'
+import { formatTime } from '../../shared/text/dateFormat.ts'
 import { FormField } from '../../shared/ui/FormField.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { FIELD_CONTROL, PRIMARY_BUTTON } from '../../shared/ui/styles.ts'
@@ -107,13 +108,12 @@ function RoundResult({ round, number }: { readonly round: AdminRound | null; rea
     <div className="flex w-full flex-col gap-1 rounded-lg bg-surface p-4 shadow-raised">
       <p className="text-lg font-semibold text-fg">{`Rodada atual: ${round.number}`}</p>
       <p className="text-fg">{roundCountsText(round)}</p>
-      <p className="text-sm text-fg-muted">{`Começou às ${TIME_FORMAT.format(round.startedAt)}.`}</p>
+      <p className="text-sm text-fg-muted">{`Começou às ${formatTime(round.startedAt)}.`}</p>
     </div>
   )
 }
 
 /** Sem `timeZone`: o Intl usa o fuso de quem está com o app aberto. */
-const TIME_FORMAT = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
 interface ShownNotice {
   readonly notice: AdminNotice

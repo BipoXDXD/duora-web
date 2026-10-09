@@ -1,4 +1,4 @@
-import { waitText } from '../events/registrationNotices.ts'
+import { waitText } from '../../shared/text/waitText.ts'
 import type { EventActionResult, StartRoundResult } from './adminEvents.ts'
 import { STAFF_ONLY_TEXT } from './adminText.ts'
 

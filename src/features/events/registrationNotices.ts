@@ -1,3 +1,4 @@
+import { waitText } from '../../shared/text/waitText.ts'
 import type { CancelResult, EventClosure, RegisterResult } from './registrations.ts'
 
 /**
@@ -76,14 +77,6 @@ const TOO_LATE_TEXT: Readonly<Record<'started' | 'ended' | 'unknown', string>> =
 /** O 503 (evento ocupado) e o 429 (limite da conta) pedem a mesma coisa: esperar. Por isso o texto não aponta o motivo. */
 function busyText(retryAfterSeconds: number | null): string {
   return `Muitos pedidos de inscrição em pouco tempo. Tente de novo ${waitText(retryAfterSeconds)}.`
-}
-
-/** "em instantes", "em 1 segundo" ou "em N segundos", pelo `Retry-After` da API. */
-export function waitText(retryAfterSeconds: number | null): string {
-  if (retryAfterSeconds === null || retryAfterSeconds === 0) {
-    return 'em instantes'
-  }
-  return retryAfterSeconds === 1 ? 'em 1 segundo' : `em ${retryAfterSeconds} segundos`
 }
 
 function success(text: string): RegistrationNotice {

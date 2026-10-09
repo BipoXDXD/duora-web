@@ -1,4 +1,4 @@
-import { waitText } from '../events/registrationNotices.ts'
+import { waitText } from '../../shared/text/waitText.ts'
 import type { DecideResult } from './decision.ts'
 
 /** O aviso depois de decidir. `signIn` pede o link "Entrar de novo" junto. */

@@ -4,6 +4,8 @@ import { isApiFailure } from '../../shared/api/http.ts'
 import { usePagedList } from '../../shared/api/usePagedList.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { PATHS } from '../../shared/routing/routes.ts'
+import { accountCode } from '../../shared/text/accountCode.ts'
+import { formatDay } from '../../shared/text/dateFormat.ts'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { LoadMore } from '../../shared/ui/LoadMore.tsx'
 import { PageFrame } from '../../shared/ui/PageFrame.tsx'
@@ -13,11 +15,6 @@ import { RequireSession } from '../auth/RequireSession.tsx'
 import { fetchBlockedPage, unblockAccount, type BlockedAccount, type BlockedPage } from './blockedAccounts.ts'
 
 const BLOCKED_ACCOUNTS_KEY = ['blocked-accounts'] as const
-
-/** A API não manda o nome de quem foi bloqueado; o fim do id (aleatório no UUIDv7) distingue uma conta da outra. */
-const ACCOUNT_CODE_LENGTH = 8
-
-const BLOCKED_AT_FORMAT = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' })
 
 type BlockedPages = InfiniteData<BlockedPage, string | null>
 
@@ -140,8 +137,8 @@ function BlockedAccountItem({ account, onUnblocked }: BlockedAccountItemProps) {
   return (
     <li className="flex flex-col gap-4 rounded-lg bg-surface p-4 shadow-raised">
       <div id={descriptionId} className="flex flex-col gap-1">
-        <p className="font-semibold text-fg">{`Conta ${account.accountId.slice(-ACCOUNT_CODE_LENGTH)}`}</p>
-        <p className="text-sm text-fg-muted">{`Bloqueada em ${BLOCKED_AT_FORMAT.format(new Date(account.blockedAt))}`}</p>
+        <p className="font-semibold text-fg">{`Conta ${accountCode(account.accountId)}`}</p>
+        <p className="text-sm text-fg-muted">{`Bloqueada em ${formatDay(new Date(account.blockedAt))}`}</p>
       </div>
       {isConfirming ? (
         <ConfirmUnblock

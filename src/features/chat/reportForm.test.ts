@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DESCRIPTION_MAX_LENGTH,
   descriptionLength,
+  messageExcerpt,
   parseReportDraft,
   problemsFromApi,
   quotaWaitText,
@@ -132,5 +133,19 @@ describe('quotaWaitText', () => {
     [86400, 'em 24 horas'],
   ])('says when to report again after %s seconds', (seconds, text) => {
     expect(quotaWaitText(seconds)).toBe(text)
+  })
+})
+
+describe('messageExcerpt', () => {
+  it('keeps a short message whole, on one line', () => {
+    expect(messageExcerpt('Oi!\n  Tudo bem?')).toBe('Oi! Tudo bem?')
+  })
+
+  it('keeps a message of exactly the excerpt size whole', () => {
+    expect(messageExcerpt('a'.repeat(40))).toBe('a'.repeat(40))
+  })
+
+  it('cuts a longer message at 40 characters, without splitting an emoji', () => {
+    expect(messageExcerpt(`${'a'.repeat(39)}😀😀`)).toBe(`${'a'.repeat(39)}😀…`)
   })
 })

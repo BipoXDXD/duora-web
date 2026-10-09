@@ -90,3 +90,12 @@ export function quotaWaitText(retryAfterSeconds: number | null): string {
   const hours = Math.ceil(retryAfterSeconds / SECONDS_PER_HOUR)
   return hours === 1 ? 'em 1 hora' : `em ${hours} horas`
 }
+
+/** Quantos caracteres da mensagem entram no nome do botão "Denunciar", para o leitor de tela saber qual é. */
+const EXCERPT_LENGTH = 40
+
+/** O começo da mensagem, numa linha só, sem partir um emoji ao meio. */
+export function messageExcerpt(text: string): string {
+  const characters = [...text.replace(/\s+/g, ' ').trim()]
+  return characters.length > EXCERPT_LENGTH ? `${characters.slice(0, EXCERPT_LENGTH).join('')}…` : characters.join('')
+}

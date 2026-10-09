@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../app/App.tsx'
-import { BEFORE_EVENTS, DINNER, SESSION } from '../../test/eventFixtures.ts'
+import { BEFORE_EVENTS, DINNER, emptyChatRoutes, SESSION } from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
   byMethod,
@@ -473,6 +473,7 @@ describe('event page', () => {
         rounds.flatMap((round) => [
           [`${PAIRING}/${round}/pairing`, pairingAnswer(round, PARTNER)],
           [`${PAIRING}/${round}/decision`, problemAnswer(404)],
+          ...Object.entries(emptyChatRoutes(round)),
         ]),
       )
     }
@@ -531,6 +532,43 @@ describe('event page', () => {
       expect(screen.getByText('Rodada atual: 2.')).toBeInTheDocument()
       expect(screen.queryByLabelText('Rodada')).not.toBeInTheDocument()
       expect(callsTo(fetchMock, `${PAIRING}/1/pairing`, 'GET')).toHaveLength(0)
+    })
+
+    it('opens the conversation with the partner of the current round', async () => {
+      renderEventPage({ [EVENT]: inRound(2), [REGISTRATION]: REGISTERED, ...pairingRoutes([1, 2]) })
+
+      const heading = await screen.findByRole('heading', { name: 'Conversa com sua dupla' })
+      expect(await screen.findByText('Nenhuma mensagem ainda.')).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Sua mensagem' })).toBeInTheDocument()
+      // Dentro de outra região viva, cada tecla no campo seria anunciada.
+      expect(heading.closest('[aria-live]')).toBeNull()
+    })
+
+    it('shows no conversation for an earlier round', async () => {
+      const { fetchMock, user } = renderEventPage({
+        [EVENT]: inRound(2),
+        [REGISTRATION]: REGISTERED,
+        ...pairingRoutes([1, 2]),
+      })
+      await screen.findByText('Nenhuma mensagem ainda.')
+
+      await user.click(screen.getByRole('button', { name: 'Rodada anterior' }))
+
+      expect(await screen.findByText('Sua dupla na rodada 1 é a conta 1a2b3c4d.')).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Conversa com sua dupla' })).not.toBeInTheDocument()
+      expect(callsTo(fetchMock, `${PAIRING}/1/chat`, 'GET')).toHaveLength(0)
+    })
+
+    it('shows no conversation to someone who sat the round out', async () => {
+      const { fetchMock } = renderEventPage({
+        [EVENT]: inRound(1),
+        [REGISTRATION]: REGISTERED,
+        [`${PAIRING}/1/pairing`]: pairingAnswer(1, null),
+      })
+
+      expect(await screen.findByText(/Na rodada 1 você ficou de fora/)).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Conversa com sua dupla' })).not.toBeInTheDocument()
+      expect(callsTo(fetchMock, `${PAIRING}/1/chat`, 'GET')).toHaveLength(0)
     })
 
     it('goes back to an earlier round and forward to the current one again', async () => {

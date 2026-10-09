@@ -1,5 +1,6 @@
 import { useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useId, useState } from 'react'
+import { RoundChatPanel } from '../chat/RoundChatPanel.tsx'
 import { DecisionPanel } from '../connections/DecisionPanel.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
@@ -98,6 +99,13 @@ function Rounds({ eventId, currentRound }: RoundsProps) {
           onRetry={() => void query.refetch()}
         />
       </div>
+      {/*
+        Fora da região viva acima: a conversa tem a sua, e o contador do campo não pode ser anunciado a cada tecla.
+        Só na rodada atual, porque a de uma rodada anterior já não recebe mensagens.
+      */}
+      {round === currentRound && !query.isFetching && query.data?.kind === 'paired' && (
+        <RoundChatPanel key={round} eventId={eventId} roundNumber={round} />
+      )}
       {currentRound > FIRST_ROUND && (
         <div role="group" aria-label="Escolher a rodada" className="flex flex-wrap gap-4">
           <button

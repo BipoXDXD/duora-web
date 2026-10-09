@@ -1,4 +1,4 @@
-import { jsonAnswer } from './fakeApi.ts'
+import { jsonAnswer, type FakeRoute } from './fakeApi.ts'
 
 /** Eventos como a API os manda, para os testes das telas de eventos. */
 export const DINNER = {
@@ -38,4 +38,16 @@ export const BEFORE_EVENTS = new Date('2026-10-08T15:00:00Z')
 
 export function pageOf(items: readonly object[], nextPageToken: string | null = null) {
   return jsonAnswer({ items, nextPageToken })
+}
+
+/**
+ * O chat aberto e vazio de uma rodada do jantar, para as telas que mostram a dupla da rodada atual sem testar a
+ * conversa: o painel do chat lê as duas rotas assim que aparece.
+ */
+export function emptyChatRoutes(roundNumber: number): Record<string, FakeRoute> {
+  const chat = `/api/events/${DINNER.id}/rounds/${roundNumber}/chat`
+  return {
+    [chat]: jsonAnswer({ chatId: '0199b0c4-7f3a-7c2e-9a1b-00000000c4a7', open: true, lastSeq: 0 }),
+    [`${chat}/messages?afterSeq=0&maxPageSize=100`]: jsonAnswer({ items: [], nextAfterSeq: null }),
+  }
 }

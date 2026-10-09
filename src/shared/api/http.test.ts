@@ -124,10 +124,10 @@ describe('sendApiRequest', () => {
   })
 
   it('sends Idempotency-Key when the request carries one', async () => {
-    const key = '0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7c'
-    await sendApiRequest({ method: 'POST', path: '/api/x', idempotencyKey: key, body: {} })
+    const attemptId = '0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7c'
+    await sendApiRequest({ method: 'POST', path: '/api/x', idempotencyKey: attemptId, body: {} })
 
-    expect(sentHeaders().get('Idempotency-Key')).toBe(key)
+    expect(sentHeaders().get('Idempotency-Key')).toBe(attemptId)
   })
 
   it('sends no Idempotency-Key when the request has none', async () => {

@@ -10,8 +10,9 @@ O projeto está no início. Por enquanto ele tem os dois layouts, a identidade v
 dois temas e contraste testado), o cliente HTTP compatível com o login da API, o estado de sessão (entrar e
 sair), a landing com a inscrição na **lista de espera**, as telas de **Meu perfil** e **Contas bloqueadas**, e as de
 **Eventos**: a lista, o evento com a inscrição, a dupla de cada rodada, a **conversa com a dupla** da rodada atual e a
-**decisão privada** depois dela, **Minhas inscrições** e **Conexões**. Para o piloto há também a **área da equipe** (`/admin/...`): criar o rascunho de um evento,
-publicá-lo, cancelá-lo e iniciar as rodadas, sem `curl`.
+**decisão privada** depois dela, **Minhas inscrições** e **Conexões**. Para o piloto há também a **área da equipe**
+(`/admin/...`): listar os eventos (rascunhos incluídos), criar o rascunho de um evento, publicá-lo, cancelá-lo e
+iniciar as rodadas, sem `curl`.
 
 ## Pré-requisitos
 
@@ -56,7 +57,9 @@ Firefox, que tratam `localhost` como contexto seguro. O Safari não aceita: use 
 
 ### Sessão no front
 
-- `GET /api/me` diz quem está logado: 200 com `{"displayName": "..." | null}` ou 401 para quem não entrou. O
+- `GET /api/me` diz quem está logado: 200 com `{"displayName": "..." | null, "roles": [...]}` ou 401 para quem não entrou.
+  `roles` vem sempre (`[]` ou `["ADMIN"]`); o front lê por allowlist (`KNOWN_ROLES` em `session.ts`) e ignora o papel que
+  não conhece. Os papéis só decidem o que mostrar, como o link "Equipe"; a API confere o papel em cada rota. O
   hook `useSession` (`src/features/auth/useSession.ts`) guarda a resposta no TanStack Query e devolve uma união:
   `loading`, `anonymous`, `authenticated` (com o usuário) ou `error` (com `retry`). Sem retry automático; ao voltar
   para a aba, a sessão é checada de novo, e se essa nova checagem falhar continua valendo a última conhecida.
@@ -80,6 +83,7 @@ Firefox, que tratam `localhost` como contexto seguro. O Safari não aceita: use 
 | `/eventos/{id}` | O evento: inscrição e, durante ele, a dupla da rodada | Quem entrou |
 | `/inscricoes` | Minhas inscrições | Quem entrou |
 | `/conexoes` | Conexões: quem também quis continuar em contato | Quem entrou |
+| `/admin/eventos` | Eventos da equipe: todos os estados, com filtro por estado | Só ADMIN, decidido pela API (veja [Área da equipe](#área-da-equipe-admin)) |
 | `/admin/eventos/novo` | Novo evento: o formulário do rascunho | Só ADMIN, decidido pela API (veja [Área da equipe](#área-da-equipe-admin)) |
 | `/admin/eventos/{id}` | O evento para a equipe: estado, inscritos, publicar, cancelar e rodadas | Só ADMIN, decidido pela API |
 | outro | Página não encontrada | Todos |
@@ -96,8 +100,8 @@ Os links para "Eventos", "Conexões" e o perfil só aparecem para quem entrou: n
 "Eventos" fica marcado também nela e em cada evento. As páginas do perfil mostram "Entre para ver…" a quem não entrou, sem chamar a API.
 
 Em produção, o servidor de arquivos estáticos precisa devolver o `index.html` para `/perfil`,
-`/perfil/bloqueios`, `/eventos`, `/eventos/{id}`, `/inscricoes`, `/conexoes`, `/admin/eventos/novo` e
-`/admin/eventos/{id}` (SPA fallback), para o recarregar e o
+`/perfil/bloqueios`, `/eventos`, `/eventos/{id}`, `/inscricoes`, `/conexoes`, `/admin/eventos`,
+`/admin/eventos/novo` e `/admin/eventos/{id}` (SPA fallback), para o recarregar e o
 link direto funcionarem. O `vite dev` e o `vite preview` já fazem isso; no Azure Static Web Apps é o
 `public/staticwebapp.config.json` (veja [Publicação](#publicação-azure-static-web-apps)).
 
@@ -221,14 +225,19 @@ depois. O código está em `src/features/chat/`.
 
 ### Área da equipe (ADMIN)
 
-O piloto precisa que a equipe opere eventos sem `curl`. As rotas são `/admin/eventos/novo` e `/admin/eventos/{id}`
-(`src/features/admin/`).
+O piloto precisa que a equipe opere eventos sem `curl`. As rotas são `/admin/eventos`, `/admin/eventos/novo` e
+`/admin/eventos/{id}` (`src/features/admin/`).
 
-- **O front não sabe quem é ADMIN.** `GET /api/me` devolve só `displayName` e `profileComplete`, sem papéis, e o front
-  não inventa um critério. Por isso **nenhum link da navegação leva à área da equipe**: ela se abre pelo endereço, e
-  quem manda é a API. Quem não é ADMIN recebe 403, e a tela diz "Área só para a equipe." (no formulário, só depois do
-  envio, porque antes não há como saber). Esconder a rota não protege nada; a segurança é da API, e a página nunca
-  mostra dado que a API não mandou.
+- **Quem manda é a API.** O link **"Equipe"** (nos dois layouts, depois de "Perfil") só aparece quando `roles` de
+  `GET /api/me` inclui `ADMIN`; o nome segue o "área só para a equipe" que a própria API e as telas usam. Isso é
+  conforto de navegação, não proteção: quem não é ADMIN e abre o endereço recebe 403 da API, e a tela diz "Área só
+  para a equipe." (no formulário, só depois do envio). A página nunca mostra dado que a API não mandou.
+- **Eventos da equipe** (`/admin/eventos`). Lista `GET /api/admin/events` com "Carregar mais", do início mais distante
+  ao mais antigo (ordem da API). Cada item mostra título (link para o evento), o estado em texto (rascunho, publicado,
+  em andamento, encerrado ou cancelado), o horário no fuso de quem usa o app e a contagem de inscritos (nunca quem).
+  O filtro "Mostrar" é um `select` (todos, rascunhos, publicados, cancelados) que vai como `?status=`, e o estado é
+  mantido nas páginas seguintes. "Novo evento" leva ao formulário. Há estados de carregando, vazio (com e sem filtro),
+  erro com "Tentar de novo", 401 ("Entrar de novo") e 403. Criar, publicar ou cancelar invalida a lista.
 - **Novo evento.** Título (1 a 80 caracteres, uma linha), descrição (1 a 500, parágrafos com quebra de linha), início,
   fim e capacidade (2 a 200). O formulário repete as regras da duora-api para o erro aparecer antes do envio: início no
   futuro e em até 365 dias, fim depois do início e em até 12 horas dele, texto em NFC e sem caractere de controle ou
@@ -491,13 +500,6 @@ gerados da spec, testes com cobertura e build. Também roda o gitleaks sobre tod
 ## Pendências
 
 - Área da equipe (pendências para a **duora-api**):
-  - **Lista de eventos para o ADMIN, rascunhos incluídos.** A spec só tem a leitura de um evento por id
-    (`GET /api/admin/events/{id}`); `GET /api/events` não traz rascunhos. Hoje a equipe chega ao rascunho pelo
-    endereço que a criação abre, e um rascunho perdido (por exemplo, depois de fechar a aba) não tem como ser
-    encontrado. Com a lista, a área ganharia uma página de entrada.
-  - **Papéis em `GET /api/me`** (por exemplo `roles` ou `isAdmin`). Sem isso o front não sabe quem é ADMIN, e por isso
-    não há link para a área da equipe nem estado "sem acesso" antes de chamar a API. Quando existir, o link entra na
-    navegação só para ADMIN, sem tirar a recusa do servidor.
   - **`Idempotency-Key` na criação do rascunho**, para repetir depois de uma falha de rede não criar um segundo.
   - Não há como editar um rascunho (título, horário, capacidade): errou, cancela e cria outro.
 - A confirmação de ações que não se desfazem (cancelar evento, iniciar rodada) usa o botão primário, porque o tema

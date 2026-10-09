@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useId, useState } from 'react'
+import { useId } from 'react'
 import { isBug } from '../../shared/api/http.ts'
 import { READ_OPTIONS } from '../../shared/api/readOptions.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
@@ -9,6 +9,7 @@ import { ConfirmStep } from '../../shared/ui/ConfirmStep.tsx'
 import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
+import { useConfirmStep } from '../../shared/ui/useConfirmStep.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
 import { useShownNotice } from '../../shared/ui/useShownNotice.ts'
 import { LOGIN_URL } from '../auth/loginUrl.ts'
@@ -128,10 +129,6 @@ const CHOICES = [
   { interested: false, button: 'Não quero' },
 ] as const
 
-type ChoiceStep =
-  | { readonly kind: 'choosing'; readonly focusOn: boolean | null }
-  | { readonly kind: 'confirming'; readonly interested: boolean }
-
 interface ChoiceProps {
   readonly isSaving: boolean
   readonly hasNextStep: boolean
@@ -143,19 +140,21 @@ interface ChoiceProps {
  * empurra para nenhuma.
  */
 function Choice({ isSaving, hasNextStep, onConfirm }: ChoiceProps) {
-  const [step, setStep] = useState<ChoiceStep>({ kind: 'choosing', focusOn: null })
+  /** O `subject` é a resposta escolhida: `true` para "quero continuar em contato". */
+  const choice = useConfirmStep<boolean>()
 
-  if (step.kind === 'confirming') {
+  if (choice.confirming !== null) {
+    const { subject: interested } = choice.confirming
     return (
       <ConfirmStep
         confirmLabel="Confirmar minha decisão"
         pendingLabel="Registrando…"
         isPending={isSaving}
         confirmClassName={hasNextStep ? SECONDARY_BUTTON : PRIMARY_BUTTON}
-        onConfirm={() => onConfirm(step.interested)}
-        onBack={() => setStep({ kind: 'choosing', focusOn: step.interested })}
+        onConfirm={() => onConfirm(interested)}
+        onBack={choice.back}
       >
-        <p className="font-semibold text-fg">{`Você escolheu: ${chosenText(step.interested)}.`}</p>
+        <p className="font-semibold text-fg">{`Você escolheu: ${chosenText(interested)}.`}</p>
         <p className="text-fg">A decisão é final: depois de confirmar, não dá para mudar. Ela continua só sua.</p>
       </ConfirmStep>
     )
@@ -167,13 +166,13 @@ function Choice({ isSaving, hasNextStep, onConfirm }: ChoiceProps) {
         viram uma conexão.
       </p>
       <div className="flex flex-wrap gap-4">
-        {CHOICES.map((choice) => (
+        {CHOICES.map((option) => (
           <FocusReturnButton
-            key={choice.button}
-            hasFocus={step.focusOn === choice.interested}
-            onClick={() => setStep({ kind: 'confirming', interested: choice.interested })}
+            key={option.button}
+            hasFocus={choice.returnsFocusTo(option.interested)}
+            onClick={() => choice.ask(option.interested)}
           >
-            {choice.button}
+            {option.button}
           </FocusReturnButton>
         ))}
       </div>

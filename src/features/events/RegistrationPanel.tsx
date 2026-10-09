@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useId, useState } from 'react'
+import { useId } from 'react'
 import { isBug } from '../../shared/api/http.ts'
 import { READ_OPTIONS } from '../../shared/api/readOptions.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
@@ -9,6 +9,7 @@ import { ConfirmStep } from '../../shared/ui/ConfirmStep.tsx'
 import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
+import { useConfirmStep } from '../../shared/ui/useConfirmStep.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
 import { useShownNotice } from '../../shared/ui/useShownNotice.ts'
 import { LOGIN_URL } from '../auth/loginUrl.ts'
@@ -145,30 +146,24 @@ interface RegisteredProps {
 
 /** Quem está inscrito pode cancelar, depois de confirmar: num evento lotado, a vaga pode não voltar. */
 function Registered({ registration, isCancelling, onCancel }: RegisteredProps) {
-  const [isConfirming, setIsConfirming] = useState(false)
-  const [wasKept, setWasKept] = useState(false)
-
-  function keep() {
-    setWasKept(true)
-    setIsConfirming(false)
-  }
+  const cancellation = useConfirmStep<'cancel'>()
 
   return (
     <>
       <p className="text-fg">{`Você está na lista desde ${formatDay(registration.registeredAt)}.`}</p>
-      {isConfirming || isCancelling ? (
+      {cancellation.confirming !== null || isCancelling ? (
         <ConfirmStep
           confirmLabel="Sim, cancelar"
           pendingLabel="Cancelando…"
           backLabel="Manter inscrição"
           isPending={isCancelling}
           onConfirm={onCancel}
-          onBack={keep}
+          onBack={cancellation.back}
         >
           <p className="text-fg">Cancelar sua inscrição? Se o evento lotar, pode não haver vaga para voltar.</p>
         </ConfirmStep>
       ) : (
-        <FocusReturnButton hasFocus={wasKept} onClick={() => setIsConfirming(true)}>
+        <FocusReturnButton hasFocus={cancellation.returnsFocusTo('cancel')} onClick={() => cancellation.ask('cancel')}>
           Cancelar inscrição
         </FocusReturnButton>
       )}

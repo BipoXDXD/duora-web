@@ -3,6 +3,7 @@ import { useId, useRef, useState, type FormEvent } from 'react'
 import { isBug } from '../../shared/api/http.ts'
 import { READ_OPTIONS } from '../../shared/api/readOptions.ts'
 import { formatTime } from '../../shared/text/dateFormat.ts'
+import { ConfirmStep } from '../../shared/ui/ConfirmStep.tsx'
 import { FormField } from '../../shared/ui/FormField.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { FIELD_CONTROL, PRIMARY_BUTTON } from '../../shared/ui/styles.ts'
@@ -15,7 +16,6 @@ import { noticeOfRound, type AdminNotice } from './adminNotices.ts'
 import { AdminNoticeMessage } from './AdminNoticeMessage.tsx'
 import { ADMIN_KEYS } from './adminQueries.ts'
 import { roundCountsText } from './adminText.ts'
-import { ConfirmAction } from './ConfirmAction.tsx'
 
 interface AdminRoundsPanelProps {
   readonly event: AdminEvent
@@ -216,8 +216,7 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
           </button>
         </form>
       ) : (
-        <ConfirmAction
-          question={confirmQuestion(confirming, event.registrationCount)}
+        <ConfirmStep
           confirmLabel={`Sim, iniciar a rodada ${confirming}`}
           pendingLabel="Iniciando…"
           isPending={mutation.isPending}
@@ -226,7 +225,9 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
             setReturnedFromConfirm(true)
             setConfirming(null)
           }}
-        />
+        >
+          <p className="text-fg">{confirmQuestion(confirming, event.registrationCount)}</p>
+        </ConfirmStep>
       )}
     </>
   )

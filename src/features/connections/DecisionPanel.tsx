@@ -5,6 +5,7 @@ import { READ_OPTIONS } from '../../shared/api/readOptions.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { PATHS } from '../../shared/routing/routes.ts'
 import { formatDay } from '../../shared/text/dateFormat.ts'
+import { ConfirmStep } from '../../shared/ui/ConfirmStep.tsx'
 import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
@@ -151,13 +152,17 @@ function Choice({ isSaving, hasNextStep, onConfirm }: ChoiceProps) {
 
   if (step.kind === 'confirming') {
     return (
-      <ConfirmChoice
-        interested={step.interested}
-        isSaving={isSaving}
-        hasNextStep={hasNextStep}
+      <ConfirmStep
+        confirmLabel="Confirmar minha decisão"
+        pendingLabel="Registrando…"
+        isPending={isSaving}
+        confirmClassName={hasNextStep ? SECONDARY_BUTTON : PRIMARY_BUTTON}
         onConfirm={() => onConfirm(step.interested)}
         onBack={() => setStep({ kind: 'choosing', focusOn: step.interested })}
-      />
+      >
+        <p className="font-semibold text-fg">{`Você escolheu: ${chosenText(step.interested)}.`}</p>
+        <p className="text-fg">A decisão é final: depois de confirmar, não dá para mudar. Ela continua só sua.</p>
+      </ConfirmStep>
     )
   }
   return (
@@ -178,38 +183,6 @@ function Choice({ isSaving, hasNextStep, onConfirm }: ChoiceProps) {
         ))}
       </div>
     </>
-  )
-}
-
-interface ConfirmChoiceProps {
-  readonly interested: boolean
-  readonly isSaving: boolean
-  readonly hasNextStep: boolean
-  readonly onConfirm: () => void
-  readonly onBack: () => void
-}
-
-function ConfirmChoice({ interested, isSaving, hasNextStep, onConfirm, onBack }: ConfirmChoiceProps) {
-  const confirmRef = useFocusOnMount<HTMLButtonElement>()
-  return (
-    <div className="flex flex-col items-start gap-3">
-      <p className="font-semibold text-fg">{`Você escolheu: ${chosenText(interested)}.`}</p>
-      <p className="text-fg">A decisão é final: depois de confirmar, não dá para mudar. Ela continua só sua.</p>
-      <div className="flex flex-wrap gap-4">
-        <button
-          ref={confirmRef}
-          type="button"
-          onClick={onConfirm}
-          disabled={isSaving}
-          className={hasNextStep ? SECONDARY_BUTTON : PRIMARY_BUTTON}
-        >
-          {isSaving ? 'Registrando…' : 'Confirmar minha decisão'}
-        </button>
-        <button type="button" onClick={onBack} disabled={isSaving} className={SECONDARY_BUTTON}>
-          Voltar
-        </button>
-      </div>
-    </div>
   )
 }
 

@@ -6,11 +6,12 @@ import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { PATHS } from '../../shared/routing/routes.ts'
 import { accountCode } from '../../shared/text/accountCode.ts'
 import { formatDay } from '../../shared/text/dateFormat.ts'
+import { ConfirmStep } from '../../shared/ui/ConfirmStep.tsx'
 import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { LoadMore } from '../../shared/ui/LoadMore.tsx'
 import { PageFrame } from '../../shared/ui/PageFrame.tsx'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
+import { TEXT_LINK } from '../../shared/ui/styles.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
 import { RequireSession } from '../auth/RequireSession.tsx'
 import { fetchBlockedPage, unblockAccount, type BlockedAccount, type BlockedPage } from './blockedAccounts.ts'
@@ -142,11 +143,16 @@ function BlockedAccountItem({ account, onUnblocked }: BlockedAccountItemProps) {
         <p className="text-sm text-fg-muted">{`Bloqueada em ${formatDay(new Date(account.blockedAt))}`}</p>
       </div>
       {isConfirming ? (
-        <ConfirmUnblock
-          isUnblocking={state === 'unblocking'}
+        <ConfirmStep
+          confirmLabel="Sim, desbloquear"
+          pendingLabel="Desbloqueando…"
+          backLabel="Cancelar"
+          isPending={state === 'unblocking'}
           onConfirm={() => void unblock()}
-          onCancel={cancel}
-        />
+          onBack={cancel}
+        >
+          <p className="text-fg">Desbloquear esta conta? Ela volta a poder encontrar você e falar com você no Duora.</p>
+        </ConfirmStep>
       ) : (
         <div className="flex flex-col items-start gap-2">
           {state === 'failed' && (
@@ -161,28 +167,5 @@ function BlockedAccountItem({ account, onUnblocked }: BlockedAccountItemProps) {
         </div>
       )}
     </li>
-  )
-}
-
-interface ConfirmUnblockProps {
-  readonly isUnblocking: boolean
-  readonly onConfirm: () => void
-  readonly onCancel: () => void
-}
-
-function ConfirmUnblock({ isUnblocking, onConfirm, onCancel }: ConfirmUnblockProps) {
-  const confirmRef = useFocusOnMount<HTMLButtonElement>()
-  return (
-    <div className="flex flex-col items-start gap-3">
-      <p className="text-fg">Desbloquear esta conta? Ela volta a poder encontrar você e falar com você no Duora.</p>
-      <div className="flex flex-wrap gap-4">
-        <button ref={confirmRef} type="button" onClick={onConfirm} disabled={isUnblocking} className={PRIMARY_BUTTON}>
-          {isUnblocking ? 'Desbloqueando…' : 'Sim, desbloquear'}
-        </button>
-        <button type="button" onClick={onCancel} disabled={isUnblocking} className={SECONDARY_BUTTON}>
-          Cancelar
-        </button>
-      </div>
-    </div>
   )
 }

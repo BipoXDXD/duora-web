@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useId, useState } from 'react'
 import { isBug } from '../../shared/api/http.ts'
+import { ConfirmStep } from '../../shared/ui/ConfirmStep.tsx'
 import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
 import { PRIMARY_BUTTON } from '../../shared/ui/styles.ts'
 import { EVENT_KEYS } from '../events/eventQueries.ts'
@@ -8,7 +9,6 @@ import { cancelEvent, canCancelAt, publishEvent, type AdminEvent, type EventActi
 import { noticeOfChange, type AdminNotice, type EventChange } from './adminNotices.ts'
 import { AdminNoticeMessage } from './AdminNoticeMessage.tsx'
 import { ADMIN_KEYS } from './adminQueries.ts'
-import { ConfirmAction } from './ConfirmAction.tsx'
 
 interface AdminEventActionsProps {
   readonly event: AdminEvent
@@ -82,8 +82,7 @@ export function AdminEventActions({ event, now }: AdminEventActionsProps) {
       </h2>
       {shown !== null && <AdminNoticeMessage key={shown.id} notice={shown.notice} />}
       {confirming !== null ? (
-        <ConfirmAction
-          question={CONFIRMATION[confirming].question}
+        <ConfirmStep
           confirmLabel={CONFIRMATION[confirming].confirm}
           pendingLabel={CONFIRMATION[confirming].pending}
           isPending={mutation.isPending}
@@ -92,7 +91,9 @@ export function AdminEventActions({ event, now }: AdminEventActionsProps) {
             setReturnFocusTo(confirming)
             setConfirming(null)
           }}
-        />
+        >
+          <p className="text-fg">{CONFIRMATION[confirming].question}</p>
+        </ConfirmStep>
       ) : (
         <div className="flex flex-wrap gap-4">
           {canPublish && (

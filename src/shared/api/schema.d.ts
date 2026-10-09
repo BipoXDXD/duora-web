@@ -284,6 +284,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/events/{eventId}/rounds/{number}/chat/messages/{seq}:report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Denuncia uma mensagem do par da rodada
+         * @description Cria uma denúncia contra o par, com uma cópia da mensagem guardada para a moderação: a cópia continua depois que o chat é apagado, 24 h após o fim do evento. Vale com o chat fechado e depois de bloquear o par. Só a mensagem do outro pode ser denunciada. A cota é a mesma de fileReport: 10 denúncias por dia, somando as duas rotas. Denunciar não bloqueia: para isso, chame blockAccount.
+         */
+        post: operations["reportRoundChatMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events/{eventId}/rounds/{number}/decision": {
         parameters: {
             query?: never;
@@ -647,6 +667,32 @@ export interface components {
             /** @description O texto como foi gravado; mostre como texto comum, nunca como HTML ou link */
             text: string;
         };
+        ChatMessageReport: {
+            /**
+             * Format: date-time
+             * @description Quando a denúncia foi feita
+             */
+            createdAt: string;
+            /** @description O relato, ou null se não houve */
+            description: string | null;
+            /**
+             * Format: uuid
+             * @description Id da denúncia
+             */
+            id: string;
+            /** @enum {string} */
+            reason: "HARASSMENT" | "HATE_SPEECH" | "SEXUAL_CONTENT" | "VIOLENCE_OR_THREAT" | "SCAM_OR_SPAM" | "FAKE_PROFILE" | "SUSPECTED_MINOR" | "OTHER";
+            /**
+             * Format: uuid
+             * @description Id da conta denunciada: o par da rodada
+             */
+            reportedAccountId: string;
+            /**
+             * @description Estado na moderação
+             * @enum {string}
+             */
+            status: "OPEN";
+        };
         ChatMessages: {
             /** @description Mensagens depois de afterSeq, em ordem crescente de posição */
             items: components["schemas"]["ChatMessage"][];
@@ -937,6 +983,15 @@ export interface components {
              * @description Quando a inscrição foi feita; não muda nas repetições do PUT
              */
             registeredAt: string;
+        };
+        ReportChatMessageRequest: {
+            /** @description Relato livre em parágrafos, sem caracteres invisíveis; obrigatório com o motivo OTHER. Vazio ou só com espaços conta como ausente. */
+            description?: string | null;
+            /**
+             * @description Motivo, da mesma lista de fileReport
+             * @enum {string}
+             */
+            reason: "HARASSMENT" | "HATE_SPEECH" | "SEXUAL_CONTENT" | "VIOLENCE_OR_THREAT" | "SCAM_OR_SPAM" | "FAKE_PROFILE" | "SUSPECTED_MINOR" | "OTHER";
         };
         ReportResponse: {
             /**
@@ -2453,6 +2508,124 @@ export interface operations {
             /** @description Erro inesperado */
             500: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    reportRoundChatMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Id do evento */
+                eventId: string;
+                /** @description Número da rodada no evento, a partir de 1 */
+                number: number;
+                /** @description A posição da mensagem do par no chat */
+                seq: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportChatMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description A denúncia criada */
+            201: {
+                headers: {
+                    /** @description Endereço da denúncia criada */
+                    Location: string;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageReport"];
+                };
+            };
+            /** @description Id que não é UUID, ou número fora de 1 a 100, posição fora de 1 a 300, mensagem enviada por quem chama, motivo OTHER sem descrição, descrição inválida, JSON malformado ou campo desconhecido */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ValidationProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sessão web sem o token CSRF no header X-XSRF-TOKEN */
+            403: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Não há mensagem nessa posição, ou quem chama não formou par nessa rodada */
+            404: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Corpo em outro formato que não application/json */
+            415: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Cota diária de denúncias desta conta esgotada; nada foi gravado */
+            429: {
+                headers: {
+                    /** @description Segundos até a próxima denúncia ficar disponível */
+                    "Retry-After": number;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Cota indisponível; a denúncia é recusada */
+            503: {
+                headers: {
+                    /** @description Segundos até tentar de novo */
+                    "Retry-After": number;
                     "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };

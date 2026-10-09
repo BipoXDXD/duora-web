@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type FormEvent, type RefObject } from 'react'
+import { useId, useReducer, useRef, type FormEvent, type RefObject } from 'react'
 import { FIELD_CONTROL, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
 import { LOGIN_URL } from '../auth/loginUrl.ts'
@@ -14,6 +14,7 @@ import {
   type ReasonProblem,
   type ReportProblems,
 } from './reportForm.ts'
+import { INITIAL_REPORT_FORM, reportFormReducer, type Refusal } from './reportFormState.ts'
 import type { MessageReports, ReportTarget } from './useMessageReports.ts'
 import { useRethrowInRender } from './useRoundChat.ts'
 interface ReasonText {
@@ -47,13 +48,6 @@ const DESCRIPTION_PROBLEM_TEXT: Readonly<Record<DescriptionProblem, string>> = {
   rejected: 'A descrição não foi aceita. Revise o texto e envie de novo.',
 }
 
-/** A recusa da denúncia inteira, fora dos campos. */
-type Refusal =
-  | { readonly kind: 'rejected' | 'notFound' | 'unavailable' | 'signedOut' | 'failed' }
-  | { readonly kind: 'quotaExhausted'; readonly retryAfterSeconds: number | null }
-
-const NO_PROBLEMS: ReportProblems = { reason: null, description: null }
-
 interface ReportFormProps {
   readonly eventId: string
   readonly roundNumber: number
@@ -66,12 +60,10 @@ interface ReportFormProps {
  * feita e a confirmação diz isso. Erro de campo vai para o campo, com o foco nele; o resto é alerta.
  */
 export function ReportForm({ eventId, roundNumber, target, reports }: ReportFormProps) {
-  const [reason, setReason] = useState<ReportReason | null>(null)
-  const [description, setDescription] = useState('')
-  const [alsoBlock, setAlsoBlock] = useState(false)
-  const [problems, setProblems] = useState<ReportProblems>(NO_PROBLEMS)
-  const [refusal, setRefusal] = useState<Refusal | null>(null)
-  const [isSending, setSending] = useState(false)
+  const [{ reason, description, alsoBlock, problems, refusal, isSending }, dispatch] = useReducer(
+    reportFormReducer,
+    INITIAL_REPORT_FORM,
+  )
   const headingRef = useFocusOnMount<HTMLHeadingElement>()
   const firstReasonRef = useRef<HTMLInputElement>(null)
   const descriptionRef = useRef<HTMLTextAreaElement>(null)
@@ -79,7 +71,7 @@ export function ReportForm({ eventId, roundNumber, target, reports }: ReportForm
   const id = useId()
 
   function showProblems(found: ReportProblems) {
-    setProblems(found)
+    dispatch({ type: 'fieldsRefused', problems: found })
     if (found.reason !== null) {
       firstReasonRef.current?.focus()
     } else if (found.description !== null) {
@@ -89,30 +81,27 @@ export function ReportForm({ eventId, roundNumber, target, reports }: ReportForm
 
   async function submit() {
     const parsed = parseReportDraft({ reason, description })
-    setRefusal(null)
     if (parsed.kind === 'invalid') {
       showProblems(parsed.problems)
       return
     }
-    setProblems(NO_PROBLEMS)
-    setSending(true)
+    dispatch({ type: 'sendStarted' })
     const result = await reportMessage(eventId, roundNumber, target.seq, parsed.body)
     if (result.kind === 'reported') {
       const block = alsoBlock ? await blockReported(result.reportedAccountId) : 'notRequested'
       reports.finish(target.seq, { reportedAccountId: result.reportedAccountId, block })
       return
     }
-    setSending(false)
     if (result.kind === 'invalid') {
       const fieldProblems = problemsFromApi(result.fieldErrors)
       if (fieldProblems === null) {
-        setRefusal({ kind: 'rejected' })
+        dispatch({ type: 'reportRefused', refusal: { kind: 'rejected' } })
       } else {
         showProblems(fieldProblems)
       }
       return
     }
-    setRefusal(result)
+    dispatch({ type: 'reportRefused', refusal: result })
   }
 
   function onSubmit(event: FormEvent) {
@@ -140,20 +129,14 @@ export function ReportForm({ eventId, roundNumber, target, reports }: ReportForm
           reason={reason}
           problem={problems.reason}
           firstReasonRef={firstReasonRef}
-          onChange={(next) => {
-            setReason(next)
-            setProblems(NO_PROBLEMS)
-          }}
+          onChange={(next) => dispatch({ type: 'reasonChosen', reason: next })}
         />
         <DescriptionField
           fieldRef={descriptionRef}
           value={description}
           isRequired={reason === 'OTHER'}
           problem={problems.description}
-          onChange={(next) => {
-            setDescription(next)
-            setProblems((current) => ({ ...current, description: null }))
-          }}
+          onChange={(next) => dispatch({ type: 'descriptionTyped', description: next })}
         />
         <Choice
           type="checkbox"
@@ -161,7 +144,7 @@ export function ReportForm({ eventId, roundNumber, target, reports }: ReportForm
           label="Também bloquear esta pessoa"
           hint="Vocês não poderão mais conversar. Para desfazer, use Contas bloqueadas, no seu perfil."
           checked={alsoBlock}
-          onChange={() => setAlsoBlock((current) => !current)}
+          onChange={() => dispatch({ type: 'blockToggled' })}
         />
         {refusal !== null && <RefusalAlert refusal={refusal} />}
         <div className="flex flex-wrap gap-4">

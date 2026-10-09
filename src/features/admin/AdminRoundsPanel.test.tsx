@@ -1,22 +1,21 @@
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { screen, waitFor } from '@testing-library/react'
+import type userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { App } from '../../app/App.tsx'
 import { adminRound, ADMIN_PUBLISHED, AFTER_DINNER, BEFORE_DINNER, DURING_DINNER } from '../../test/adminFixtures.ts'
 import { DINNER, SESSION } from '../../test/eventFixtures.ts'
 import {
+  busyAnswer,
   byMethod,
   callsTo,
-  type FakeRoute,
   inSequence,
   jsonAnswer,
   neverAnswer,
   problemAnswer,
   refusalAnswer,
-  stubApi,
+  type FakeRoute,
 } from '../../test/fakeApi.ts'
-import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
+import { renderAppAt } from '../../test/renderApp.tsx'
 
 const ADMIN_EVENT = `/api/admin/events/${ADMIN_PUBLISHED.id}`
 const PUBLIC_EVENT = `/api/events/${DINNER.id}`
@@ -25,10 +24,6 @@ const ROUNDS = `${ADMIN_EVENT}/rounds`
 /** O evento público com a última rodada iniciada (`null` antes da primeira). */
 function inRound(currentRound: number | null): FakeRoute {
   return jsonAnswer({ ...DINNER, currentRound })
-}
-
-function busyAnswer(status: number, retryAfter = '30'): FakeRoute {
-  return () => Promise.resolve(new Response(null, { status, headers: { 'Retry-After': retryAfter } }))
 }
 
 beforeEach(() => {
@@ -43,11 +38,7 @@ afterEach(() => {
 })
 
 function renderRounds(routes: Readonly<Record<string, FakeRoute>>, event: object = ADMIN_PUBLISHED) {
-  stubMatchMedia(false)
-  window.history.replaceState(null, '', `/admin/eventos/${ADMIN_PUBLISHED.id}`)
-  const fetchMock = stubApi({ ...SESSION, [ADMIN_EVENT]: jsonAnswer(event), ...routes })
-  render(<App />)
-  return { fetchMock, user: userEvent.setup() }
+  return renderAppAt(`/admin/eventos/${ADMIN_PUBLISHED.id}`, { ...SESSION, [ADMIN_EVENT]: jsonAnswer(event), ...routes })
 }
 
 async function askToStart(user: ReturnType<typeof userEvent.setup>) {
@@ -305,7 +296,7 @@ describe('rounds of the admin event page', () => {
     })
 
     it('tells the limit of rounds per hour and when to try again on a 429', async () => {
-      await startRefusedBy(busyAnswer(429, '120'))
+      await startRefusedBy(busyAnswer(429, 120))
 
       expect(await screen.findByRole('alert')).toHaveTextContent(
         'Você atingiu o limite de rodadas por hora. Tente de novo em 120 segundos.',
@@ -313,7 +304,7 @@ describe('rounds of the admin event page', () => {
     })
 
     it('tells that nothing was saved and when to try again on a 503', async () => {
-      await startRefusedBy(busyAnswer(503, '1'))
+      await startRefusedBy(busyAnswer(503, 1))
 
       const alert = await screen.findByRole('alert')
       expect(alert).toHaveTextContent('Nada foi gravado. Tente de novo em 1 segundo.')

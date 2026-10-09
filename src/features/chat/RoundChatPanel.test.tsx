@@ -5,7 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { wait } from '../../test/fakeTimers.ts'
 import { setVisibility, startHidden, stubVisibility } from '../../test/fakeVisibility.ts'
 import { LOGIN_URL } from '../auth/loginUrl.ts'
+import { message } from '../../test/chatFixtures.ts'
 import {
+  busyAnswer,
   byMethod,
   inSequence,
   jsonAnswer,
@@ -32,19 +34,11 @@ function after(seq: number): string {
   return `${MESSAGES}?afterSeq=${seq}&maxPageSize=100`
 }
 
-function message(seq: number, text: string, fromMe = false) {
-  return { seq, fromMe, text, sentAt: '2026-10-10T23:05:00Z' }
-}
-
 function page(items: readonly ReturnType<typeof message>[], nextAfterSeq: number | null = null): FakeRoute {
   return jsonAnswer({ items, nextAfterSeq })
 }
 
 const EMPTY = page([])
-
-function busy(status: number, seconds: number): FakeRoute {
-  return () => Promise.resolve(new Response(null, { status, headers: { 'Retry-After': String(seconds) } }))
-}
 
 /** Uma resposta que o teste solta quando quiser, para ver a tela no meio do envio. */
 function held() {
@@ -388,7 +382,7 @@ describe('RoundChatPanel', () => {
     })
 
     it.each([429, 503])('waits the Retry-After of a %i', async (status) => {
-      const { fetchMock } = renderChat({ [CHAT]: OPEN, [after(0)]: inSequence(EMPTY, busy(status, 10), EMPTY) })
+      const { fetchMock } = renderChat({ [CHAT]: OPEN, [after(0)]: inSequence(EMPTY, busyAnswer(status, 10), EMPTY) })
       await screen.findByText('Nenhuma mensagem ainda.')
       await wait(2000)
 
@@ -601,7 +595,7 @@ describe('RoundChatPanel', () => {
     })
 
     it.each([429, 503])('says when to try again after a %i, and resends with the same key', async (status) => {
-      const { fetchMock, user } = chatWithSend(inSequence(busy(status, 7), jsonAnswer(message(2, 'Oi?', true), 201)))
+      const { fetchMock, user } = chatWithSend(inSequence(busyAnswer(status, 7), jsonAnswer(message(2, 'Oi?', true), 201)))
       await screen.findByText('Oi!')
       await user.type(field(), 'Oi?{Enter}')
 

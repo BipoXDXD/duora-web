@@ -62,6 +62,16 @@ export function statusAnswer(status: number): FakeRoute {
   return () => Promise.resolve(new Response(null, { status }))
 }
 
+/**
+ * "Ocupado" (429 ou 503) com o `Retry-After` em segundos, ou sem o cabeçalho quando `retryAfterSeconds` não vem.
+ * O corpo é vazio: a tela só olha o status e o cabeçalho.
+ */
+export function busyAnswer(status: number, retryAfterSeconds?: number): FakeRoute {
+  const headers: Record<string, string> =
+    retryAfterSeconds === undefined ? {} : { 'Retry-After': String(retryAfterSeconds) }
+  return () => Promise.resolve(new Response(null, { status, headers }))
+}
+
 export function networkFailure(): FakeRoute {
   return () => Promise.reject(new TypeError('Failed to fetch'))
 }

@@ -2,7 +2,9 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LOGIN_URL } from '../auth/loginUrl.ts'
+import { message } from '../../test/chatFixtures.ts'
 import {
+  busyAnswer,
   byMethod,
   inSequence,
   jsonAnswer,
@@ -51,18 +53,10 @@ const REASON_LABELS = [
   'Outro motivo',
 ]
 
-function message(seq: number, text: string, fromMe = false) {
-  return { seq, fromMe, text, sentAt: '2026-10-10T23:05:00Z' }
-}
-
 const THREE_MESSAGES = jsonAnswer({
   items: [message(1, 'Oi! Me passa seu endereço?'), message(2, 'Prefiro não.', true), message(3, 'Por quê?')],
   nextAfterSeq: null,
 })
-
-function retryAfter(status: number, seconds: number): FakeRoute {
-  return () => Promise.resolve(new Response(null, { status, headers: { 'Retry-After': String(seconds) } }))
-}
 
 beforeEach(() => {
   vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
@@ -449,11 +443,11 @@ describe('reporting a chat message', () => {
       ],
       [
         '429, with the time of the Retry-After',
-        retryAfter(429, 7200),
+        busyAnswer(429, 7200),
         'Você atingiu o limite de denúncias de hoje. Você poderá denunciar de novo em 2 horas.',
       ],
       ['429 without Retry-After', statusAnswer(429), 'Você atingiu o limite de denúncias de hoje. Você poderá denunciar de novo mais tarde.'],
-      ['503', retryAfter(503, 1), 'As denúncias estão indisponíveis agora. Tente de novo em instantes.'],
+      ['503', busyAnswer(503, 1), 'As denúncias estão indisponíveis agora. Tente de novo em instantes.'],
       ['a network failure', networkFailure(), 'Não foi possível enviar a denúncia. Tente de novo.'],
       ['500', problemAnswer(500), 'Não foi possível enviar a denúncia. Tente de novo.'],
     ])('announces %s as an alert and keeps the form', async (_case, answer, text) => {

@@ -1,17 +1,14 @@
-import { render, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { App } from '../../app/App.tsx'
 import { pageOf, SESSION } from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
   inSequence,
   neverAnswer,
   problemAnswer,
-  stubApi,
   type FakeRoute,
 } from '../../test/fakeApi.ts'
-import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
+import { renderAppAt } from '../../test/renderApp.tsx'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
 const LIST = '/api/me/connections'
@@ -24,11 +21,7 @@ afterEach(() => {
 })
 
 function renderConnectionsPage(routes: Readonly<Record<string, FakeRoute>>, session = SESSION) {
-  stubMatchMedia(false)
-  window.history.replaceState(null, '', '/conexoes')
-  const fetchMock = stubApi({ ...session, ...routes })
-  render(<App />)
-  return { fetchMock, user: userEvent.setup() }
+  return renderAppAt('/conexoes', { ...session, ...routes })
 }
 
 describe('connections page', () => {

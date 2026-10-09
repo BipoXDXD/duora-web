@@ -1,7 +1,5 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { App } from '../../app/App.tsx'
 import {
   ADMIN_CANCELLED,
   ADMIN_DRAFT,
@@ -19,9 +17,8 @@ import {
   neverAnswer,
   problemAnswer,
   refusalAnswer,
-  stubApi,
 } from '../../test/fakeApi.ts'
-import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
+import { renderAppAt } from '../../test/renderApp.tsx'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
 const EVENT = `/api/admin/events/${ADMIN_DRAFT.id}`
@@ -40,11 +37,7 @@ afterEach(() => {
 })
 
 function renderAdminEvent(routes: Readonly<Record<string, FakeRoute>>, session = SESSION) {
-  stubMatchMedia(false)
-  window.history.replaceState(null, '', `/admin/eventos/${ADMIN_DRAFT.id}`)
-  const fetchMock = stubApi({ ...session, ...routes })
-  render(<App />)
-  return { fetchMock, user: userEvent.setup() }
+  return renderAppAt(`/admin/eventos/${ADMIN_DRAFT.id}`, { ...session, ...routes })
 }
 
 function titleOf(name: string) {

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../app/App.tsx'
 import { DINNER, emptyChatRoutes, SESSION } from '../../test/eventFixtures.ts'
 import {
+  busyAnswer,
   byMethod,
   inSequence,
   jsonAnswer,
@@ -33,13 +34,6 @@ const NOT_DECIDED = problemAnswer(404)
 
 function decisionAnswer(interested: boolean, status = 200, extra: object = {}): FakeRoute {
   return jsonAnswer({ eventId: DINNER.id, roundNumber: 1, interested, decidedAt: DECIDED_AT, ...extra }, status)
-}
-
-function waitAnswer(status: number, retryAfter?: string): FakeRoute {
-  return () =>
-    Promise.resolve(
-      new Response(null, { status, headers: retryAfter === undefined ? {} : { 'Retry-After': retryAfter } }),
-    )
 }
 
 beforeEach(() => {
@@ -256,12 +250,12 @@ describe('private decision after a round', () => {
     })
 
     it.each([
-      [503, '3', 'Não foi possível registrar agora. Tente de novo em 3 segundos.'],
-      [429, '1', 'Não foi possível registrar agora. Tente de novo em 1 segundo.'],
+      [503, 3, 'Não foi possível registrar agora. Tente de novo em 3 segundos.'],
+      [429, 1, 'Não foi possível registrar agora. Tente de novo em 1 segundo.'],
       [503, undefined, 'Não foi possível registrar agora. Tente de novo em instantes.'],
     ])('on %i with Retry-After %s asks to wait, keeping the confirmation to try again', async (status, retry, text) => {
       const { fetchMock, user } = await openRound(
-        byMethod({ GET: NOT_DECIDED, PUT: inSequence(waitAnswer(status, retry), decisionAnswer(false, 201)) }),
+        byMethod({ GET: NOT_DECIDED, PUT: inSequence(busyAnswer(status, retry), decisionAnswer(false, 201)) }),
       )
 
       await chooseAndConfirm(user, 'Não quero')

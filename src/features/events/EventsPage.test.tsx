@@ -1,7 +1,5 @@
-import { render, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { App } from '../../app/App.tsx'
 import { BEFORE_EVENTS, DINNER, pageOf, PICNIC, SESSION, WINE } from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
@@ -9,10 +7,9 @@ import {
   networkFailure,
   neverAnswer,
   problemAnswer,
-  stubApi,
   type FakeRoute,
 } from '../../test/fakeApi.ts'
-import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
+import { renderAppAt } from '../../test/renderApp.tsx'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
 const LIST = '/api/events'
@@ -28,11 +25,7 @@ afterEach(() => {
 })
 
 function renderEventsPage(routes: Readonly<Record<string, FakeRoute>>, session = SESSION) {
-  stubMatchMedia(true)
-  window.history.replaceState(null, '', '/eventos')
-  const fetchMock = stubApi({ ...session, ...routes })
-  render(<App />)
-  return { fetchMock, user: userEvent.setup() }
+  return renderAppAt('/eventos', { ...session, ...routes }, { isDesktop: true })
 }
 
 describe('events page', () => {

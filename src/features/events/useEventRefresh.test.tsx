@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { READ_OPTIONS } from '../../shared/api/readOptions.ts'
 import { DINNER } from '../../test/eventFixtures.ts'
-import { jsonAnswer, inSequence, networkFailure, problemAnswer, stubApi, type FakeRoute } from '../../test/fakeApi.ts'
+import { busyAnswer, inSequence, jsonAnswer, networkFailure, problemAnswer, stubApi, type FakeRoute } from '../../test/fakeApi.ts'
 import { wait } from '../../test/fakeTimers.ts'
 import { setVisibility, stubVisibility } from '../../test/fakeVisibility.ts'
 import { EVENT_KEYS } from './eventQueries.ts'
@@ -15,10 +15,6 @@ const EVENT = `/api/events/${DINNER.id}`
 
 /** O meio do espalhamento: a releitura sai em 15 s, 30 s depois de uma falha, 60 s depois de duas. */
 const MIDDLE = 0.5
-
-function busy(seconds: number): FakeRoute {
-  return () => Promise.resolve(new Response(null, { status: 503, headers: { 'Retry-After': String(seconds) } }))
-}
 
 function renderRefresh(route: FakeRoute, isActive = true) {
   const fetchMock = stubApi({ [EVENT]: route })
@@ -203,7 +199,7 @@ describe('useEventRefresh', () => {
   })
 
   it('waits at least the Retry-After of a 503 when it is longer than the backoff', async () => {
-    const { reads } = renderRefresh(inSequence(jsonAnswer(DINNER), busy(90)))
+    const { reads } = renderRefresh(inSequence(jsonAnswer(DINNER), busyAnswer(503, 90)))
     await wait(0)
     await wait(15_000)
     expect(reads()).toBe(2)

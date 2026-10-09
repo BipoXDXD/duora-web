@@ -1,23 +1,22 @@
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { App } from '../../app/App.tsx'
 import { BEFORE_EVENTS, DINNER, emptyChatRoutes, SESSION } from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
+  busyAnswer,
   byMethod,
   callsTo,
-  type FakeRoute,
   inSequence,
   jsonAnswer,
   neverAnswer,
   problemAnswer,
   refusalAnswer,
   statusAnswer,
-  stubApi,
+  type FakeRoute,
+  type stubApi,
 } from '../../test/fakeApi.ts'
 import { expectPrimaryAction, expectSecondaryAction } from '../../test/buttonHierarchy.ts'
-import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
+import { renderAppAt } from '../../test/renderApp.tsx'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
 const EVENT = `/api/events/${DINNER.id}`
@@ -25,11 +24,8 @@ const REGISTRATION = `${EVENT}/registration`
 const REGISTERED = jsonAnswer({ eventId: DINNER.id, registeredAt: '2026-10-05T12:00:00Z' })
 const NOT_REGISTERED = problemAnswer(404)
 
-function busyAnswer(status: number): FakeRoute {
-  return () => Promise.resolve(new Response(null, { status, headers: { 'Retry-After': '3' } }))
-}
-
-const BUSY = busyAnswer(503)
+const RETRY_AFTER_SECONDS = 3
+const BUSY = busyAnswer(503, RETRY_AFTER_SECONDS)
 
 function pairingAnswer(roundNumber: number, partnerAccountId: string | null): FakeRoute {
   return jsonAnswer({ eventId: DINNER.id, roundNumber, partnerAccountId })
@@ -60,11 +56,7 @@ afterEach(() => {
 })
 
 function renderEventPage(routes: Readonly<Record<string, FakeRoute>>, session = SESSION) {
-  stubMatchMedia(false)
-  window.history.replaceState(null, '', `/eventos/${DINNER.id}`)
-  const fetchMock = stubApi({ ...session, ...routes })
-  render(<App />)
-  return { fetchMock, user: userEvent.setup() }
+  return renderAppAt(`/eventos/${DINNER.id}`, { ...session, ...routes })
 }
 
 describe('event page', () => {
@@ -296,7 +288,7 @@ describe('event page', () => {
     it.each([503, 429])('asks to wait the seconds of Retry-After on a %s', async (status) => {
       const { user } = renderEventPage({
         [EVENT]: jsonAnswer(DINNER),
-        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: busyAnswer(status) }),
+        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: busyAnswer(status, RETRY_AFTER_SECONDS) }),
       })
 
       await user.click(await screen.findByRole('button', { name: 'Quero me inscrever' }))
@@ -410,7 +402,7 @@ describe('event page', () => {
     it.each([503, 429])('keeps the registration and asks to wait on a %s of the cancel', async (status) => {
       const { user } = renderEventPage({
         [EVENT]: jsonAnswer(DINNER),
-        [REGISTRATION]: byMethod({ GET: REGISTERED, DELETE: busyAnswer(status) }),
+        [REGISTRATION]: byMethod({ GET: REGISTERED, DELETE: busyAnswer(status, RETRY_AFTER_SECONDS) }),
       })
 
       await user.click(await screen.findByRole('button', { name: 'Cancelar inscrição' }))

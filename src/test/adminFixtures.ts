@@ -1,8 +1,10 @@
+import { DINNER_BLURB } from './eventFixtures.ts'
+
 /** Eventos como o GET /api/admin/events/{id} os manda, para os testes das telas da equipe. */
 export const ADMIN_DRAFT = {
   id: '0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7b',
   title: 'Jantar às cegas',
-  description: 'Uma noite de jogos de mesa.\nTraga sua curiosidade.',
+  description: `${DINNER_BLURB}\nTraga sua curiosidade.`,
   startsAt: '2026-10-10T22:00:00Z',
   endsAt: '2026-10-11T01:00:00Z',
   status: 'DRAFT',

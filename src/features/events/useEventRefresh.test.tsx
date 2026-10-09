@@ -169,7 +169,7 @@ describe('useEventRefresh', () => {
 
     await wait(15_000)
     expect(reads()).toBe(2)
-    expect(result.current.data?.title).toBe('Jantar às cegas')
+    expect(result.current.data?.title).toBe(DINNER.title)
 
     await wait(29_999)
     expect(reads()).toBe(2)

@@ -1,6 +1,13 @@
 import { screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { BEFORE_EVENTS, DINNER, emptyChatRoutes, SESSION } from '../../test/eventFixtures.ts'
+import {
+  BEFORE_EVENTS,
+  DINNER,
+  DINNER_BLURB,
+  DINNER_TIME_TEXT,
+  emptyChatRoutes,
+  SESSION,
+} from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
   busyAnswer,
@@ -82,7 +89,7 @@ describe('event page', () => {
     expect(await screen.findByText('Não foi possível carregar o evento.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Jantar às cegas' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: DINNER.title })).toBeInTheDocument()
   })
 
   it('says the event does not exist on 404, with the way back to the events', async () => {
@@ -95,10 +102,10 @@ describe('event page', () => {
   it('shows the event with the time in the time zone of the user, and focuses its title', async () => {
     renderEventPage({ [EVENT]: jsonAnswer(DINNER), [REGISTRATION]: NOT_REGISTERED })
 
-    const title = await screen.findByRole('heading', { level: 1, name: 'Jantar às cegas' })
+    const title = await screen.findByRole('heading', { level: 1, name: DINNER.title })
     expect(title).toHaveFocus()
-    expect(screen.getByText(/sábado, 10 de outubro.*19:00.*22:00/)).toBeInTheDocument()
-    expect(screen.getByText(/Uma noite de jogos de mesa\./)).toBeInTheDocument()
+    expect(screen.getByText(DINNER_TIME_TEXT)).toBeInTheDocument()
+    expect(screen.getByText(DINNER_BLURB, { exact: false })).toBeInTheDocument()
   })
 
   describe('registration before the event', () => {

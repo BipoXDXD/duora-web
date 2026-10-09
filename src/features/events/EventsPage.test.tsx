@@ -1,6 +1,15 @@
 import { screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { BEFORE_EVENTS, DINNER, pageOf, PICNIC, SESSION, WINE } from '../../test/eventFixtures.ts'
+import {
+  BEFORE_EVENTS,
+  DINNER,
+  DINNER_BLURB,
+  DINNER_TIME_TEXT,
+  pageOf,
+  PICNIC,
+  SESSION,
+  WINE,
+} from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
   inSequence,
@@ -48,7 +57,7 @@ describe('events page', () => {
     expect(await screen.findByText('Não foi possível carregar os eventos.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
 
-    expect(await screen.findByRole('link', { name: 'Jantar às cegas' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: DINNER.title })).toBeInTheDocument()
   })
 
   it('says so when no event is scheduled', async () => {
@@ -63,16 +72,16 @@ describe('events page', () => {
 
     const items = within(await screen.findByRole('list', { name: 'Próximos eventos' })).getAllByRole('listitem')
     expect(items).toHaveLength(2)
-    expect(items[0]).toHaveTextContent('Jantar às cegas')
-    expect(items[0]).toHaveTextContent(/sábado, 10 de outubro.*19:00.*22:00/)
-    expect(items[0]).toHaveTextContent('Uma noite de jogos de mesa.')
-    expect(items[1]).toHaveTextContent('Vinho e cartas')
+    expect(items[0]).toHaveTextContent(DINNER.title)
+    expect(items[0]).toHaveTextContent(DINNER_TIME_TEXT)
+    expect(items[0]).toHaveTextContent(DINNER_BLURB)
+    expect(items[1]).toHaveTextContent(WINE.title)
   })
 
   it('links each event to its page', async () => {
     const { user } = renderEventsPage({ [LIST]: pageOf([DINNER]), [`${LIST}/${DINNER.id}`]: neverAnswer() })
 
-    await user.click(await screen.findByRole('link', { name: 'Jantar às cegas' }))
+    await user.click(await screen.findByRole('link', { name: DINNER.title }))
 
     expect(window.location.pathname).toBe(`/eventos/${DINNER.id}`)
   })
@@ -85,7 +94,7 @@ describe('events page', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Carregar mais' }))
 
-    expect(await screen.findByRole('link', { name: 'Piquenique no parque' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: PICNIC.title })).toBeInTheDocument()
     expect(within(screen.getByRole('list', { name: 'Próximos eventos' })).getAllByRole('listitem')).toHaveLength(3)
     expect(screen.queryByRole('button', { name: 'Carregar mais' })).not.toBeInTheDocument()
   })
@@ -99,11 +108,11 @@ describe('events page', () => {
     await user.click(await screen.findByRole('button', { name: 'Carregar mais' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar mais. Tente de novo.')
-    expect(screen.getByRole('link', { name: 'Jantar às cegas' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: DINNER.title })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Carregar mais' }))
 
-    expect(await screen.findByRole('link', { name: 'Piquenique no parque' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: PICNIC.title })).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 

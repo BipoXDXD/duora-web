@@ -92,7 +92,7 @@ async function renderEventPage(startsFrom: Date, routes: Readonly<Record<string,
   window.history.replaceState(null, '', `/eventos/${DINNER.id}`)
   const fetchMock = stubApi({ ...SESSION, [REGISTRATION]: REGISTERED, ...routes })
   render(<App />)
-  await screen.findByRole('heading', { level: 1, name: 'Jantar às cegas' })
+  await screen.findByRole('heading', { level: 1, name: DINNER.title })
   await wait(0)
   return { fetchMock, user: userEvent.setup({ delay: null }) }
 }

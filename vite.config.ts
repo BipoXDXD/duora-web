@@ -29,6 +29,8 @@ export default defineConfig({
     // tokens do index.css, a fonte única deles.
     css: { include: [/src\/index\.css/] },
     setupFiles: ['./src/test/setup.ts'],
+    // Acima do `asyncUtilTimeout` de src/test/setup.ts, para uma espera que falha acabar na Testing Library.
+    testTimeout: 15_000,
     restoreMocks: true,
     unstubGlobals: true,
     coverage: {

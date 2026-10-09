@@ -46,16 +46,13 @@ function AdminEventDetails({ eventId }: AdminEventPageProps) {
   })
   const result = query.data
 
+  // A leitura devolve as falhas esperadas como resultado; uma rejeição aqui é bug e sobe para o React.
   if (result === undefined) {
     return (
       <PageFrame key="loading" title={GENERIC_TITLE}>
-        {query.isError ? (
-          <LoadFailure message="Não foi possível carregar o evento." onRetry={() => void query.refetch()} />
-        ) : (
-          <p role="status" className="text-fg-muted">
-            Carregando o evento…
-          </p>
-        )}
+        <p role="status" className="text-fg-muted">
+          Carregando o evento…
+        </p>
       </PageFrame>
     )
   }

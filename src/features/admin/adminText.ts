@@ -1,4 +1,3 @@
-import { PHASE_LABELS } from '../events/eventText.ts'
 import type { AdminPhase, AdminRound } from './adminEvents.ts'
 import {
   DESCRIPTION_MAX_LENGTH,
@@ -63,9 +62,9 @@ export function problemMessage(field: EventField, problem: EventFieldProblem): s
 export const ADMIN_PHASE_LABELS: Readonly<Record<AdminPhase, string>> = {
   draft: 'Rascunho',
   upcoming: 'Publicado',
-  inProgress: PHASE_LABELS.inProgress ?? 'Em andamento',
-  ended: PHASE_LABELS.ended ?? 'Encerrado',
-  cancelled: PHASE_LABELS.cancelled ?? 'Cancelado',
+  inProgress: 'Em andamento',
+  ended: 'Encerrado',
+  cancelled: 'Cancelado',
 }
 
 /** "1 par" ou "12 pares". */

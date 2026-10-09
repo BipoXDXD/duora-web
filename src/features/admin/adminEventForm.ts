@@ -210,10 +210,11 @@ function parseLocalDateTime(local: string): Date | null {
   if (match === null) {
     return null
   }
-  const [year, month, day, hour, minute] = match.slice(1).map(Number)
-  if (year === undefined || month === undefined || day === undefined || hour === undefined || minute === undefined) {
-    return null
-  }
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const hour = Number(match[4])
+  const minute = Number(match[5])
   const date = new Date(year, month - 1, day, hour, minute)
   const exists =
     date.getFullYear() === year &&

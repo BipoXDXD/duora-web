@@ -4,6 +4,7 @@ import { isBug } from '../../shared/api/http.ts'
 import { ConfirmStep } from '../../shared/ui/ConfirmStep.tsx'
 import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
 import { PRIMARY_BUTTON } from '../../shared/ui/styles.ts'
+import { useShownNotice } from '../../shared/ui/useShownNotice.ts'
 import { EVENT_KEYS } from '../events/eventQueries.ts'
 import { cancelEvent, canCancelAt, publishEvent, type AdminEvent, type EventActionResult } from './adminEvents.ts'
 import { noticeOfChange, type AdminNotice, type EventChange } from './adminNotices.ts'
@@ -14,12 +15,6 @@ interface AdminEventActionsProps {
   readonly event: AdminEvent
   /** O instante da leitura do evento, para saber se ele ainda pode ser cancelado. */
   readonly now: Date
-}
-
-/** Notícia mostrada; o número muda a cada resposta, para o mesmo aviso repetido receber o foco de novo. */
-interface ShownNotice {
-  readonly notice: AdminNotice
-  readonly id: number
 }
 
 const CONFIRMATION: Readonly<Record<EventChange, { readonly question: string; readonly confirm: string; readonly pending: string }>> = {
@@ -46,7 +41,7 @@ export function AdminEventActions({ event, now }: AdminEventActionsProps) {
   const [confirming, setConfirming] = useState<EventChange | null>(null)
   /** O botão que abriu a confirmação recebe o foco de volta quando a pessoa desiste. */
   const [returnFocusTo, setReturnFocusTo] = useState<EventChange | null>(null)
-  const [shown, setShown] = useState<ShownNotice | null>(null)
+  const { shown, show: showNotice } = useShownNotice<{ readonly notice: AdminNotice }>()
 
   const mutation = useMutation({
     mutationFn: ({ change }: { readonly change: EventChange }) =>
@@ -70,7 +65,7 @@ export function AdminEventActions({ event, now }: AdminEventActionsProps) {
     }
     setConfirming(null)
     setReturnFocusTo(null)
-    setShown((previous) => ({ notice: noticeOfChange(change, result), id: (previous?.id ?? 0) + 1 }))
+    showNotice({ notice: noticeOfChange(change, result) })
   }
 
   const canPublish = event.status === 'DRAFT'

@@ -10,6 +10,7 @@ import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
+import { useShownNotice } from '../../shared/ui/useShownNotice.ts'
 import { LOGIN_URL } from '../auth/loginUrl.ts'
 import { CONNECTION_KEYS } from './connectionQueries.ts'
 import { decide, fetchDecision, type Decision } from './decision.ts'
@@ -18,12 +19,6 @@ import { noticeOfDecide, type DecisionNotice } from './decisionNotices.ts'
 interface DecisionPanelProps {
   readonly eventId: string
   readonly roundNumber: number
-}
-
-/** Aviso mostrado; o número muda a cada resposta, para o mesmo aviso repetido ser anunciado de novo. */
-interface ShownNotice {
-  readonly notice: DecisionNotice
-  readonly id: number
 }
 
 /**
@@ -38,7 +33,7 @@ export function DecisionPanel({ eventId, roundNumber }: DecisionPanelProps) {
     queryFn: () => fetchDecision(eventId, roundNumber),
     ...READ_OPTIONS,
   })
-  const [shown, setShown] = useState<ShownNotice | null>(null)
+  const { shown, show: showNotice } = useShownNotice<{ readonly notice: DecisionNotice }>()
   const headingId = useId()
 
   const mutation = useMutation({
@@ -53,7 +48,7 @@ export function DecisionPanel({ eventId, roundNumber }: DecisionPanelProps) {
       if (result.kind === 'alreadyDecided') {
         void queryClient.invalidateQueries({ queryKey: decisionKey })
       }
-      setShown((previous) => ({ notice: noticeOfDecide(result), id: (previous?.id ?? 0) + 1 }))
+      showNotice({ notice: noticeOfDecide(result) })
     },
   })
 

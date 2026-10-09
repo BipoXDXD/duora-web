@@ -6,6 +6,7 @@ import { FormField } from '../../shared/ui/FormField.tsx'
 import { PageFrame } from '../../shared/ui/PageFrame.tsx'
 import { errorNotice } from '../../shared/ui/notice.ts'
 import { FIELD_CONTROL, PRIMARY_BUTTON } from '../../shared/ui/styles.ts'
+import { useShownNotice } from '../../shared/ui/useShownNotice.ts'
 import { RequireSession } from '../auth/RequireSession.tsx'
 import { eventProblemsFromApi } from './adminEventApiProblems.ts'
 import {
@@ -40,27 +41,16 @@ export function AdminNewEventPage() {
   )
 }
 
-/** O aviso do formulário inteiro, com o número da resposta, para o mesmo aviso repetido receber o foco de novo. */
-interface ShownNotice {
-  readonly notice: AdminNotice
-  readonly id: number
-  readonly takesFocus: boolean
-}
-
 const REJECTED_FORM_TEXT = 'Confira os dados do evento e tente de novo.'
 
 function NewEventForm() {
   const queryClient = useQueryClient()
   const [values, setValues] = useState<EventFormValues>(EMPTY_EVENT_FORM)
   const [problems, setProblems] = useState<EventFieldProblems>({})
-  const [shown, setShown] = useState<ShownNotice | null>(null)
+  const { shown, show: showNotice, hide: hideNotice } = useShownNotice<{ readonly notice: AdminNotice; readonly takesFocus: boolean }>()
   const [isForbidden, setIsForbidden] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
-
-  function showNotice(notice: AdminNotice, takesFocus = true) {
-    setShown((previous) => ({ notice, id: (previous?.id ?? 0) + 1, takesFocus }))
-  }
 
   function showProblems(found: EventFieldProblems) {
     setProblems(found)
@@ -73,7 +63,7 @@ function NewEventForm() {
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setShown(null)
+    hideNotice()
     const check = checkEventForm(values, currentInstant())
     if (check.kind === 'invalid') {
       showProblems(check.problems)
@@ -97,7 +87,7 @@ function NewEventForm() {
         const { problems: refused, hasUnplacedProblem } = eventProblemsFromApi(result.fieldErrors)
         showProblems(refused)
         if (hasUnplacedProblem) {
-          showNotice(errorNotice(REJECTED_FORM_TEXT), Object.keys(refused).length === 0)
+          showNotice({ notice: errorNotice(REJECTED_FORM_TEXT), takesFocus: Object.keys(refused).length === 0 })
         }
         return
       }
@@ -105,7 +95,7 @@ function NewEventForm() {
         setIsForbidden(true)
         return
       default:
-        showNotice(noticeOfCreateFailure(result.kind))
+        showNotice({ notice: noticeOfCreateFailure(result.kind), takesFocus: true })
     }
   }
 

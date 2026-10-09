@@ -8,6 +8,7 @@ import { FormField } from '../../shared/ui/FormField.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { FIELD_CONTROL, PRIMARY_BUTTON } from '../../shared/ui/styles.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
+import { useShownNotice } from '../../shared/ui/useShownNotice.ts'
 import { EVENT_KEYS } from '../events/eventQueries.ts'
 import { fetchEvent } from '../events/events.ts'
 import { FIRST_ROUND, LAST_ROUND } from '../events/pairing.ts'
@@ -115,11 +116,6 @@ function RoundResult({ round, number }: { readonly round: AdminRound | null; rea
 
 /** Sem `timeZone`: o Intl usa o fuso de quem está com o app aberto. */
 
-interface ShownNotice {
-  readonly notice: AdminNotice
-  readonly id: number
-}
-
 const NUMBER_TEXT = /^\d+$/
 
 /** O número que a pessoa digitou, se for uma rodada que a API aceita (1 a 100). */
@@ -151,7 +147,7 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
   /** Ao desistir da confirmação o foco volta para o campo do número. */
   const [returnedFromConfirm, setReturnedFromConfirm] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
-  const [shown, setShown] = useState<ShownNotice | null>(null)
+  const { shown, show: showNotice, hide: hideNotice } = useShownNotice<{ readonly notice: AdminNotice }>()
   const roundNumberText = typed ?? suggested
 
   const mutation = useMutation({
@@ -171,12 +167,12 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
       void queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.event(event.id) })
     }
     setConfirming(null)
-    setShown((previous) => ({ notice: noticeOfRound(number, result), id: (previous?.id ?? 0) + 1 }))
+    showNotice({ notice: noticeOfRound(number, result) })
   }
 
   function ask(submitted: FormEvent<HTMLFormElement>) {
     submitted.preventDefault()
-    setShown(null)
+    hideNotice()
     const number = roundNumberOf(roundNumberText)
     setHasProblem(number === null)
     setReturnedFromConfirm(false)

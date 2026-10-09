@@ -1,6 +1,6 @@
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 // As telas mostram horários no fuso de quem usa o app. Nos testes o fuso é fixo, para o texto esperado não
 // depender da máquina; os workers do Vitest herdam esta variável.
@@ -25,6 +25,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // Os E2E (e2e/*.spec.ts) são do Playwright, que roda contra o build; o Vitest não os executa.
+    exclude: [...configDefaults.exclude, 'e2e/**'],
     // Sem isto o Vitest troca todo CSS por string vazia, inclusive no `?raw`. O teste de contraste lê os
     // tokens do index.css, a fonte única deles.
     css: { include: [/src\/index\.css/] },

@@ -1,17 +1,25 @@
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import type {
   AdminEventResponse,
+  AdminEventsPageResponse,
   AdminRoundResponse,
 } from '../../shared/api/contract.ts'
+import type { operations } from '../../shared/api/schema.d.ts'
+import { ApiError, InvalidResponseError } from '../../shared/api/http.ts'
 import {
+  ADMIN_EVENT_STATUSES,
+  adminFailureOf,
   adminPhaseAt,
   canCancelAt,
   cancelEvent,
   createEvent,
   fetchAdminEvent,
+  fetchAdminEventsPage,
   fetchAdminRound,
   publishEvent,
   startRound,
+  type AdminEventPageWire,
+  type AdminEventStatus,
   type AdminEventWire,
   type AdminRoundWire,
   type NewEvent,
@@ -189,6 +197,76 @@ describe('fetchAdminEvent', () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
 
     await expect(fetchAdminEvent(EVENT_ID)).resolves.toEqual({ kind: 'failed' })
+  })
+})
+
+describe('fetchAdminEventsPage', () => {
+  const LIST_PATH = '/api/admin/events'
+
+  it('asks GET /api/admin/events for the first page of every status', async () => {
+    fetchMock.mockResolvedValue(json({ items: [], nextPageToken: null }))
+
+    await fetchAdminEventsPage(null, null)
+
+    expect(sentRequest().path).toBe(LIST_PATH)
+    expect(sentRequest().init.method).toBe('GET')
+  })
+
+  it.each([
+    ['the status', null, 'PUBLISHED', `${LIST_PATH}?status=PUBLISHED`],
+    ['the page token', 'abc_-123', null, `${LIST_PATH}?pageToken=abc_-123`],
+    ['both', 'abc', 'CANCELLED', `${LIST_PATH}?status=CANCELLED&pageToken=abc`],
+    ['a page token with characters that need escaping', 'a b&c=d', null, `${LIST_PATH}?pageToken=a+b%26c%3Dd`],
+  ] as const)('sends %s as query parameters', async (_case, pageToken, status, path) => {
+    fetchMock.mockResolvedValue(json({ items: [], nextPageToken: null }))
+
+    await fetchAdminEventsPage(pageToken, status)
+
+    expect(sentRequest().path).toBe(path)
+  })
+
+  it('reads the events with the dates as instants, and the next page token', async () => {
+    fetchMock.mockResolvedValue(json({ items: [WIRE_EVENT], nextPageToken: 'next' }))
+
+    await expect(fetchAdminEventsPage(null, null)).resolves.toEqual({ items: [EVENT], nextPageToken: 'next' })
+  })
+
+  it('reads the last page, which has no next page token', async () => {
+    fetchMock.mockResolvedValue(json({ items: [], nextPageToken: null }))
+
+    await expect(fetchAdminEventsPage(null, null)).resolves.toEqual({ items: [], nextPageToken: null })
+  })
+
+  it.each([
+    ['an event with a status out of the contract', { items: [{ ...WIRE_EVENT, status: 'ARCHIVED' }], nextPageToken: null }],
+    ['an event without the registration count', { items: [{ ...WIRE_EVENT, registrationCount: undefined }], nextPageToken: null }],
+    ['a page without the token field', { items: [] }],
+    ['a page whose items are not a list', { items: 'x', nextPageToken: null }],
+  ])('fails on a 200 with %s', async (_case, body) => {
+    fetchMock.mockResolvedValue(json(body))
+
+    await expect(fetchAdminEventsPage(null, null)).rejects.toBeInstanceOf(InvalidResponseError)
+  })
+
+  it.each([400, 401, 403, 500])('fails with the API status on %i', async (status) => {
+    fetchMock.mockResolvedValue(problem(status))
+
+    await expect(fetchAdminEventsPage(null, null)).rejects.toMatchObject({ name: 'ApiError', status })
+  })
+})
+
+describe('adminFailureOf', () => {
+  it.each([
+    [401, { kind: 'signedOut' }],
+    [403, { kind: 'forbidden' }],
+    [500, { kind: 'failed' }],
+    [503, { kind: 'failed' }],
+  ] as const)('reports the status %i as %o', (status, failure) => {
+    expect(adminFailureOf(new ApiError(status, null))).toEqual(failure)
+  })
+
+  it('reports an error that is not from the API as failed', () => {
+    expect(adminFailureOf(new TypeError('Failed to fetch'))).toEqual({ kind: 'failed' })
   })
 })
 
@@ -392,6 +470,16 @@ describe('canCancelAt', () => {
 describe('contract with the generated API types', () => {
   it('reads an admin event the way the spec declares it', () => {
     expectTypeOf<AdminEventWire>().toEqualTypeOf<AdminEventResponse>()
+  })
+
+  it('reads a page of admin events the way the spec declares it', () => {
+    expectTypeOf<AdminEventPageWire>().toEqualTypeOf<AdminEventsPageResponse>()
+  })
+
+  it('knows the same status filter values the spec declares', () => {
+    type Query = NonNullable<operations['listAdminEvents']['parameters']['query']>
+    expectTypeOf<AdminEventStatus>().toEqualTypeOf<NonNullable<Query['status']>>()
+    expect(new Set(ADMIN_EVENT_STATUSES).size).toBe(ADMIN_EVENT_STATUSES.length)
   })
 
   it('reads a round the way the spec declares it', () => {

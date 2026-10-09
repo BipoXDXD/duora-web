@@ -1,27 +1,12 @@
 import { waitText } from '../../shared/text/waitText.ts'
+import { errorNotice, SIGNED_OUT_NOTICE, successNotice, type Notice } from '../../shared/ui/notice.ts'
 import type { EventActionResult, StartRoundResult } from './adminEvents.ts'
 import { STAFF_ONLY_TEXT } from './adminText.ts'
 
-/** O aviso depois de uma ação da equipe. `action` é o próximo passo que a tela oferece junto. */
-export interface AdminNotice {
-  readonly tone: 'success' | 'error'
-  readonly text: string
-  readonly action: 'signIn' | null
-}
+/** O aviso depois de uma ação da equipe: o único passo que ela oferece junto é entrar de novo. */
+export type AdminNotice = Notice
 
-const SIGNED_OUT = 'Sua sessão terminou. Entre de novo para continuar.'
 const GONE = 'Este evento não existe mais.'
-
-export function successNotice(text: string): AdminNotice {
-  return { tone: 'success', text, action: null }
-}
-
-export function errorNotice(text: string): AdminNotice {
-  return { tone: 'error', text, action: null }
-}
-
-/** O que valia para todas as chamadas da área da equipe: o 401, o 403 e o 404 do evento. */
-const signedOutNotice: AdminNotice = { tone: 'error', text: SIGNED_OUT, action: 'signIn' }
 
 export type EventChange = 'publish' | 'cancel'
 
@@ -65,7 +50,7 @@ export function noticeOfChange(change: EventChange, result: EventActionResult): 
     case 'notFound':
       return errorNotice(GONE)
     case 'signedOut':
-      return signedOutNotice
+      return SIGNED_OUT_NOTICE
     case 'failed':
       return errorNotice(FAILED_TEXT[change])
   }
@@ -92,7 +77,7 @@ export function noticeOfRound(number: number, result: StartRoundResult): AdminNo
     case 'notFound':
       return errorNotice(GONE)
     case 'signedOut':
-      return signedOutNotice
+      return SIGNED_OUT_NOTICE
     case 'failed':
       return errorNotice('Não foi possível iniciar a rodada. Tente de novo; repetir é seguro, a rodada nasce uma vez só.')
   }
@@ -110,7 +95,7 @@ export function noticeOfCreateFailure(kind: 'forbidden' | 'signedOut' | 'notFoun
     case 'forbidden':
       return errorNotice(STAFF_ONLY_TEXT)
     case 'signedOut':
-      return signedOutNotice
+      return SIGNED_OUT_NOTICE
     case 'notFound':
     case 'failed':
       // A API não tem chave de idempotência aqui (ADR 0016): repetir pode criar um segundo rascunho.

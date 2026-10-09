@@ -5,6 +5,8 @@ import { App } from '../../app/App.tsx'
 import { DINNER, emptyChatRoutes, SESSION } from '../../test/eventFixtures.ts'
 import { jsonAnswer, problemAnswer, stubApi, type FakeRoute } from '../../test/fakeApi.ts'
 import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
+import { wait } from '../../test/fakeTimers.ts'
+import { setVisibility, stubVisibility } from '../../test/fakeVisibility.ts'
 
 const EVENT = `/api/events/${DINNER.id}`
 const REGISTRATION = `${EVENT}/registration`
@@ -15,22 +17,12 @@ const STARTS_AT = new Date(DINNER.startsAt)
 const ENDS_AT = new Date(DINNER.endsAt)
 const REFRESH_MS = 15_000
 
-let visibility: DocumentVisibilityState = 'visible'
-
-function setVisibility(state: DocumentVisibilityState) {
-  visibility = state
-  act(() => {
-    document.dispatchEvent(new Event('visibilitychange'))
-  })
-}
-
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] })
   // A Testing Library só espera com relógio falso se achar o `jest`. Andar 0 ms deixa as respostas chegarem sem
   // mexer nos timers da página, que só o teste adianta, com `wait`.
   vi.stubGlobal('jest', { advanceTimersByTime: () => vi.advanceTimersByTime(0) })
-  visibility = 'visible'
-  vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility)
+  stubVisibility()
   // O meio do espalhamento: a releitura do evento sai em exatos 15 s.
   vi.spyOn(Math, 'random').mockReturnValue(0.5)
 })
@@ -41,10 +33,6 @@ afterEach(() => {
 })
 
 /** Passa o relógio falso e deixa as respostas (promessas) chegarem. */
-async function wait(ms: number) {
-  await act(() => vi.advanceTimersByTimeAsync(ms))
-}
-
 const SETTLE_ROUNDS = 5
 
 /** Um turno real do laço de eventos, que o relógio falso não move. */

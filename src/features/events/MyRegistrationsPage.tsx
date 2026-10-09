@@ -1,15 +1,16 @@
 import { useState } from 'react'
+import { usePagedList } from '../../shared/api/usePagedList.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { PATHS } from '../../shared/routing/routes.ts'
+import { formatDay } from '../../shared/text/dateFormat.ts'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { LoadMore } from '../../shared/ui/LoadMore.tsx'
 import { PageFrame } from '../../shared/ui/PageFrame.tsx'
 import { PRIMARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
 import { RequireSession } from '../auth/RequireSession.tsx'
 import { EventCard } from './EventCard.tsx'
-import { EVENT_KEYS, usePagedList } from './eventQueries.ts'
+import { EVENT_KEYS } from './eventQueries.ts'
 import { eventPhaseAt } from './events.ts'
-import { formatDay } from './eventText.ts'
 import { fetchMyRegistrationsPage } from './registrations.ts'
 
 /** "Minhas inscrições": eventos que ainda não acabaram, inclusive cancelados e em andamento. */

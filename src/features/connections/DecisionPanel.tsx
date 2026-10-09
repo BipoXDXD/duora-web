@@ -1,14 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useId, useState } from 'react'
 import { isBug } from '../../shared/api/http.ts'
+import { READ_OPTIONS } from '../../shared/api/readOptions.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { PATHS } from '../../shared/routing/routes.ts'
+import { formatDay } from '../../shared/text/dateFormat.ts'
+import { ConfirmStep } from '../../shared/ui/ConfirmStep.tsx'
+import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
+import { useShownNotice } from '../../shared/ui/useShownNotice.ts'
 import { LOGIN_URL } from '../auth/loginUrl.ts'
-import { READ_OPTIONS } from '../events/eventQueries.ts'
-import { formatDay } from '../events/eventText.ts'
 import { CONNECTION_KEYS } from './connectionQueries.ts'
 import { decide, fetchDecision, type Decision } from './decision.ts'
 import { noticeOfDecide, type DecisionNotice } from './decisionNotices.ts'
@@ -16,12 +19,6 @@ import { noticeOfDecide, type DecisionNotice } from './decisionNotices.ts'
 interface DecisionPanelProps {
   readonly eventId: string
   readonly roundNumber: number
-}
-
-/** Aviso mostrado; o número muda a cada resposta, para o mesmo aviso repetido ser anunciado de novo. */
-interface ShownNotice {
-  readonly notice: DecisionNotice
-  readonly id: number
 }
 
 /**
@@ -36,7 +33,7 @@ export function DecisionPanel({ eventId, roundNumber }: DecisionPanelProps) {
     queryFn: () => fetchDecision(eventId, roundNumber),
     ...READ_OPTIONS,
   })
-  const [shown, setShown] = useState<ShownNotice | null>(null)
+  const { shown, show: showNotice } = useShownNotice<{ readonly notice: DecisionNotice }>()
   const headingId = useId()
 
   const mutation = useMutation({
@@ -51,7 +48,7 @@ export function DecisionPanel({ eventId, roundNumber }: DecisionPanelProps) {
       if (result.kind === 'alreadyDecided') {
         void queryClient.invalidateQueries({ queryKey: decisionKey })
       }
-      setShown((previous) => ({ notice: noticeOfDecide(result), id: (previous?.id ?? 0) + 1 }))
+      showNotice({ notice: noticeOfDecide(result) })
     },
   })
 
@@ -150,13 +147,17 @@ function Choice({ isSaving, hasNextStep, onConfirm }: ChoiceProps) {
 
   if (step.kind === 'confirming') {
     return (
-      <ConfirmChoice
-        interested={step.interested}
-        isSaving={isSaving}
-        hasNextStep={hasNextStep}
+      <ConfirmStep
+        confirmLabel="Confirmar minha decisão"
+        pendingLabel="Registrando…"
+        isPending={isSaving}
+        confirmClassName={hasNextStep ? SECONDARY_BUTTON : PRIMARY_BUTTON}
         onConfirm={() => onConfirm(step.interested)}
         onBack={() => setStep({ kind: 'choosing', focusOn: step.interested })}
-      />
+      >
+        <p className="font-semibold text-fg">{`Você escolheu: ${chosenText(step.interested)}.`}</p>
+        <p className="text-fg">A decisão é final: depois de confirmar, não dá para mudar. Ela continua só sua.</p>
+      </ConfirmStep>
     )
   }
   return (
@@ -167,62 +168,16 @@ function Choice({ isSaving, hasNextStep, onConfirm }: ChoiceProps) {
       </p>
       <div className="flex flex-wrap gap-4">
         {CHOICES.map((choice) => (
-          <ChoiceButton
+          <FocusReturnButton
             key={choice.button}
-            label={choice.button}
             hasFocus={step.focusOn === choice.interested}
             onClick={() => setStep({ kind: 'confirming', interested: choice.interested })}
-          />
+          >
+            {choice.button}
+          </FocusReturnButton>
         ))}
       </div>
     </>
-  )
-}
-
-interface ChoiceButtonProps {
-  readonly label: string
-  readonly hasFocus: boolean
-  readonly onClick: () => void
-}
-
-function ChoiceButton({ label, hasFocus, onClick }: ChoiceButtonProps) {
-  const ref = useFocusOnMount<HTMLButtonElement>()
-  return (
-    <button ref={hasFocus ? ref : undefined} type="button" onClick={onClick} className={SECONDARY_BUTTON}>
-      {label}
-    </button>
-  )
-}
-
-interface ConfirmChoiceProps {
-  readonly interested: boolean
-  readonly isSaving: boolean
-  readonly hasNextStep: boolean
-  readonly onConfirm: () => void
-  readonly onBack: () => void
-}
-
-function ConfirmChoice({ interested, isSaving, hasNextStep, onConfirm, onBack }: ConfirmChoiceProps) {
-  const confirmRef = useFocusOnMount<HTMLButtonElement>()
-  return (
-    <div className="flex flex-col items-start gap-3">
-      <p className="font-semibold text-fg">{`Você escolheu: ${chosenText(interested)}.`}</p>
-      <p className="text-fg">A decisão é final: depois de confirmar, não dá para mudar. Ela continua só sua.</p>
-      <div className="flex flex-wrap gap-4">
-        <button
-          ref={confirmRef}
-          type="button"
-          onClick={onConfirm}
-          disabled={isSaving}
-          className={hasNextStep ? SECONDARY_BUTTON : PRIMARY_BUTTON}
-        >
-          {isSaving ? 'Registrando…' : 'Confirmar minha decisão'}
-        </button>
-        <button type="button" onClick={onBack} disabled={isSaving} className={SECONDARY_BUTTON}>
-          Voltar
-        </button>
-      </div>
-    </div>
   )
 }
 

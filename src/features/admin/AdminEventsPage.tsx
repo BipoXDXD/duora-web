@@ -1,4 +1,5 @@
 import { useId, useState } from 'react'
+import { usePagedList } from '../../shared/api/usePagedList.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { adminEventPath, PATHS } from '../../shared/routing/routes.ts'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
@@ -6,7 +7,6 @@ import { LoadMore } from '../../shared/ui/LoadMore.tsx'
 import { PageFrame } from '../../shared/ui/PageFrame.tsx'
 import { FIELD_CONTROL, PRIMARY_BUTTON } from '../../shared/ui/styles.ts'
 import { RequireSession } from '../auth/RequireSession.tsx'
-import { usePagedList } from '../events/eventQueries.ts'
 import { formatEventTime } from '../events/eventText.ts'
 import {
   ADMIN_EVENT_STATUSES,

@@ -84,6 +84,15 @@ function reportButton(excerpt: string) {
   return screen.getByRole('button', { name: `Denunciar a mensagem “${excerpt}”` })
 }
 
+/** O item da conversa com este texto, pelo papel de item de lista. */
+function messageItem(text: string): HTMLElement {
+  const item = screen.getAllByRole('listitem').find((candidate) => within(candidate).queryByText(text) !== null)
+  if (item === undefined) {
+    throw new Error(`mensagem fora da conversa: ${text}`)
+  }
+  return item
+}
+
 function form() {
   return screen.getByRole('region', { name: 'Denunciar mensagem' })
 }
@@ -139,9 +148,7 @@ describe('reporting a chat message', () => {
     it('is never offered on your own message', async () => {
       await renderClosedChat()
 
-      const own = screen.getByText('Prefiro não.').closest('li')
-      expect(own).not.toBeNull()
-      expect(within(own as HTMLElement).queryByRole('button')).not.toBeInTheDocument()
+      expect(within(messageItem('Prefiro não.')).queryByRole('button')).not.toBeInTheDocument()
       expect(screen.getAllByRole('button', { name: /^Denunciar/ })).toHaveLength(2)
     })
 
@@ -307,7 +314,7 @@ describe('reporting a chat message', () => {
       await user.click(submitButton())
       await screen.findByRole('status')
 
-      const reported = screen.getByText('Oi! Me passa seu endereço?').closest('li') as HTMLElement
+      const reported = messageItem('Oi! Me passa seu endereço?')
       expect(within(reported).getByText('Denunciada por você')).toBeInTheDocument()
       expect(within(reported).queryByRole('button')).not.toBeInTheDocument()
       expect(screen.getAllByText('Denunciada por você')).toHaveLength(1)
@@ -365,7 +372,7 @@ describe('reporting a chat message', () => {
 
       expect(await screen.findByRole('status')).toHaveTextContent('Denúncia enviada.')
       expect(screen.getByRole('alert')).toHaveTextContent('A denúncia está feita, mas o bloqueio não deu certo.')
-      expect(screen.getByText('Oi! Me passa seu endereço?').closest('li')).toHaveTextContent('Denunciada por você')
+      expect(messageItem('Oi! Me passa seu endereço?')).toHaveTextContent('Denunciada por você')
       await user.click(screen.getByRole('button', { name: 'Tentar bloquear de novo' }))
 
       expect(await screen.findByText('Você também bloqueou esta pessoa.', { exact: false })).toBeInTheDocument()

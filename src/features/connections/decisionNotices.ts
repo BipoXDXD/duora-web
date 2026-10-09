@@ -1,12 +1,9 @@
-import { waitText } from '../events/registrationNotices.ts'
+import { waitText } from '../../shared/text/waitText.ts'
+import { errorNotice, SIGNED_OUT_NOTICE, successNotice, type Notice } from '../../shared/ui/notice.ts'
 import type { DecideResult } from './decision.ts'
 
 /** O aviso depois de decidir. `signIn` pede o link "Entrar de novo" junto. */
-export interface DecisionNotice {
-  readonly tone: 'success' | 'error'
-  readonly text: string
-  readonly action: 'signIn' | null
-}
+export type DecisionNotice = Notice
 
 /**
  * O texto depende só do resultado da própria decisão: nada aqui pode variar com a escolha do par, que o
@@ -15,20 +12,16 @@ export interface DecisionNotice {
 export function noticeOfDecide(result: DecideResult): DecisionNotice {
   switch (result.kind) {
     case 'decided':
-      return { tone: 'success', text: 'Decisão registrada.', action: null }
+      return successNotice('Decisão registrada.')
     case 'alreadyDecided':
-      return error('Você já tinha decidido nesta rodada, e a decisão é final. Esta é a que vale.')
+      return errorNotice('Você já tinha decidido nesta rodada, e a decisão é final. Esta é a que vale.')
     case 'notPaired':
-      return error('Não há o que decidir: você não formou dupla nesta rodada.')
+      return errorNotice('Não há o que decidir: você não formou dupla nesta rodada.')
     case 'busy':
-      return error(`Não foi possível registrar agora. Tente de novo ${waitText(result.retryAfterSeconds)}.`)
+      return errorNotice(`Não foi possível registrar agora. Tente de novo ${waitText(result.retryAfterSeconds)}.`)
     case 'signedOut':
-      return { tone: 'error', text: 'Sua sessão terminou. Entre de novo para continuar.', action: 'signIn' }
+      return SIGNED_OUT_NOTICE
     case 'failed':
-      return error('Não foi possível registrar sua decisão. Tente de novo.')
+      return errorNotice('Não foi possível registrar sua decisão. Tente de novo.')
   }
-}
-
-function error(text: string): DecisionNotice {
-  return { tone: 'error', text, action: null }
 }

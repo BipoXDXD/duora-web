@@ -1,7 +1,9 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { Component, type ReactNode } from 'react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { wait } from '../../test/fakeTimers.ts'
+import { setVisibility, startHidden, stubVisibility } from '../../test/fakeVisibility.ts'
 import { LOGIN_URL } from '../auth/loginUrl.ts'
 import {
   byMethod,
@@ -54,22 +56,12 @@ function held() {
   return { route, release: (answer: FakeRoute) => release?.(answer) }
 }
 
-let visibility: DocumentVisibilityState = 'visible'
-
-function setVisibility(state: DocumentVisibilityState) {
-  visibility = state
-  act(() => {
-    document.dispatchEvent(new Event('visibilitychange'))
-  })
-}
-
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
   // A Testing Library só espera com relógio falso se achar o `jest`. Andar 0 ms deixa as respostas chegarem sem
   // mexer no intervalo do polling, que só o teste adianta, com `wait`.
   vi.stubGlobal('jest', { advanceTimersByTime: () => vi.advanceTimersByTime(0) })
-  visibility = 'visible'
-  vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility)
+  stubVisibility()
   vi.spyOn(Math, 'random').mockReturnValue(0)
   vi.spyOn(crypto, 'randomUUID').mockReturnValueOnce(KEY_1).mockReturnValueOnce(KEY_2)
 })
@@ -85,10 +77,6 @@ function renderChat(routes: Readonly<Record<string, FakeRoute>>) {
 }
 
 /** Passa o relógio falso e deixa as respostas (promessas) chegarem. */
-async function wait(ms: number) {
-  await act(() => vi.advanceTimersByTimeAsync(ms))
-}
-
 function readsOf(fetchMock: ReturnType<typeof stubApi>): string[] {
   return fetchMock.mock.calls
     .filter(([, init]) => (init?.method ?? 'GET') === 'GET')
@@ -257,7 +245,7 @@ describe('RoundChatPanel', () => {
     })
 
     it('does not start reading while the tab opens hidden', async () => {
-      visibility = 'hidden'
+      startHidden()
       const { fetchMock } = renderChat({ [CHAT]: OPEN, [after(0)]: EMPTY })
 
       await wait(10_000)

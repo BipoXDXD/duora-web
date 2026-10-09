@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import type { CurrentUserResponse, LogoutResponse } from '../../shared/api/contract.ts'
 import { ApiError, InvalidResponseError, NetworkError } from '../../shared/api/http.ts'
+import { firstRequest } from '../../test/responses.ts'
 import { type CurrentUserWire, fetchSession, KNOWN_ROLES, type LogoutResponseWire, logOut, type Role } from './session.ts'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -17,21 +18,13 @@ function json(body: string, status = 200): Response {
   return new Response(body, { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-function sentRequest(): { path: unknown; init: RequestInit } {
-  const call = fetchMock.mock.calls[0]
-  if (call === undefined) {
-    throw new Error('fetch não foi chamado')
-  }
-  return { path: call[0], init: call[1] ?? {} }
-}
-
 describe('fetchSession', () => {
   it('asks GET /api/me for the session', async () => {
     fetchMock.mockResolvedValue(json('{"displayName":"Ana Souza","roles":[]}'))
 
     await fetchSession()
 
-    const { path, init } = sentRequest()
+    const { path, init } = firstRequest(fetchMock)
     expect(path).toBe('/api/me')
     expect(init.method).toBe('GET')
   })
@@ -133,7 +126,7 @@ describe('logOut', () => {
 
     await logOut()
 
-    const { path, init } = sentRequest()
+    const { path, init } = firstRequest(fetchMock)
     expect(path).toBe('/logout')
     expect(init.method).toBe('POST')
     expect(new Headers(init.headers).get('X-XSRF-TOKEN')).toBe('csrf-123')

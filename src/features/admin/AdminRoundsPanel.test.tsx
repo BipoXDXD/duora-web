@@ -6,13 +6,14 @@ import { adminRound, ADMIN_PUBLISHED, AFTER_DINNER, BEFORE_DINNER, DURING_DINNER
 import { DINNER, SESSION } from '../../test/eventFixtures.ts'
 import {
   byMethod,
+  callsTo,
+  type FakeRoute,
   inSequence,
   jsonAnswer,
   neverAnswer,
   problemAnswer,
   refusalAnswer,
   stubApi,
-  type FakeRoute,
 } from '../../test/fakeApi.ts'
 import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
@@ -47,10 +48,6 @@ function renderRounds(routes: Readonly<Record<string, FakeRoute>>, event: object
   const fetchMock = stubApi({ ...SESSION, [ADMIN_EVENT]: jsonAnswer(event), ...routes })
   render(<App />)
   return { fetchMock, user: userEvent.setup() }
-}
-
-function callsTo(fetchMock: ReturnType<typeof stubApi>, path: string, method: string) {
-  return fetchMock.mock.calls.filter(([calledPath, init]) => calledPath === path && (init?.method ?? 'GET') === method)
 }
 
 async function askToStart(user: ReturnType<typeof userEvent.setup>) {

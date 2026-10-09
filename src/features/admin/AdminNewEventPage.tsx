@@ -4,20 +4,29 @@ import { goTo } from '../../shared/routing/history.ts'
 import { adminEventPath } from '../../shared/routing/routes.ts'
 import { FormField } from '../../shared/ui/FormField.tsx'
 import { PageFrame } from '../../shared/ui/PageFrame.tsx'
+import { focusFirstProblem } from '../../shared/ui/focusFirstProblem.ts'
+import { errorNotice } from '../../shared/ui/notice.ts'
 import { FIELD_CONTROL, PRIMARY_BUTTON } from '../../shared/ui/styles.ts'
+import { useShownNotice } from '../../shared/ui/useShownNotice.ts'
 import { RequireSession } from '../auth/RequireSession.tsx'
 import { eventProblemsFromApi } from './adminEventApiProblems.ts'
 import {
   checkEventForm,
+  DESCRIPTION_MAX_LENGTH,
   EMPTY_EVENT_FORM,
   EVENT_FIELDS,
+  MAX_CAPACITY,
+  MAX_DAYS_AHEAD,
+  MAX_DURATION_HOURS,
+  MIN_CAPACITY,
+  TITLE_MAX_LENGTH,
   userTimeZone,
   type EventField,
   type EventFieldProblems,
   type EventFormValues,
 } from './adminEventForm.ts'
 import { createEvent, type CreateEventResult } from './adminEvents.ts'
-import { errorNotice, noticeOfCreateFailure, type AdminNotice } from './adminNotices.ts'
+import { noticeOfCreateFailure, type AdminNotice } from './adminNotices.ts'
 import { AdminNoticeMessage } from './AdminNoticeMessage.tsx'
 import { ADMIN_KEYS } from './adminQueries.ts'
 import { problemMessage, STAFF_ONLY_TEXT } from './adminText.ts'
@@ -33,40 +42,25 @@ export function AdminNewEventPage() {
   )
 }
 
-/** O aviso do formulário inteiro, com o número da resposta, para o mesmo aviso repetido receber o foco de novo. */
-interface ShownNotice {
-  readonly notice: AdminNotice
-  readonly id: number
-  readonly takesFocus: boolean
-}
-
 const REJECTED_FORM_TEXT = 'Confira os dados do evento e tente de novo.'
 
 function NewEventForm() {
   const queryClient = useQueryClient()
   const [values, setValues] = useState<EventFormValues>(EMPTY_EVENT_FORM)
   const [problems, setProblems] = useState<EventFieldProblems>({})
-  const [shown, setShown] = useState<ShownNotice | null>(null)
+  const { shown, show: showNotice, hide: hideNotice } = useShownNotice<{ readonly notice: AdminNotice; readonly takesFocus: boolean }>()
   const [isForbidden, setIsForbidden] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
 
-  function showNotice(notice: AdminNotice, takesFocus = true) {
-    setShown((previous) => ({ notice, id: (previous?.id ?? 0) + 1, takesFocus }))
-  }
-
   function showProblems(found: EventFieldProblems) {
     setProblems(found)
-    const first = EVENT_FIELDS.find((field) => found[field] !== undefined)
-    const control = first === undefined ? null : formRef.current?.elements.namedItem(first)
-    if (control instanceof HTMLElement) {
-      control.focus()
-    }
+    focusFirstProblem(formRef.current, EVENT_FIELDS, found)
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setShown(null)
+    hideNotice()
     const check = checkEventForm(values, currentInstant())
     if (check.kind === 'invalid') {
       showProblems(check.problems)
@@ -90,7 +84,7 @@ function NewEventForm() {
         const { problems: refused, hasUnplacedProblem } = eventProblemsFromApi(result.fieldErrors)
         showProblems(refused)
         if (hasUnplacedProblem) {
-          showNotice(errorNotice(REJECTED_FORM_TEXT), Object.keys(refused).length === 0)
+          showNotice({ notice: errorNotice(REJECTED_FORM_TEXT), takesFocus: Object.keys(refused).length === 0 })
         }
         return
       }
@@ -98,7 +92,7 @@ function NewEventForm() {
         setIsForbidden(true)
         return
       default:
-        showNotice(noticeOfCreateFailure(result.kind))
+        showNotice({ notice: noticeOfCreateFailure(result.kind), takesFocus: true })
     }
   }
 
@@ -124,7 +118,7 @@ function NewEventForm() {
       className="flex flex-col gap-6"
     >
       {shown !== null && <AdminNoticeMessage key={shown.id} notice={shown.notice} takesFocus={shown.takesFocus} />}
-      <FormField label="Título" hint="Uma linha, até 80 caracteres." problem={messageOf('title', problems)}>
+      <FormField label="Título" hint={`Uma linha, até ${TITLE_MAX_LENGTH} caracteres.`} problem={messageOf('title', problems)}>
         {(control) => (
           <input
             {...control}
@@ -139,7 +133,7 @@ function NewEventForm() {
       </FormField>
       <FormField
         label="Descrição"
-        hint="Até 500 caracteres. Separe os parágrafos com uma linha em branco."
+        hint={`Até ${DESCRIPTION_MAX_LENGTH} caracteres. Separe os parágrafos com uma linha em branco.`}
         problem={messageOf('description', problems)}
       >
         {(control) => (
@@ -155,7 +149,7 @@ function NewEventForm() {
       </FormField>
       <FormField
         label="Início"
-        hint={`${timeZoneHint} No futuro e em até 365 dias.`}
+        hint={`${timeZoneHint} No futuro e em até ${MAX_DAYS_AHEAD} dias.`}
         problem={messageOf('startsAt', problems)}
       >
         {(control) => (
@@ -171,7 +165,7 @@ function NewEventForm() {
       </FormField>
       <FormField
         label="Fim"
-        hint={`${timeZoneHint} Depois do início e em até 12 horas dele.`}
+        hint={`${timeZoneHint} Depois do início e em até ${MAX_DURATION_HOURS} horas dele.`}
         problem={messageOf('endsAt', problems)}
       >
         {(control) => (
@@ -185,7 +179,7 @@ function NewEventForm() {
           />
         )}
       </FormField>
-      <FormField label="Capacidade" hint="De 2 a 200 pessoas." problem={messageOf('capacity', problems)}>
+      <FormField label="Capacidade" hint={`De ${MIN_CAPACITY} a ${MAX_CAPACITY} pessoas.`} problem={messageOf('capacity', problems)}>
         {(control) => (
           <input
             {...control}

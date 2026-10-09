@@ -1,23 +1,22 @@
-import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
+import { useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { useId, useState } from 'react'
-import { isApiFailure, isBug } from '../../shared/api/http.ts'
+import { isApiFailure } from '../../shared/api/http.ts'
+import { usePagedList } from '../../shared/api/usePagedList.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { PATHS } from '../../shared/routing/routes.ts'
+import { accountCode } from '../../shared/text/accountCode.ts'
+import { formatDay } from '../../shared/text/dateFormat.ts'
+import { ConfirmStep } from '../../shared/ui/ConfirmStep.tsx'
+import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { LoadMore } from '../../shared/ui/LoadMore.tsx'
 import { PageFrame } from '../../shared/ui/PageFrame.tsx'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
+import { TEXT_LINK } from '../../shared/ui/styles.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
 import { RequireSession } from '../auth/RequireSession.tsx'
 import { fetchBlockedPage, unblockAccount, type BlockedAccount, type BlockedPage } from './blockedAccounts.ts'
 
 const BLOCKED_ACCOUNTS_KEY = ['blocked-accounts'] as const
-const FIRST_PAGE: string | null = null
-
-/** A API não manda o nome de quem foi bloqueado; o fim do id (aleatório no UUIDv7) distingue uma conta da outra. */
-const ACCOUNT_CODE_LENGTH = 8
-
-const BLOCKED_AT_FORMAT = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long' })
 
 type BlockedPages = InfiniteData<BlockedPage, string | null>
 
@@ -37,20 +36,13 @@ export function BlockedAccountsPage() {
 
 function BlockedAccountsSection() {
   const queryClient = useQueryClient()
-  const query = useInfiniteQuery({
-    queryKey: BLOCKED_ACCOUNTS_KEY,
-    queryFn: ({ pageParam }) => fetchBlockedPage(pageParam),
-    initialPageParam: FIRST_PAGE,
-    getNextPageParam: (lastPage) => lastPage.nextPageToken,
-    retry: false,
-    refetchOnWindowFocus: false,
-    throwOnError: isBug,
-  })
+  const list = usePagedList(BLOCKED_ACCOUNTS_KEY, fetchBlockedPage)
   const [hasUnblocked, setHasUnblocked] = useState(false)
 
-  if (query.data === undefined) {
-    return query.isError ? (
-      <LoadFailure message="Não foi possível carregar as contas bloqueadas." onRetry={() => void query.refetch()} />
+  const accounts = list.items
+  if (accounts === undefined) {
+    return list.hasFailed ? (
+      <LoadFailure message="Não foi possível carregar as contas bloqueadas." onRetry={list.retry} />
     ) : (
       <p role="status" className="text-fg-muted">
         Carregando as contas bloqueadas…
@@ -60,12 +52,12 @@ function BlockedAccountsSection() {
 
   /** Tira a conta do cache em vez de recarregar: os tokens das páginas seguintes continuam valendo. */
   function removeFromList(accountId: string) {
-    queryClient.setQueryData<BlockedPages>(BLOCKED_ACCOUNTS_KEY, (data) =>
-      data === undefined
-        ? data
+    queryClient.setQueryData<BlockedPages>(BLOCKED_ACCOUNTS_KEY, (cached) =>
+      cached === undefined
+        ? cached
         : {
-            ...data,
-            pages: data.pages.map((page) => ({
+            ...cached,
+            pages: cached.pages.map((page) => ({
               ...page,
               items: page.items.filter((account) => account.accountId !== accountId),
             })),
@@ -74,8 +66,7 @@ function BlockedAccountsSection() {
     setHasUnblocked(true)
   }
 
-  const accounts = query.data.pages.flatMap((page) => page.items)
-  const hasNoBlocks = accounts.length === 0 && !query.hasNextPage
+  const hasNoBlocks = accounts.length === 0 && !list.loadMore.hasNextPage
   return (
     <div className="flex flex-col items-start gap-6">
       {hasUnblocked && <UnblockedNotice />}
@@ -93,12 +84,7 @@ function BlockedAccountsSection() {
           ))}
         </ul>
       )}
-      <LoadMore
-        hasNextPage={query.hasNextPage}
-        isFetchingNextPage={query.isFetchingNextPage}
-        hasFailed={query.isFetchNextPageError && !query.isFetchingNextPage}
-        onLoadMore={() => void query.fetchNextPage()}
-      />
+      <LoadMore {...list.loadMore} />
     </div>
   )
 }
@@ -153,15 +139,20 @@ function BlockedAccountItem({ account, onUnblocked }: BlockedAccountItemProps) {
   return (
     <li className="flex flex-col gap-4 rounded-lg bg-surface p-4 shadow-raised">
       <div id={descriptionId} className="flex flex-col gap-1">
-        <p className="font-semibold text-fg">{`Conta ${account.accountId.slice(-ACCOUNT_CODE_LENGTH)}`}</p>
-        <p className="text-sm text-fg-muted">{`Bloqueada em ${BLOCKED_AT_FORMAT.format(new Date(account.blockedAt))}`}</p>
+        <p className="font-semibold text-fg">{`Conta ${accountCode(account.accountId)}`}</p>
+        <p className="text-sm text-fg-muted">{`Bloqueada em ${formatDay(new Date(account.blockedAt))}`}</p>
       </div>
       {isConfirming ? (
-        <ConfirmUnblock
-          isUnblocking={state === 'unblocking'}
+        <ConfirmStep
+          confirmLabel="Sim, desbloquear"
+          pendingLabel="Desbloqueando…"
+          backLabel="Cancelar"
+          isPending={state === 'unblocking'}
           onConfirm={() => void unblock()}
-          onCancel={cancel}
-        />
+          onBack={cancel}
+        >
+          <p className="text-fg">Desbloquear esta conta? Ela volta a poder encontrar você e falar com você no Duora.</p>
+        </ConfirmStep>
       ) : (
         <div className="flex flex-col items-start gap-2">
           {state === 'failed' && (
@@ -169,58 +160,12 @@ function BlockedAccountItem({ account, onUnblocked }: BlockedAccountItemProps) {
               Não foi possível desbloquear. Tente de novo.
             </p>
           )}
-          <UnblockButton
-            hasFocus={wasCancelled}
-            describedBy={descriptionId}
-            onClick={() => setState('confirming')}
-          />
+          {/* Ação secundária: o desbloqueio só vira primário no passo de confirmação. */}
+          <FocusReturnButton hasFocus={wasCancelled} describedBy={descriptionId} onClick={() => setState('confirming')}>
+            Desbloquear
+          </FocusReturnButton>
         </div>
       )}
     </li>
-  )
-}
-
-interface UnblockButtonProps {
-  readonly hasFocus: boolean
-  readonly describedBy: string
-  readonly onClick: () => void
-}
-
-/** Ação secundária: o desbloqueio só vira primário no passo de confirmação. */
-function UnblockButton({ hasFocus, describedBy, onClick }: UnblockButtonProps) {
-  const ref = useFocusOnMount<HTMLButtonElement>()
-  return (
-    <button
-      ref={hasFocus ? ref : undefined}
-      type="button"
-      aria-describedby={describedBy}
-      onClick={onClick}
-      className={SECONDARY_BUTTON}
-    >
-      Desbloquear
-    </button>
-  )
-}
-
-interface ConfirmUnblockProps {
-  readonly isUnblocking: boolean
-  readonly onConfirm: () => void
-  readonly onCancel: () => void
-}
-
-function ConfirmUnblock({ isUnblocking, onConfirm, onCancel }: ConfirmUnblockProps) {
-  const confirmRef = useFocusOnMount<HTMLButtonElement>()
-  return (
-    <div className="flex flex-col items-start gap-3">
-      <p className="text-fg">Desbloquear esta conta? Ela volta a poder encontrar você e falar com você no Duora.</p>
-      <div className="flex flex-wrap gap-4">
-        <button ref={confirmRef} type="button" onClick={onConfirm} disabled={isUnblocking} className={PRIMARY_BUTTON}>
-          {isUnblocking ? 'Desbloqueando…' : 'Sim, desbloquear'}
-        </button>
-        <button type="button" onClick={onCancel} disabled={isUnblocking} className={SECONDARY_BUTTON}>
-          Cancelar
-        </button>
-      </div>
-    </div>
   )
 }

@@ -1,10 +1,13 @@
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
-import { act, renderHook } from '@testing-library/react'
+import { renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { READ_OPTIONS } from '../../shared/api/readOptions.ts'
 import { DINNER } from '../../test/eventFixtures.ts'
-import { jsonAnswer, networkFailure, problemAnswer, stubApi, type FakeRoute } from '../../test/fakeApi.ts'
-import { EVENT_KEYS, READ_OPTIONS } from './eventQueries.ts'
+import { jsonAnswer, inSequence, networkFailure, problemAnswer, stubApi, type FakeRoute } from '../../test/fakeApi.ts'
+import { wait } from '../../test/fakeTimers.ts'
+import { setVisibility, stubVisibility } from '../../test/fakeVisibility.ts'
+import { EVENT_KEYS } from './eventQueries.ts'
 import { fetchEvent } from './events.ts'
 import { useEventRefresh } from './useEventRefresh.ts'
 
@@ -12,19 +15,6 @@ const EVENT = `/api/events/${DINNER.id}`
 
 /** O meio do espalhamento: a releitura sai em 15 s, 30 s depois de uma falha, 60 s depois de duas. */
 const MIDDLE = 0.5
-
-let visibility: DocumentVisibilityState = 'visible'
-
-function setVisibility(state: DocumentVisibilityState) {
-  visibility = state
-  act(() => {
-    document.dispatchEvent(new Event('visibilitychange'))
-  })
-}
-
-async function wait(ms: number) {
-  await act(() => vi.advanceTimersByTimeAsync(ms))
-}
 
 function busy(seconds: number): FakeRoute {
   return () => Promise.resolve(new Response(null, { status: 503, headers: { 'Retry-After': String(seconds) } }))
@@ -54,8 +44,7 @@ function renderRefresh(route: FakeRoute, isActive = true) {
 
 beforeEach(() => {
   vi.useFakeTimers()
-  visibility = 'visible'
-  vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility)
+  stubVisibility()
   vi.spyOn(Math, 'random').mockReturnValue(MIDDLE)
 })
 
@@ -179,7 +168,7 @@ describe('useEventRefresh', () => {
     ['a server error', problemAnswer(500)],
     ['the network down', networkFailure()],
   ])('waits twice as long after %s, and keeps the event it had', async (_case, failure) => {
-    const { reads, result } = renderRefresh(inSequenceOf(jsonAnswer(DINNER), failure))
+    const { reads, result } = renderRefresh(inSequence(jsonAnswer(DINNER), failure))
     await wait(0)
 
     await wait(15_000)
@@ -195,7 +184,7 @@ describe('useEventRefresh', () => {
   it('doubles again on each failure in a row, up to 2 minutes, and goes back to 15 s after a success', async () => {
     const failing = problemAnswer(500)
     const { reads } = renderRefresh(
-      inSequenceOf(jsonAnswer(DINNER), failing, failing, failing, failing, jsonAnswer(DINNER)),
+      inSequence(jsonAnswer(DINNER), failing, failing, failing, failing, jsonAnswer(DINNER)),
     )
     await wait(0)
 
@@ -214,7 +203,7 @@ describe('useEventRefresh', () => {
   })
 
   it('waits at least the Retry-After of a 503 when it is longer than the backoff', async () => {
-    const { reads } = renderRefresh(inSequenceOf(jsonAnswer(DINNER), busy(90)))
+    const { reads } = renderRefresh(inSequence(jsonAnswer(DINNER), busy(90)))
     await wait(0)
     await wait(15_000)
     expect(reads()).toBe(2)
@@ -236,13 +225,3 @@ describe('useEventRefresh', () => {
   })
 })
 
-/** A primeira resposta é a leitura da tela; a última se repete para as releituras seguintes. */
-function inSequenceOf(first: FakeRoute, ...rest: readonly FakeRoute[]): FakeRoute {
-  const answers = [first, ...rest]
-  let call = 0
-  return (init) => {
-    const answer = answers[Math.min(call, answers.length - 1)] ?? first
-    call += 1
-    return answer(init)
-  }
-}

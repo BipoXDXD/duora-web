@@ -1,7 +1,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../app/App.tsx'
+import { SESSION } from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
   byMethod,
@@ -17,7 +18,6 @@ import {
 import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
-const SESSION = { '/api/me': jsonAnswer({ displayName: 'Ana Souza', profileComplete: true, roles: [] }) }
 
 const ANA = {
   displayName: 'Ana Souza',
@@ -29,6 +29,7 @@ const ANA = {
 const EMPTY = { displayName: null, birthDate: null, bio: null, region: null, complete: false } as const
 
 afterEach(() => {
+  vi.useRealTimers()
   window.history.replaceState(null, '', '/')
   document.cookie = 'XSRF-TOKEN=; path=/; max-age=0'
 })
@@ -199,6 +200,8 @@ describe('profile page', () => {
   })
 
   it('refuses the birth date of someone under 18 on the field', async () => {
+    // Só o Date é falso: a idade depende de hoje, e quem nasceu em 2015 faz 18 anos em 2033.
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-08T12:00:00Z') })
     const { user } = renderProfilePage(profileAnswer(EMPTY, 0))
     const form = await openEditor(user, 'Preencher perfil')
     const birthDate = within(form).getByLabelText('Data de nascimento')

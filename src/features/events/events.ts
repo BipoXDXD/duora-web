@@ -1,5 +1,6 @@
 import { z } from 'zod/mini'
-import { ApiError, readJsonBody, sendApiRequest } from '../../shared/api/http.ts'
+import { hasStatus, readJsonBody, sendApiRequest } from '../../shared/api/http.ts'
+import { NOT_FOUND } from '../../shared/api/httpStatus.ts'
 import { FIRST_ROUND, LAST_ROUND } from './pairing.ts'
 
 /** Instante com fuso, como a API manda; vira `Date` já na fronteira. */
@@ -67,7 +68,6 @@ export function nextPhaseChange(event: Pick<SocialEvent, 'status' | 'startsAt' |
 }
 
 const EVENTS_PATH = '/api/events'
-const NOT_FOUND = 404
 
 /** `?pageToken=…` para as páginas depois da primeira; o tamanho é o padrão da API. */
 export function pageQuery(pageToken: string | null): string {
@@ -86,7 +86,7 @@ export async function fetchEvent(eventId: string): Promise<SocialEvent | null> {
     const response = await sendApiRequest({ method: 'GET', path: `${EVENTS_PATH}/${encodeURIComponent(eventId)}` })
     return await readJsonBody(response, eventSchema)
   } catch (error) {
-    if (error instanceof ApiError && error.status === NOT_FOUND) {
+    if (hasStatus(error, NOT_FOUND)) {
       return null
     }
     throw error

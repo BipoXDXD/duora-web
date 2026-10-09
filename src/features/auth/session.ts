@@ -1,5 +1,6 @@
 import { z } from 'zod/mini'
-import { ApiError, readJsonBody, sendApiRequest } from '../../shared/api/http.ts'
+import { hasStatus, readJsonBody, sendApiRequest } from '../../shared/api/http.ts'
+import { UNAUTHORIZED } from '../../shared/api/httpStatus.ts'
 
 /** Os papéis que o front conhece; o teste confere que são os mesmos que a spec declara. */
 export const KNOWN_ROLES = ['ADMIN'] as const
@@ -47,8 +48,6 @@ export type CurrentUser = Readonly<z.output<typeof currentUserSchema>>
 
 export type Session = { readonly kind: 'anonymous' } | { readonly kind: 'authenticated'; readonly user: CurrentUser }
 
-const UNAUTHORIZED = 401
-
 /**
  * Quem está logado. 401 é a resposta normal para quem não entrou; os outros erros (status, rede,
  * corpo fora do contrato) propagam.
@@ -58,7 +57,7 @@ export async function fetchSession(): Promise<Session> {
     const response = await sendApiRequest({ method: 'GET', path: '/api/me' })
     return { kind: 'authenticated', user: await readJsonBody(response, currentUserSchema) }
   } catch (error) {
-    if (error instanceof ApiError && error.status === UNAUTHORIZED) {
+    if (hasStatus(error, UNAUTHORIZED)) {
       return { kind: 'anonymous' }
     }
     throw error

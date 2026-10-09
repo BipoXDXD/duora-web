@@ -1,25 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useId, useState } from 'react'
 import { isBug } from '../../shared/api/http.ts'
+import { READ_OPTIONS } from '../../shared/api/readOptions.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { PATHS } from '../../shared/routing/routes.ts'
+import { formatDay } from '../../shared/text/dateFormat.ts'
+import { ConfirmStep } from '../../shared/ui/ConfirmStep.tsx'
+import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
+import { useShownNotice } from '../../shared/ui/useShownNotice.ts'
 import { LOGIN_URL } from '../auth/loginUrl.ts'
-import { EVENT_KEYS, READ_OPTIONS } from './eventQueries.ts'
-import { formatDay } from './eventText.ts'
+import { EVENT_KEYS } from './eventQueries.ts'
 import { noticeOfCancel, noticeOfRegister, type RegistrationNotice } from './registrationNotices.ts'
 import { cancelRegistration, fetchRegistration, register, type Registration } from './registrations.ts'
 
 interface RegistrationPanelProps {
   readonly eventId: string
-}
-
-/** Notícia mostrada; o número muda a cada resposta, para o mesmo aviso repetido ser anunciado de novo. */
-interface ShownNotice {
-  readonly notice: RegistrationNotice
-  readonly id: number
 }
 
 /** Inscrição de um evento que ainda vai começar: inscrever-se ou cancelar, com cada falha explicada. */
@@ -30,7 +28,7 @@ export function RegistrationPanel({ eventId }: RegistrationPanelProps) {
     queryFn: () => fetchRegistration(eventId),
     ...READ_OPTIONS,
   })
-  const [shown, setShown] = useState<ShownNotice | null>(null)
+  const { shown, show: showNotice } = useShownNotice<{ readonly notice: RegistrationNotice }>()
   const headingId = useId()
 
   /**
@@ -45,7 +43,7 @@ export function RegistrationPanel({ eventId }: RegistrationPanelProps) {
     if (eventChanged) {
       void queryClient.invalidateQueries({ queryKey: EVENT_KEYS.event(eventId) })
     }
-    setShown((previous) => ({ notice, id: (previous?.id ?? 0) + 1 }))
+    showNotice({ notice })
   }
 
   const registerMutation = useMutation({
@@ -159,42 +157,21 @@ function Registered({ registration, isCancelling, onCancel }: RegisteredProps) {
     <>
       <p className="text-fg">{`Você está na lista desde ${formatDay(registration.registeredAt)}.`}</p>
       {isConfirming || isCancelling ? (
-        <ConfirmCancel isCancelling={isCancelling} onConfirm={onCancel} onKeep={keep} />
+        <ConfirmStep
+          confirmLabel="Sim, cancelar"
+          pendingLabel="Cancelando…"
+          backLabel="Manter inscrição"
+          isPending={isCancelling}
+          onConfirm={onCancel}
+          onBack={keep}
+        >
+          <p className="text-fg">Cancelar sua inscrição? Se o evento lotar, pode não haver vaga para voltar.</p>
+        </ConfirmStep>
       ) : (
-        <CancelButton hasFocus={wasKept} onClick={() => setIsConfirming(true)} />
+        <FocusReturnButton hasFocus={wasKept} onClick={() => setIsConfirming(true)}>
+          Cancelar inscrição
+        </FocusReturnButton>
       )}
     </>
-  )
-}
-
-function CancelButton({ hasFocus, onClick }: { readonly hasFocus: boolean; readonly onClick: () => void }) {
-  const ref = useFocusOnMount<HTMLButtonElement>()
-  return (
-    <button ref={hasFocus ? ref : undefined} type="button" onClick={onClick} className={SECONDARY_BUTTON}>
-      Cancelar inscrição
-    </button>
-  )
-}
-
-interface ConfirmCancelProps {
-  readonly isCancelling: boolean
-  readonly onConfirm: () => void
-  readonly onKeep: () => void
-}
-
-function ConfirmCancel({ isCancelling, onConfirm, onKeep }: ConfirmCancelProps) {
-  const confirmRef = useFocusOnMount<HTMLButtonElement>()
-  return (
-    <div className="flex flex-col items-start gap-3">
-      <p className="text-fg">Cancelar sua inscrição? Se o evento lotar, pode não haver vaga para voltar.</p>
-      <div className="flex flex-wrap gap-4">
-        <button ref={confirmRef} type="button" onClick={onConfirm} disabled={isCancelling} className={PRIMARY_BUTTON}>
-          {isCancelling ? 'Cancelando…' : 'Sim, cancelar'}
-        </button>
-        <button type="button" onClick={onKeep} disabled={isCancelling} className={SECONDARY_BUTTON}>
-          Manter inscrição
-        </button>
-      </div>
-    </div>
   )
 }

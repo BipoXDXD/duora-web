@@ -1,11 +1,11 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
+import { SESSION } from '../test/eventFixtures.ts'
 import { ANONYMOUS_SESSION, jsonAnswer, neverAnswer, problemAnswer, stubApi, type FakeRoute } from '../test/fakeApi.ts'
 import { stubMatchMedia } from '../test/fakeMatchMedia.ts'
 import { App } from './App.tsx'
 
-const SESSION = { '/api/me': jsonAnswer({ displayName: 'Ana Souza', profileComplete: true, roles: [] }) }
 const ADMIN_SESSION = {
   '/api/me': jsonAnswer({ displayName: 'Ana Souza', profileComplete: true, roles: ['ADMIN'] }),
 }

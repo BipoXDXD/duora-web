@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
-import { ApiError, isApiFailure } from '../../shared/api/http.ts'
+import { ApiError, hasStatus, isApiFailure } from '../../shared/api/http.ts'
+import { UNAUTHORIZED } from '../../shared/api/httpStatus.ts'
 import { fetchChatAccess, fetchMessagesAfter, sendMessage, type Outgoing } from './chat.ts'
 import { problemFromApi, type DraftProblem } from './chatDraft.ts'
 import { chatLogReducer, INITIAL_CHAT_LOG, type ChatLog, type Pending } from './chatLog.ts'
@@ -18,8 +19,6 @@ export interface RoundChat {
 }
 
 type Reading = 'continue' | 'stop'
-
-const UNAUTHORIZED = 401
 
 /**
  * O chat de uma rodada por polling (ADR 0021 da duora-api): lê se aceita mensagens e depois as mensagens depois
@@ -99,7 +98,7 @@ export function useRoundChat(eventId: string, roundNumber: number): RoundChat {
           rethrow(error)
           return
         }
-        if (error instanceof ApiError && error.status === UNAUTHORIZED) {
+        if (hasStatus(error, UNAUTHORIZED)) {
           setReconnecting(false)
           setSignedOut(true)
           return

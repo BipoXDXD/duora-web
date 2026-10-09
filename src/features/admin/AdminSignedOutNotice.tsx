@@ -1,3 +1,4 @@
+import { SIGNED_OUT_NOTICE } from '../../shared/ui/notice.ts'
 import { SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
 import { LOGIN_URL } from '../auth/loginUrl.ts'
 
@@ -6,7 +7,7 @@ export function AdminSignedOutNotice() {
   return (
     <div className="flex flex-col items-start gap-4">
       <p role="alert" className="text-fg">
-        Sua sessão terminou. Entre de novo para continuar.
+        {SIGNED_OUT_NOTICE.text}
       </p>
       <a href={LOGIN_URL} className={SECONDARY_BUTTON}>
         Entrar de novo

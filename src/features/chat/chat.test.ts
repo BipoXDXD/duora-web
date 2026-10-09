@@ -6,6 +6,7 @@ import type {
   SendMessageRequest,
 } from '../../shared/api/contract.ts'
 import { ApiError, InvalidResponseError } from '../../shared/api/http.ts'
+import { jsonResponse } from '../../test/responses.ts'
 import {
   fetchChatAccess,
   fetchMessagesAfter,
@@ -29,10 +30,6 @@ const KEY = '0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7c'
 const MESSAGE = { seq: 3, fromMe: false, text: 'Oi!\nTudo bem?', sentAt: '2026-10-10T23:05:00Z' }
 const READ_MESSAGE: ChatMessage = { seq: 3, fromMe: false, text: 'Oi!\nTudo bem?', sentAt: new Date(MESSAGE.sentAt) }
 
-function json(body: unknown, status = 200, headers: Readonly<Record<string, string>> = {}): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } })
-}
-
 function lastCall() {
   const [path, init] = fetchMock.mock.calls.at(-1) ?? []
   return { path, method: init?.method, body: init?.body, headers: new Headers(init?.headers) }
@@ -43,7 +40,7 @@ describe('fetchChatAccess', () => {
     [true, 'open'],
     [false, 'closed'],
   ] as const)('reads open=%s as %s', async (open, kind) => {
-    fetchMock.mockResolvedValue(json({ chatId: KEY, open, lastSeq: 4 }))
+    fetchMock.mockResolvedValue(jsonResponse({ chatId: KEY, open, lastSeq: 4 }))
 
     await expect(fetchChatAccess(EVENT_ID, 2)).resolves.toEqual({ kind })
     expect(lastCall()).toMatchObject({ path: CHAT, method: 'GET' })
@@ -62,7 +59,7 @@ describe('fetchChatAccess', () => {
   })
 
   it('fails when open is not a boolean', async () => {
-    fetchMock.mockResolvedValue(json({ chatId: KEY, open: 'true', lastSeq: 4 }))
+    fetchMock.mockResolvedValue(jsonResponse({ chatId: KEY, open: 'true', lastSeq: 4 }))
 
     await expect(fetchChatAccess(EVENT_ID, 2)).rejects.toBeInstanceOf(InvalidResponseError)
   })
@@ -70,20 +67,20 @@ describe('fetchChatAccess', () => {
 
 describe('fetchMessagesAfter', () => {
   it('asks for the messages after the cursor, in the largest page the API gives', async () => {
-    fetchMock.mockResolvedValue(json({ items: [MESSAGE], nextAfterSeq: null }))
+    fetchMock.mockResolvedValue(jsonResponse({ items: [MESSAGE], nextAfterSeq: null }))
 
     await expect(fetchMessagesAfter(EVENT_ID, 2, 2)).resolves.toEqual({ items: [READ_MESSAGE], hasMore: false })
     expect(lastCall()).toMatchObject({ path: `${CHAT}/messages?afterSeq=2&maxPageSize=100`, method: 'GET' })
   })
 
   it('says there is more when the API gives the next cursor', async () => {
-    fetchMock.mockResolvedValue(json({ items: [MESSAGE], nextAfterSeq: 3 }))
+    fetchMock.mockResolvedValue(jsonResponse({ items: [MESSAGE], nextAfterSeq: 3 }))
 
     await expect(fetchMessagesAfter(EVENT_ID, 2, 2)).resolves.toEqual({ items: [READ_MESSAGE], hasMore: true })
   })
 
   it('reads an empty page', async () => {
-    fetchMock.mockResolvedValue(json({ items: [], nextAfterSeq: null }))
+    fetchMock.mockResolvedValue(jsonResponse({ items: [], nextAfterSeq: null }))
 
     await expect(fetchMessagesAfter(EVENT_ID, 2, 0)).resolves.toEqual({ items: [], hasMore: false })
   })
@@ -106,7 +103,7 @@ describe('fetchMessagesAfter', () => {
     ['a date without a time zone', { ...MESSAGE, sentAt: '2026-10-10T23:05:00' }],
     ['text missing', { seq: 3, fromMe: false, sentAt: MESSAGE.sentAt }],
   ])('fails on a message with %s', async (_case, message) => {
-    fetchMock.mockResolvedValue(json({ items: [message], nextAfterSeq: null }))
+    fetchMock.mockResolvedValue(jsonResponse({ items: [message], nextAfterSeq: null }))
 
     await expect(fetchMessagesAfter(EVENT_ID, 2, 0)).rejects.toBeInstanceOf(InvalidResponseError)
   })
@@ -115,7 +112,7 @@ describe('fetchMessagesAfter', () => {
 describe('sendMessage', () => {
   it('sends the text with POST, the key and the CSRF header', async () => {
     document.cookie = 'XSRF-TOKEN=token-1; path=/'
-    fetchMock.mockResolvedValue(json({ ...MESSAGE, fromMe: true }, 201))
+    fetchMock.mockResolvedValue(jsonResponse({ ...MESSAGE, fromMe: true }, 201))
 
     await sendMessage(EVENT_ID, 2, { key: KEY, text: 'Oi!' })
 
@@ -127,7 +124,7 @@ describe('sendMessage', () => {
   })
 
   it.each([201, 200])('reports the recorded message on %i', async (status) => {
-    fetchMock.mockResolvedValue(json({ ...MESSAGE, fromMe: true }, status))
+    fetchMock.mockResolvedValue(jsonResponse({ ...MESSAGE, fromMe: true }, status))
 
     await expect(sendMessage(EVENT_ID, 2, { key: KEY, text: 'Oi!' })).resolves.toEqual({
       kind: 'sent',
@@ -140,13 +137,13 @@ describe('sendMessage', () => {
     ['IDEMPOTENCY_KEY_REUSED', { kind: 'keyReused' }],
     ['SOMETHING_NEW', { kind: 'failed' }],
   ])('turns a 409 with the reason %s into %o', async (reason, result) => {
-    fetchMock.mockResolvedValue(json({ title: 'Conflict', status: 409, reason }, 409))
+    fetchMock.mockResolvedValue(jsonResponse({ title: 'Conflict', status: 409, reason }, 409))
 
     await expect(sendMessage(EVENT_ID, 2, { key: KEY, text: 'Oi!' })).resolves.toEqual(result)
   })
 
   it('gives the field errors of a 400', async () => {
-    fetchMock.mockResolvedValue(json({ title: 'Bad Request', status: 400, errors: [{ field: 'text', code: 'TOO_LONG' }] }, 400))
+    fetchMock.mockResolvedValue(jsonResponse({ title: 'Bad Request', status: 400, errors: [{ field: 'text', code: 'TOO_LONG' }] }, 400))
 
     await expect(sendMessage(EVENT_ID, 2, { key: KEY, text: 'x' })).resolves.toEqual({
       kind: 'invalid',
@@ -181,7 +178,7 @@ describe('sendMessage', () => {
   })
 
   it('reports a failure on a body outside the contract', async () => {
-    fetchMock.mockResolvedValue(json({ ...MESSAGE, seq: 'três' }, 201))
+    fetchMock.mockResolvedValue(jsonResponse({ ...MESSAGE, seq: 'três' }, 201))
 
     await expect(sendMessage(EVENT_ID, 2, { key: KEY, text: 'Oi!' })).resolves.toEqual({ kind: 'failed' })
   })

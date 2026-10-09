@@ -1,11 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useId, useRef, useState, type FormEvent } from 'react'
 import { isBug } from '../../shared/api/http.ts'
+import { READ_OPTIONS } from '../../shared/api/readOptions.ts'
+import { formatTime } from '../../shared/text/dateFormat.ts'
+import { ConfirmStep } from '../../shared/ui/ConfirmStep.tsx'
 import { FormField } from '../../shared/ui/FormField.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { FIELD_CONTROL, PRIMARY_BUTTON } from '../../shared/ui/styles.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
-import { EVENT_KEYS, READ_OPTIONS } from '../events/eventQueries.ts'
+import { useShownNotice } from '../../shared/ui/useShownNotice.ts'
+import { EVENT_KEYS } from '../events/eventQueries.ts'
 import { fetchEvent } from '../events/events.ts'
 import { FIRST_ROUND, LAST_ROUND } from '../events/pairing.ts'
 import { fetchAdminRound, startRound, type AdminEvent, type AdminPhase, type AdminRound, type StartRoundResult } from './adminEvents.ts'
@@ -13,7 +17,6 @@ import { noticeOfRound, type AdminNotice } from './adminNotices.ts'
 import { AdminNoticeMessage } from './AdminNoticeMessage.tsx'
 import { ADMIN_KEYS } from './adminQueries.ts'
 import { roundCountsText } from './adminText.ts'
-import { ConfirmAction } from './ConfirmAction.tsx'
 
 interface AdminRoundsPanelProps {
   readonly event: AdminEvent
@@ -106,18 +109,12 @@ function RoundResult({ round, number }: { readonly round: AdminRound | null; rea
     <div className="flex w-full flex-col gap-1 rounded-lg bg-surface p-4 shadow-raised">
       <p className="text-lg font-semibold text-fg">{`Rodada atual: ${round.number}`}</p>
       <p className="text-fg">{roundCountsText(round)}</p>
-      <p className="text-sm text-fg-muted">{`Começou às ${TIME_FORMAT.format(round.startedAt)}.`}</p>
+      <p className="text-sm text-fg-muted">{`Começou às ${formatTime(round.startedAt)}.`}</p>
     </div>
   )
 }
 
 /** Sem `timeZone`: o Intl usa o fuso de quem está com o app aberto. */
-const TIME_FORMAT = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' })
-
-interface ShownNotice {
-  readonly notice: AdminNotice
-  readonly id: number
-}
 
 const NUMBER_TEXT = /^\d+$/
 
@@ -150,8 +147,8 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
   /** Ao desistir da confirmação o foco volta para o campo do número. */
   const [returnedFromConfirm, setReturnedFromConfirm] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
-  const [shown, setShown] = useState<ShownNotice | null>(null)
-  const value = typed ?? suggested
+  const { shown, show: showNotice, hide: hideNotice } = useShownNotice<{ readonly notice: AdminNotice }>()
+  const roundNumberText = typed ?? suggested
 
   const mutation = useMutation({
     mutationFn: ({ number }: { readonly number: number }) => startRound(event.id, number),
@@ -170,13 +167,13 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
       void queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.event(event.id) })
     }
     setConfirming(null)
-    setShown((previous) => ({ notice: noticeOfRound(number, result), id: (previous?.id ?? 0) + 1 }))
+    showNotice({ notice: noticeOfRound(number, result) })
   }
 
   function ask(submitted: FormEvent<HTMLFormElement>) {
     submitted.preventDefault()
-    setShown(null)
-    const number = roundNumberOf(value)
+    hideNotice()
+    const number = roundNumberOf(roundNumberText)
     setHasProblem(number === null)
     setReturnedFromConfirm(false)
     setConfirming(number)
@@ -205,7 +202,7 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
               <RoundNumberInput
                 control={control}
                 takesFocus={returnedFromConfirm}
-                value={value}
+                value={roundNumberText}
                 onChange={setTyped}
               />
             )}
@@ -215,8 +212,7 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
           </button>
         </form>
       ) : (
-        <ConfirmAction
-          question={confirmQuestion(confirming, event.registrationCount)}
+        <ConfirmStep
           confirmLabel={`Sim, iniciar a rodada ${confirming}`}
           pendingLabel="Iniciando…"
           isPending={mutation.isPending}
@@ -225,7 +221,9 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
             setReturnedFromConfirm(true)
             setConfirming(null)
           }}
-        />
+        >
+          <p className="text-fg">{confirmQuestion(confirming, event.registrationCount)}</p>
+        </ConfirmStep>
       )}
     </>
   )

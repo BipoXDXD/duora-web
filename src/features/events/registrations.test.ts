@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import type { MyRegistrationsPageResponse, RegistrationResponse } from '../../shared/api/contract.ts'
 import { InvalidResponseError } from '../../shared/api/http.ts'
+import { firstRequest, jsonResponse, problemResponse } from '../../test/responses.ts'
 import {
   cancelRegistration,
   fetchMyRegistrationsPage,
@@ -24,35 +25,19 @@ const EVENT_ID = '0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7b'
 const REGISTRATION = { eventId: EVENT_ID, registeredAt: '2026-10-05T12:00:00Z' }
 const REGISTRATION_PATH = `/api/events/${EVENT_ID}/registration`
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
-}
-
 function refusal(status: number, reason?: string, headers: Readonly<Record<string, string>> = {}): Response {
-  const body = { title: 'Erro', status, ...(reason !== undefined && { reason }) }
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/problem+json', ...headers },
-  })
-}
-
-function sentRequest(): { path: unknown; init: RequestInit } {
-  const call = fetchMock.mock.calls[0]
-  if (call === undefined) {
-    throw new Error('fetch não foi chamado')
-  }
-  return { path: call[0], init: call[1] ?? {} }
+  return problemResponse(status, reason === undefined ? {} : { reason }, headers)
 }
 
 describe('fetchRegistration', () => {
   it('reads the own registration in the event', async () => {
-    fetchMock.mockResolvedValue(json(REGISTRATION))
+    fetchMock.mockResolvedValue(jsonResponse(REGISTRATION))
 
     await expect(fetchRegistration(EVENT_ID)).resolves.toEqual({
       eventId: EVENT_ID,
       registeredAt: new Date('2026-10-05T12:00:00Z'),
     })
-    expect(sentRequest().path).toBe(REGISTRATION_PATH)
+    expect(firstRequest(fetchMock).path).toBe(REGISTRATION_PATH)
   })
 
   it('returns null when there is no registration', async () => {
@@ -71,11 +56,11 @@ describe('fetchRegistration', () => {
 describe('register', () => {
   it('puts the registration, with the CSRF token and without a body', async () => {
     document.cookie = 'XSRF-TOKEN=csrf-123; path=/'
-    fetchMock.mockResolvedValue(json(REGISTRATION, 201))
+    fetchMock.mockResolvedValue(jsonResponse(REGISTRATION, 201))
 
     await register(EVENT_ID)
 
-    const { path, init } = sentRequest()
+    const { path, init } = firstRequest(fetchMock)
     expect(path).toBe(REGISTRATION_PATH)
     expect(init.method).toBe('PUT')
     expect(init.body).toBeUndefined()
@@ -83,7 +68,7 @@ describe('register', () => {
   })
 
   it.each([201, 200])('reports the registration on %s', async (status) => {
-    fetchMock.mockResolvedValue(json(REGISTRATION, status))
+    fetchMock.mockResolvedValue(jsonResponse(REGISTRATION, status))
 
     await expect(register(EVENT_ID)).resolves.toEqual({
       kind: 'registered',
@@ -153,7 +138,7 @@ describe('register', () => {
   })
 
   it('reports a body out of the contract as failed', async () => {
-    fetchMock.mockResolvedValue(json({ eventId: 'x' }, 201))
+    fetchMock.mockResolvedValue(jsonResponse({ eventId: 'x' }, 201))
 
     await expect(register(EVENT_ID)).resolves.toEqual({ kind: 'failed' })
   })
@@ -171,7 +156,7 @@ describe('cancelRegistration', () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
 
     await expect(cancelRegistration(EVENT_ID)).resolves.toEqual({ kind: 'cancelled' })
-    const { path, init } = sentRequest()
+    const { path, init } = firstRequest(fetchMock)
     expect(path).toBe(REGISTRATION_PATH)
     expect(init.method).toBe('DELETE')
     expect(new Headers(init.headers).get('X-XSRF-TOKEN')).toBe('csrf-123')
@@ -229,7 +214,7 @@ describe('fetchMyRegistrationsPage', () => {
   }
 
   it('asks for the first page, then the next one by token', async () => {
-    fetchMock.mockImplementation(() => Promise.resolve(json({ items: [], nextPageToken: null })))
+    fetchMock.mockImplementation(() => Promise.resolve(jsonResponse({ items: [], nextPageToken: null })))
 
     await fetchMyRegistrationsPage(null)
     await fetchMyRegistrationsPage('page-2')
@@ -241,7 +226,7 @@ describe('fetchMyRegistrationsPage', () => {
   })
 
   it('returns the registrations with the times as dates', async () => {
-    fetchMock.mockResolvedValue(json({ items: [MINE], nextPageToken: 'next' }))
+    fetchMock.mockResolvedValue(jsonResponse({ items: [MINE], nextPageToken: 'next' }))
 
     await expect(fetchMyRegistrationsPage(null)).resolves.toEqual({
       items: [
@@ -257,7 +242,7 @@ describe('fetchMyRegistrationsPage', () => {
   })
 
   it('fails on a registration with an unknown event status', async () => {
-    fetchMock.mockResolvedValue(json({ items: [{ ...MINE, eventStatus: 'DRAFT' }], nextPageToken: null }))
+    fetchMock.mockResolvedValue(jsonResponse({ items: [{ ...MINE, eventStatus: 'DRAFT' }], nextPageToken: null }))
 
     await expect(fetchMyRegistrationsPage(null)).rejects.toBeInstanceOf(InvalidResponseError)
   })

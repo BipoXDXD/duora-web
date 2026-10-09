@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import type { EditProfileRequest, ProfileResponse } from '../../shared/api/contract.ts'
 import { InvalidResponseError } from '../../shared/api/http.ts'
+import { firstRequest, problemResponse } from '../../test/responses.ts'
 import {
   editProfile,
   fetchProfile,
@@ -38,35 +39,13 @@ function profileAnswer(body: unknown, etag: string | null = '"4"', status = 200)
   return new Response(JSON.stringify(body), { status, headers })
 }
 
-function problemAnswer(status: number, detail?: string, errors?: unknown): Response {
-  return new Response(JSON.stringify({ title: 'Erro', status, detail, errors }), {
-    status,
-    headers: { 'Content-Type': 'application/problem+json' },
-  })
-}
-
-function refusalAnswer(status: number, reason: string): Response {
-  return new Response(JSON.stringify({ title: 'Erro', status, reason }), {
-    status,
-    headers: { 'Content-Type': 'application/problem+json' },
-  })
-}
-
-function sentRequest(): { path: unknown; init: RequestInit } {
-  const call = fetchMock.mock.calls[0]
-  if (call === undefined) {
-    throw new Error('fetch não foi chamado')
-  }
-  return { path: call[0], init: call[1] ?? {} }
-}
-
 describe('fetchProfile', () => {
   it('asks GET /api/me/profile', async () => {
     fetchMock.mockResolvedValue(profileAnswer(ANA))
 
     await fetchProfile()
 
-    const { path, init } = sentRequest()
+    const { path, init } = firstRequest(fetchMock)
     expect(path).toBe('/api/me/profile')
     expect(init.method).toBe('GET')
   })
@@ -110,7 +89,7 @@ describe('fetchProfile', () => {
   })
 
   it('fails with the API status when the read is refused', async () => {
-    fetchMock.mockResolvedValue(problemAnswer(500))
+    fetchMock.mockResolvedValue(problemResponse(500))
 
     await expect(fetchProfile()).rejects.toMatchObject({ name: 'ApiError', status: 500 })
   })
@@ -123,7 +102,7 @@ describe('editProfile', () => {
 
     await editProfile('"4"', { bio: null })
 
-    const { path, init } = sentRequest()
+    const { path, init } = firstRequest(fetchMock)
     const headers = new Headers(init.headers)
     expect(path).toBe('/api/me/profile')
     expect(init.method).toBe('PATCH')
@@ -142,20 +121,20 @@ describe('editProfile', () => {
   })
 
   it('reports an outdated version on 412', async () => {
-    fetchMock.mockResolvedValue(problemAnswer(412))
+    fetchMock.mockResolvedValue(problemResponse(412))
 
     await expect(editProfile('"4"', { bio: 'Oi' })).resolves.toEqual({ kind: 'outdated' })
   })
 
   it('reports a birth date that can no longer change on a 409 BIRTH_DATE_ALREADY_SET', async () => {
-    fetchMock.mockResolvedValue(refusalAnswer(409, 'BIRTH_DATE_ALREADY_SET'))
+    fetchMock.mockResolvedValue(problemResponse(409, { reason: 'BIRTH_DATE_ALREADY_SET' }))
 
     await expect(editProfile('"4"', { birthDate: '1991-01-01' })).resolves.toEqual({ kind: 'birthDateLocked' })
   })
 
   it.each([
-    ['has no reason', () => problemAnswer(409)],
-    ['has a reason the front does not know', () => refusalAnswer(409, 'SOMETHING_NEW')],
+    ['has no reason', () => problemResponse(409)],
+    ['has a reason the front does not know', () => problemResponse(409, { reason: 'SOMETHING_NEW' })],
   ])('reports a failure when a 409 %s, since it does not say the birth date is locked', async (_case, answer) => {
     fetchMock.mockResolvedValue(answer())
 
@@ -164,10 +143,13 @@ describe('editProfile', () => {
 
   it('reports a 400 with the fields the API refused, in the order it listed them', async () => {
     fetchMock.mockResolvedValue(
-      problemAnswer(400, 'bio must have at most 300 characters', [
-        { field: 'bio', code: 'TOO_LONG' },
-        { field: 'region', code: 'UNSUPPORTED_VALUE' },
-      ]),
+      problemResponse(400, {
+        detail: 'bio must have at most 300 characters',
+        errors: [
+          { field: 'bio', code: 'TOO_LONG' },
+          { field: 'region', code: 'UNSUPPORTED_VALUE' },
+        ],
+      }),
     )
 
     await expect(editProfile('"4"', {})).resolves.toEqual({
@@ -180,7 +162,7 @@ describe('editProfile', () => {
   })
 
   it('does not read the field from the English detail, which is for developers', async () => {
-    fetchMock.mockResolvedValue(problemAnswer(400, 'bio must have at most 300 characters'))
+    fetchMock.mockResolvedValue(problemResponse(400, { detail: 'bio must have at most 300 characters' }))
 
     await expect(editProfile('"4"', {})).resolves.toEqual({ kind: 'invalid', fieldErrors: [] })
   })
@@ -189,19 +171,19 @@ describe('editProfile', () => {
     ['no detail', undefined, undefined],
     ['errors out of the format', 'bio is too long', 'bio'],
   ])('reports a 400 with %s without any field', async (_case, detail, errors) => {
-    fetchMock.mockResolvedValue(problemAnswer(400, detail, errors))
+    fetchMock.mockResolvedValue(problemResponse(400, { detail, errors }))
 
     await expect(editProfile('"4"', {})).resolves.toEqual({ kind: 'invalid', fieldErrors: [] })
   })
 
   it('reports an expired session on 401', async () => {
-    fetchMock.mockResolvedValue(problemAnswer(401))
+    fetchMock.mockResolvedValue(problemResponse(401))
 
     await expect(editProfile('"4"', { bio: 'Oi' })).resolves.toEqual({ kind: 'signedOut' })
   })
 
   it.each([403, 415, 428, 500, 503])('reports a failure on %i', async (status) => {
-    fetchMock.mockResolvedValue(problemAnswer(status))
+    fetchMock.mockResolvedValue(problemResponse(status))
 
     await expect(editProfile('"4"', { bio: 'Oi' })).resolves.toEqual({ kind: 'failed' })
   })

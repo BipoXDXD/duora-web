@@ -1,5 +1,6 @@
 import { z } from 'zod/mini'
-import { ApiError, readJsonBody, sendApiRequest } from '../../shared/api/http.ts'
+import { hasStatus, readJsonBody, sendApiRequest } from '../../shared/api/http.ts'
+import { NOT_FOUND } from '../../shared/api/httpStatus.ts'
 
 /** Corpo de GET /api/events/{eventId}/rounds/{number}/pairing (PairingResponse). */
 const pairingSchema = z.object({
@@ -24,15 +25,13 @@ export type Pairing =
 export const FIRST_ROUND = 1
 export const LAST_ROUND = 100
 
-const NOT_FOUND = 404
-
 export async function fetchPairing(eventId: string, roundNumber: number): Promise<Pairing> {
   const path = `/api/events/${encodeURIComponent(eventId)}/rounds/${roundNumber}/pairing`
   try {
     const { partnerAccountId } = await readJsonBody(await sendApiRequest({ method: 'GET', path }), pairingSchema)
     return partnerAccountId === null ? { kind: 'sittingOut' } : { kind: 'paired', partnerAccountId }
   } catch (error) {
-    if (error instanceof ApiError && error.status === NOT_FOUND) {
+    if (hasStatus(error, NOT_FOUND)) {
       return { kind: 'notInRound' }
     }
     throw error

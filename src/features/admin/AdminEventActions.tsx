@@ -1,25 +1,20 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useId, useState } from 'react'
 import { isBug } from '../../shared/api/http.ts'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
-import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
+import { ConfirmStep } from '../../shared/ui/ConfirmStep.tsx'
+import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
+import { PRIMARY_BUTTON } from '../../shared/ui/styles.ts'
+import { useShownNotice } from '../../shared/ui/useShownNotice.ts'
 import { EVENT_KEYS } from '../events/eventQueries.ts'
 import { cancelEvent, canCancelAt, publishEvent, type AdminEvent, type EventActionResult } from './adminEvents.ts'
 import { noticeOfChange, type AdminNotice, type EventChange } from './adminNotices.ts'
 import { AdminNoticeMessage } from './AdminNoticeMessage.tsx'
 import { ADMIN_KEYS } from './adminQueries.ts'
-import { ConfirmAction } from './ConfirmAction.tsx'
 
 interface AdminEventActionsProps {
   readonly event: AdminEvent
   /** O instante da leitura do evento, para saber se ele ainda pode ser cancelado. */
   readonly now: Date
-}
-
-/** Notícia mostrada; o número muda a cada resposta, para o mesmo aviso repetido receber o foco de novo. */
-interface ShownNotice {
-  readonly notice: AdminNotice
-  readonly id: number
 }
 
 const CONFIRMATION: Readonly<Record<EventChange, { readonly question: string; readonly confirm: string; readonly pending: string }>> = {
@@ -46,7 +41,7 @@ export function AdminEventActions({ event, now }: AdminEventActionsProps) {
   const [confirming, setConfirming] = useState<EventChange | null>(null)
   /** O botão que abriu a confirmação recebe o foco de volta quando a pessoa desiste. */
   const [returnFocusTo, setReturnFocusTo] = useState<EventChange | null>(null)
-  const [shown, setShown] = useState<ShownNotice | null>(null)
+  const { shown, show: showNotice } = useShownNotice<{ readonly notice: AdminNotice }>()
 
   const mutation = useMutation({
     mutationFn: ({ change }: { readonly change: EventChange }) =>
@@ -70,7 +65,7 @@ export function AdminEventActions({ event, now }: AdminEventActionsProps) {
     }
     setConfirming(null)
     setReturnFocusTo(null)
-    setShown((previous) => ({ notice: noticeOfChange(change, result), id: (previous?.id ?? 0) + 1 }))
+    showNotice({ notice: noticeOfChange(change, result) })
   }
 
   const canPublish = event.status === 'DRAFT'
@@ -82,8 +77,7 @@ export function AdminEventActions({ event, now }: AdminEventActionsProps) {
       </h2>
       {shown !== null && <AdminNoticeMessage key={shown.id} notice={shown.notice} />}
       {confirming !== null ? (
-        <ConfirmAction
-          question={CONFIRMATION[confirming].question}
+        <ConfirmStep
           confirmLabel={CONFIRMATION[confirming].confirm}
           pendingLabel={CONFIRMATION[confirming].pending}
           isPending={mutation.isPending}
@@ -92,43 +86,29 @@ export function AdminEventActions({ event, now }: AdminEventActionsProps) {
             setReturnFocusTo(confirming)
             setConfirming(null)
           }}
-        />
+        >
+          <p className="text-fg">{CONFIRMATION[confirming].question}</p>
+        </ConfirmStep>
       ) : (
         <div className="flex flex-wrap gap-4">
           {canPublish && (
-            <ChangeButton
-              label="Publicar evento"
+            <FocusReturnButton
               className={PRIMARY_BUTTON}
               hasFocus={returnFocusTo === 'publish'}
               onClick={() => setConfirming('publish')}
-            />
+            >
+              Publicar evento
+            </FocusReturnButton>
           )}
           {canCancel && (
-            <ChangeButton
-              label="Cancelar evento"
-              className={SECONDARY_BUTTON}
-              hasFocus={returnFocusTo === 'cancel'}
-              onClick={() => setConfirming('cancel')}
-            />
+            <FocusReturnButton hasFocus={returnFocusTo === 'cancel'} onClick={() => setConfirming('cancel')}>
+              Cancelar evento
+            </FocusReturnButton>
           )}
           {!canPublish && !canCancel && <p className="text-fg-muted">{closedText(event)}</p>}
         </div>
       )}
     </section>
-  )
-}
-
-function ChangeButton(props: {
-  readonly label: string
-  readonly className: string
-  readonly hasFocus: boolean
-  readonly onClick: () => void
-}) {
-  const ref = useFocusOnMount<HTMLButtonElement>()
-  return (
-    <button ref={props.hasFocus ? ref : undefined} type="button" onClick={props.onClick} className={props.className}>
-      {props.label}
-    </button>
   )
 }
 

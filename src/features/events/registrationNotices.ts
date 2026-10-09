@@ -1,22 +1,19 @@
+import { waitText } from '../../shared/text/waitText.ts'
+import { errorNotice, SIGNED_OUT_NOTICE, successNotice, type Notice } from '../../shared/ui/notice.ts'
 import type { CancelResult, EventClosure, RegisterResult } from './registrations.ts'
 
 /**
  * O aviso depois de inscrever ou cancelar. `action` é o próximo passo que a tela oferece junto: completar
  * o perfil ou entrar de novo.
  */
-export interface RegistrationNotice {
-  readonly tone: 'success' | 'error'
-  readonly text: string
-  readonly action: 'completeProfile' | 'signIn' | null
-}
+export type RegistrationNotice = Notice<'completeProfile' | 'signIn'>
 
 const GONE = 'Este evento não existe mais.'
-const SIGNED_OUT = 'Sua sessão terminou. Entre de novo para continuar.'
 
 export function noticeOfRegister(result: RegisterResult): RegistrationNotice {
   switch (result.kind) {
     case 'registered':
-      return success('Inscrição feita. Até lá!')
+      return successNotice('Inscrição feita. Até lá!')
     case 'profileIncomplete':
       return {
         tone: 'error',
@@ -25,36 +22,36 @@ export function noticeOfRegister(result: RegisterResult): RegistrationNotice {
       }
     case 'underage':
       // Sem link para o perfil: a data de nascimento não muda, então "completar" não resolveria.
-      return error('Os eventos do Duora são só para maiores de 18 anos, por isso não foi possível fazer esta inscrição.')
+      return errorNotice('Os eventos do Duora são só para maiores de 18 anos, por isso não foi possível fazer esta inscrição.')
     case 'notAllowed':
-      return error('Não foi possível fazer a inscrição: sua conta não pode participar deste evento.')
+      return errorNotice('Não foi possível fazer a inscrição: sua conta não pode participar deste evento.')
     case 'unavailable':
-      return error(UNAVAILABLE_TEXT[result.cause ?? 'unknown'])
+      return errorNotice(UNAVAILABLE_TEXT[result.cause ?? 'unknown'])
     case 'busy':
-      return error(busyText(result.retryAfterSeconds))
+      return errorNotice(busyText(result.retryAfterSeconds))
     case 'notFound':
-      return error(GONE)
+      return errorNotice(GONE)
     case 'signedOut':
-      return { tone: 'error', text: SIGNED_OUT, action: 'signIn' }
+      return SIGNED_OUT_NOTICE
     case 'failed':
-      return error('Não foi possível fazer a inscrição. Tente de novo.')
+      return errorNotice('Não foi possível fazer a inscrição. Tente de novo.')
   }
 }
 
 export function noticeOfCancel(result: CancelResult): RegistrationNotice {
   switch (result.kind) {
     case 'cancelled':
-      return success('Inscrição cancelada.')
+      return successNotice('Inscrição cancelada.')
     case 'tooLate':
-      return error(TOO_LATE_TEXT[result.cause ?? 'unknown'])
+      return errorNotice(TOO_LATE_TEXT[result.cause ?? 'unknown'])
     case 'busy':
-      return error(busyText(result.retryAfterSeconds))
+      return errorNotice(busyText(result.retryAfterSeconds))
     case 'notFound':
-      return error(GONE)
+      return errorNotice(GONE)
     case 'signedOut':
-      return { tone: 'error', text: SIGNED_OUT, action: 'signIn' }
+      return SIGNED_OUT_NOTICE
     case 'failed':
-      return error('Não foi possível cancelar a inscrição. Tente de novo.')
+      return errorNotice('Não foi possível cancelar a inscrição. Tente de novo.')
   }
 }
 
@@ -76,20 +73,4 @@ const TOO_LATE_TEXT: Readonly<Record<'started' | 'ended' | 'unknown', string>> =
 /** O 503 (evento ocupado) e o 429 (limite da conta) pedem a mesma coisa: esperar. Por isso o texto não aponta o motivo. */
 function busyText(retryAfterSeconds: number | null): string {
   return `Muitos pedidos de inscrição em pouco tempo. Tente de novo ${waitText(retryAfterSeconds)}.`
-}
-
-/** "em instantes", "em 1 segundo" ou "em N segundos", pelo `Retry-After` da API. */
-export function waitText(retryAfterSeconds: number | null): string {
-  if (retryAfterSeconds === null || retryAfterSeconds === 0) {
-    return 'em instantes'
-  }
-  return retryAfterSeconds === 1 ? 'em 1 segundo' : `em ${retryAfterSeconds} segundos`
-}
-
-function success(text: string): RegistrationNotice {
-  return { tone: 'success', text, action: null }
-}
-
-function error(text: string): RegistrationNotice {
-  return { tone: 'error', text, action: null }
 }

@@ -1,4 +1,5 @@
 import { useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { formatTime } from '../../shared/text/dateFormat.ts'
 import { FIELD_CONTROL, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
 import { LOGIN_URL } from '../auth/loginUrl.ts'
 import type { ChatMessage } from './chat.ts'
@@ -150,12 +151,11 @@ function MessageItem({ fromMe, text, children }: MessageItemProps) {
   )
 }
 
-const TIME_FORMAT = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
 function SentTime({ message }: { readonly message: ChatMessage }) {
   return (
     <time dateTime={message.sentAt.toISOString()} className="text-sm text-fg-muted">
-      {TIME_FORMAT.format(message.sentAt)}
+      {formatTime(message.sentAt)}
     </time>
   )
 }

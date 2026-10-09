@@ -2,11 +2,10 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { App } from '../../app/App.tsx'
-import { SESSION } from '../../test/eventFixtures.ts'
+import { pageOf, SESSION } from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
   inSequence,
-  jsonAnswer,
   neverAnswer,
   problemAnswer,
   stubApi,
@@ -23,10 +22,6 @@ const CAIO = { accountId: '0199a1d2-1111-7aaa-8bbb-cccccccccccc', connectedAt: '
 afterEach(() => {
   window.history.replaceState(null, '', '/')
 })
-
-function page(items: readonly object[], nextPageToken: string | null = null): FakeRoute {
-  return jsonAnswer({ items, nextPageToken })
-}
 
 function renderConnectionsPage(routes: Readonly<Record<string, FakeRoute>>, session = SESSION) {
   stubMatchMedia(false)
@@ -57,7 +52,7 @@ describe('connections page', () => {
   })
 
   it('offers to try again when the list could not be read', async () => {
-    const { user } = renderConnectionsPage({ [LIST]: inSequence(problemAnswer(500), page([BEA])) })
+    const { user } = renderConnectionsPage({ [LIST]: inSequence(problemAnswer(500), pageOf([BEA])) })
 
     expect(await screen.findByText('Não foi possível carregar suas conexões.')).toHaveAttribute('role', 'alert')
     await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
@@ -66,7 +61,7 @@ describe('connections page', () => {
   })
 
   it('explains how a connection comes up when there is none yet', async () => {
-    renderConnectionsPage({ [LIST]: page([]) })
+    renderConnectionsPage({ [LIST]: pageOf([]) })
 
     expect(await screen.findByText('Você ainda não tem conexões.')).toBeInTheDocument()
     expect(
@@ -79,7 +74,7 @@ describe('connections page', () => {
   })
 
   it('lists each connection by the end of the account id and the date, newest first', async () => {
-    renderConnectionsPage({ [LIST]: page([BEA, CAIO]) })
+    renderConnectionsPage({ [LIST]: pageOf([BEA, CAIO]) })
 
     const list = await screen.findByRole('list', { name: 'Suas conexões' })
     const items = within(list).getAllByRole('listitem')
@@ -90,8 +85,8 @@ describe('connections page', () => {
 
   it('loads more pages with the token until the last one', async () => {
     const { fetchMock, user } = renderConnectionsPage({
-      [LIST]: page([BEA], 'next-1'),
-      [`${LIST}?pageToken=next-1`]: page([CAIO]),
+      [LIST]: pageOf([BEA], 'next-1'),
+      [`${LIST}?pageToken=next-1`]: pageOf([CAIO]),
     })
     await screen.findByText('Conta 4e5f6a7b')
 
@@ -104,7 +99,7 @@ describe('connections page', () => {
 
   it('keeps the list and asks to try again when the next page fails', async () => {
     const { user } = renderConnectionsPage({
-      [LIST]: page([BEA], 'next-1'),
+      [LIST]: pageOf([BEA], 'next-1'),
       [`${LIST}?pageToken=next-1`]: problemAnswer(503),
     })
     await screen.findByText('Conta 4e5f6a7b')
@@ -123,7 +118,7 @@ describe('connections page', () => {
   })
 
   it('gives every link and button a 44px touch target', async () => {
-    renderConnectionsPage({ [LIST]: page([BEA], 'next-1') })
+    renderConnectionsPage({ [LIST]: pageOf([BEA], 'next-1') })
     await screen.findByText('Conta 4e5f6a7b')
 
     expect(elementsWithoutTouchTarget(screen.getByRole('main'))).toEqual([])

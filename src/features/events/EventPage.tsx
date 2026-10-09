@@ -14,6 +14,7 @@ import { PhaseBadge } from './PhaseBadge.tsx'
 import { RegistrationPanel } from './RegistrationPanel.tsx'
 import { fetchRegistration } from './registrations.ts'
 import { useEventPhase } from './useEventPhase.ts'
+import { useEventRefresh } from './useEventRefresh.ts'
 
 const GENERIC_TITLE = 'Evento'
 
@@ -72,9 +73,13 @@ interface LiveEventProps {
   readonly readAt: number
 }
 
-/** O evento com a página aberta: a fase muda sozinha nos horários de início e fim. */
+/**
+ * O evento com a página aberta: a fase muda sozinha nos horários de início e fim, e, em andamento, o evento é
+ * relido de tempos em tempos para a rodada atual acompanhar o anfitrião.
+ */
 function LiveEvent({ eventId, event, readAt }: LiveEventProps) {
   const phase = useEventPhase(event, readAt)
+  useEventRefresh(eventId, phase === 'inProgress')
   return (
     <PageFrame key="event" title={event.title}>
       <EventSummary event={event} phase={phase} />

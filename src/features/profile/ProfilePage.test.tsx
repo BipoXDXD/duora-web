@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { App } from '../../app/App.tsx'
+import { SESSION } from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
   byMethod,
@@ -17,7 +18,6 @@ import {
 import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
-const SESSION = { '/api/me': jsonAnswer({ displayName: 'Ana Souza', profileComplete: true, roles: [] }) }
 
 const ANA = {
   displayName: 'Ana Souza',

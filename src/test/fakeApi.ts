@@ -72,3 +72,8 @@ export function neverAnswer(): FakeRoute {
 
 /** Visitante sem sessão: o estado inicial da landing. */
 export const ANONYMOUS_SESSION = { '/api/me': statusAnswer(401) } as const
+
+/** As chamadas do dublê a um caminho com um método. */
+export function callsTo(fetchMock: ReturnType<typeof stubApi>, path: string, method: string) {
+  return fetchMock.mock.calls.filter(([calledPath, init]) => calledPath === path && (init?.method ?? 'GET') === method)
+}

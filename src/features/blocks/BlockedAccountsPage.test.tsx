@@ -2,10 +2,10 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { App } from '../../app/App.tsx'
+import { pageOf, SESSION } from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
   inSequence,
-  jsonAnswer,
   networkFailure,
   neverAnswer,
   problemAnswer,
@@ -16,7 +16,6 @@ import {
 import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
-const SESSION = { '/api/me': jsonAnswer({ displayName: 'Ana Souza', profileComplete: true, roles: [] }) }
 const LIST = '/api/me/blocked-accounts'
 
 const BEA = { accountId: '0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7b', blockedAt: '2026-10-03T12:00:00Z' }
@@ -27,10 +26,6 @@ afterEach(() => {
   window.history.replaceState(null, '', '/')
   document.cookie = 'XSRF-TOKEN=; path=/; max-age=0'
 })
-
-function page(items: readonly object[], nextPageToken: string | null = null): FakeRoute {
-  return jsonAnswer({ items, nextPageToken })
-}
 
 function renderBlockedPage(routes: Readonly<Record<string, FakeRoute>>, session = SESSION) {
   stubMatchMedia(false)
@@ -68,7 +63,7 @@ describe('blocked accounts page', () => {
   })
 
   it('offers to try again when the list could not be read', async () => {
-    const { user } = renderBlockedPage({ [LIST]: inSequence(problemAnswer(500), page([BEA])) })
+    const { user } = renderBlockedPage({ [LIST]: inSequence(problemAnswer(500), pageOf([BEA])) })
 
     expect(await screen.findByText('Não foi possível carregar as contas bloqueadas.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
@@ -77,14 +72,14 @@ describe('blocked accounts page', () => {
   })
 
   it('says so when nobody is blocked', async () => {
-    renderBlockedPage({ [LIST]: page([]) })
+    renderBlockedPage({ [LIST]: pageOf([]) })
 
     expect(await screen.findByText('Você não bloqueou ninguém.')).toBeInTheDocument()
     expect(screen.queryByRole('list', { name: 'Contas bloqueadas' })).not.toBeInTheDocument()
   })
 
   it('lists the blocks, the most recent first, with the date and the end of the id of each account', async () => {
-    renderBlockedPage({ [LIST]: page([BEA, CAIO]) })
+    renderBlockedPage({ [LIST]: pageOf([BEA, CAIO]) })
 
     const list = await screen.findByRole('list', { name: 'Contas bloqueadas' })
     const items = within(list).getAllByRole('listitem')
@@ -96,8 +91,8 @@ describe('blocked accounts page', () => {
 
   it('loads the next page on "Carregar mais" and stops offering it on the last page', async () => {
     const { user } = renderBlockedPage({
-      [LIST]: page([BEA, CAIO], 'page-2'),
-      [`${LIST}?pageToken=page-2`]: page([DANI]),
+      [LIST]: pageOf([BEA, CAIO], 'page-2'),
+      [`${LIST}?pageToken=page-2`]: pageOf([DANI]),
     })
 
     await user.click(await screen.findByRole('button', { name: 'Carregar mais' }))
@@ -109,8 +104,8 @@ describe('blocked accounts page', () => {
 
   it('keeps the loaded blocks and offers to try again when the next page fails', async () => {
     const { user } = renderBlockedPage({
-      [LIST]: page([BEA], 'page-2'),
-      [`${LIST}?pageToken=page-2`]: inSequence(networkFailure(), page([DANI])),
+      [LIST]: pageOf([BEA], 'page-2'),
+      [`${LIST}?pageToken=page-2`]: inSequence(networkFailure(), pageOf([DANI])),
     })
 
     await user.click(await screen.findByRole('button', { name: 'Carregar mais' }))
@@ -125,7 +120,7 @@ describe('blocked accounts page', () => {
   })
 
   it('asks for confirmation before unblocking, and "Cancelar" changes nothing', async () => {
-    const { fetchMock, user } = renderBlockedPage({ [LIST]: page([BEA]) })
+    const { fetchMock, user } = renderBlockedPage({ [LIST]: pageOf([BEA]) })
     const item = await findItem('3 de outubro de 2026')
 
     await user.click(within(item).getByRole('button', { name: 'Desbloquear' }))
@@ -141,7 +136,7 @@ describe('blocked accounts page', () => {
 
   it('unblocks on confirmation, with the CSRF token, and takes the account off the list', async () => {
     document.cookie = 'XSRF-TOKEN=csrf-123; path=/'
-    const { fetchMock, user } = renderBlockedPage({ [LIST]: page([BEA, CAIO]), [unblockPath(BEA.accountId)]: statusAnswer(204) })
+    const { fetchMock, user } = renderBlockedPage({ [LIST]: pageOf([BEA, CAIO]), [unblockPath(BEA.accountId)]: statusAnswer(204) })
     const item = await findItem('3 de outubro de 2026')
 
     await user.click(within(item).getByRole('button', { name: 'Desbloquear' }))
@@ -156,7 +151,7 @@ describe('blocked accounts page', () => {
   })
 
   it('shows the empty state after unblocking the last account', async () => {
-    const { user } = renderBlockedPage({ [LIST]: page([BEA]), [unblockPath(BEA.accountId)]: statusAnswer(204) })
+    const { user } = renderBlockedPage({ [LIST]: pageOf([BEA]), [unblockPath(BEA.accountId)]: statusAnswer(204) })
     const item = await findItem('3 de outubro de 2026')
 
     await user.click(within(item).getByRole('button', { name: 'Desbloquear' }))
@@ -167,7 +162,7 @@ describe('blocked accounts page', () => {
   })
 
   it('keeps the account blocked and says so when the unblock fails', async () => {
-    const { user } = renderBlockedPage({ [LIST]: page([BEA]), [unblockPath(BEA.accountId)]: problemAnswer(500) })
+    const { user } = renderBlockedPage({ [LIST]: pageOf([BEA]), [unblockPath(BEA.accountId)]: problemAnswer(500) })
     const item = await findItem('3 de outubro de 2026')
 
     await user.click(within(item).getByRole('button', { name: 'Desbloquear' }))
@@ -178,7 +173,7 @@ describe('blocked accounts page', () => {
   })
 
   it('says it is unblocking and blocks a second click meanwhile', async () => {
-    const { user } = renderBlockedPage({ [LIST]: page([BEA]), [unblockPath(BEA.accountId)]: neverAnswer() })
+    const { user } = renderBlockedPage({ [LIST]: pageOf([BEA]), [unblockPath(BEA.accountId)]: neverAnswer() })
     const item = await findItem('3 de outubro de 2026')
 
     await user.click(within(item).getByRole('button', { name: 'Desbloquear' }))
@@ -188,13 +183,13 @@ describe('blocked accounts page', () => {
   })
 
   it('links back to the profile', async () => {
-    renderBlockedPage({ [LIST]: page([]) })
+    renderBlockedPage({ [LIST]: pageOf([]) })
 
     expect(await screen.findByRole('link', { name: 'Voltar ao perfil' })).toHaveAttribute('href', '/perfil')
   })
 
   it('gives every link and button a 44px touch target', async () => {
-    const { user } = renderBlockedPage({ [LIST]: page([BEA], 'page-2') })
+    const { user } = renderBlockedPage({ [LIST]: pageOf([BEA], 'page-2') })
     const item = await findItem('3 de outubro de 2026')
     expect(elementsWithoutTouchTarget(screen.getByRole('main'))).toEqual([])
 

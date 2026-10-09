@@ -6,6 +6,8 @@ import { BEFORE_EVENTS, DINNER, emptyChatRoutes, SESSION } from '../../test/even
 import {
   ANONYMOUS_SESSION,
   byMethod,
+  callsTo,
+  type FakeRoute,
   inSequence,
   jsonAnswer,
   neverAnswer,
@@ -13,7 +15,6 @@ import {
   refusalAnswer,
   statusAnswer,
   stubApi,
-  type FakeRoute,
 } from '../../test/fakeApi.ts'
 import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
@@ -64,10 +65,6 @@ function renderEventPage(routes: Readonly<Record<string, FakeRoute>>, session = 
   const fetchMock = stubApi({ ...session, ...routes })
   render(<App />)
   return { fetchMock, user: userEvent.setup() }
-}
-
-function callsTo(fetchMock: ReturnType<typeof stubApi>, path: string, method: string) {
-  return fetchMock.mock.calls.filter(([calledPath, init]) => calledPath === path && (init?.method ?? 'GET') === method)
 }
 
 describe('event page', () => {

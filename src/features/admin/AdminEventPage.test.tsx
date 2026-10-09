@@ -12,13 +12,14 @@ import {
 import { SESSION } from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
+  callsTo,
+  type FakeRoute,
   inSequence,
   jsonAnswer,
   neverAnswer,
   problemAnswer,
   refusalAnswer,
   stubApi,
-  type FakeRoute,
 } from '../../test/fakeApi.ts'
 import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
@@ -44,10 +45,6 @@ function renderAdminEvent(routes: Readonly<Record<string, FakeRoute>>, session =
   const fetchMock = stubApi({ ...session, ...routes })
   render(<App />)
   return { fetchMock, user: userEvent.setup() }
-}
-
-function callsTo(fetchMock: ReturnType<typeof stubApi>, path: string, method: string) {
-  return fetchMock.mock.calls.filter(([calledPath, init]) => calledPath === path && (init?.method ?? 'GET') === method)
 }
 
 function titleOf(name: string) {

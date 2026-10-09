@@ -1,21 +1,13 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DINNER } from '../../test/eventFixtures.ts'
+import { setVisibility, startHidden, stubVisibility } from '../../test/fakeVisibility.ts'
 import type { SocialEvent } from './events.ts'
 import { useEventPhase } from './useEventPhase.ts'
 
 const STARTS_AT = new Date('2026-10-10T22:00:00Z')
 const ENDS_AT = new Date('2026-10-11T01:00:00Z')
 const EVENT: SocialEvent = { ...DINNER, startsAt: STARTS_AT, endsAt: ENDS_AT }
-
-let visibility: DocumentVisibilityState = 'visible'
-
-function setVisibility(state: DocumentVisibilityState) {
-  visibility = state
-  act(() => {
-    document.dispatchEvent(new Event('visibilitychange'))
-  })
-}
 
 function advance(ms: number) {
   act(() => {
@@ -31,8 +23,7 @@ function renderPhase(event: SocialEvent, startsFrom: Date) {
 
 beforeEach(() => {
   vi.useFakeTimers()
-  visibility = 'visible'
-  vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility)
+  stubVisibility()
 })
 
 afterEach(() => {
@@ -126,7 +117,7 @@ describe('useEventPhase', () => {
   })
 
   it('does not schedule anything when it opens hidden', () => {
-    visibility = 'hidden'
+    startHidden()
     renderPhase(EVENT, new Date(STARTS_AT.getTime() - 10_000))
 
     expect(vi.getTimerCount()).toBe(0)

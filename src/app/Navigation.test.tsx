@@ -13,6 +13,7 @@ const PAGES = {
   '/api/me/registrations': neverAnswer(),
   '/api/me/connections': neverAnswer(),
   '/api/events/0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7b': neverAnswer(),
+  '/api/admin/events/0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7b': neverAnswer(),
 }
 
 afterEach(() => {
@@ -115,6 +116,24 @@ describe.each([
     expect(window.location.pathname).toBe('/perfil/bloqueios')
     expect(screen.getByRole('heading', { level: 1, name: 'Contas bloqueadas' })).toBeInTheDocument()
   })
+
+  it('links to no admin page, because the front does not know who is ADMIN', async () => {
+    const { navigation } = renderAt('/')
+
+    await within(navigation).findByRole('link', { name: profileLinkName })
+    const adminLinks = screen.queryAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('/admin'))
+    expect(adminLinks).toEqual([])
+  })
+
+  it.each(['/admin/eventos/novo', '/admin/eventos/0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7b'])(
+    'marks no page of the navigation as current on %s',
+    async (path) => {
+      const { navigation } = renderAt(path)
+
+      await within(navigation).findByRole('link', { name: profileLinkName })
+      expect(within(navigation).queryAllByRole('link', { current: 'page' })).toEqual([])
+    },
+  )
 
   it('shows a not found page for an unknown address, with the way back home', async () => {
     const { user } = renderAt('/nao-existe')

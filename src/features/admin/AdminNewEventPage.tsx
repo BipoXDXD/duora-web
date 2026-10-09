@@ -4,6 +4,7 @@ import { goTo } from '../../shared/routing/history.ts'
 import { adminEventPath } from '../../shared/routing/routes.ts'
 import { FormField } from '../../shared/ui/FormField.tsx'
 import { PageFrame } from '../../shared/ui/PageFrame.tsx'
+import { focusFirstProblem } from '../../shared/ui/focusFirstProblem.ts'
 import { errorNotice } from '../../shared/ui/notice.ts'
 import { FIELD_CONTROL, PRIMARY_BUTTON } from '../../shared/ui/styles.ts'
 import { useShownNotice } from '../../shared/ui/useShownNotice.ts'
@@ -54,11 +55,7 @@ function NewEventForm() {
 
   function showProblems(found: EventFieldProblems) {
     setProblems(found)
-    const first = EVENT_FIELDS.find((field) => found[field] !== undefined)
-    const control = first === undefined ? null : formRef.current?.elements.namedItem(first)
-    if (control instanceof HTMLElement) {
-      control.focus()
-    }
+    focusFirstProblem(formRef.current, EVENT_FIELDS, found)
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {

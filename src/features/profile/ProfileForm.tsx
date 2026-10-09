@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useRef, useState, type FormEvent } from 'react'
 import { isApiFailure } from '../../shared/api/http.ts'
 import { FormField } from '../../shared/ui/FormField.tsx'
+import { focusFirstProblem } from '../../shared/ui/focusFirstProblem.ts'
 import { FIELD_CONTROL, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
 import { LOGIN_URL } from '../auth/loginUrl.ts'
@@ -112,11 +113,7 @@ export function ProfileForm({ initial, onSaved, onCancel }: ProfileFormProps) {
 
   function showProblems(found: FieldProblems) {
     setProblems(found)
-    const first = PROFILE_FIELDS.find((field) => found[field] !== undefined)
-    const control = first === undefined ? null : formRef.current?.elements.namedItem(first)
-    if (control instanceof HTMLElement) {
-      control.focus()
-    }
+    focusFirstProblem(formRef.current, PROFILE_FIELDS, found)
   }
 
   function edit<K extends keyof ProfileFormValues>(field: K, value: ProfileFormValues[K]) {

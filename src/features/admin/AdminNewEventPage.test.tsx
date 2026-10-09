@@ -223,6 +223,24 @@ describe('new event page', () => {
       expect(alert).toHaveFocus()
     })
 
+    it('warns about the whole form without taking the focus off the first refused field', async () => {
+      const { user } = renderNewEvent({
+        [CREATE]: byMethod({
+          POST: problemAnswer(400, 'invalid', [
+            { field: 'capacity', code: 'BELOW_MINIMUM' },
+            { field: 'visibility', code: 'UNKNOWN_FIELD' },
+          ]),
+        }),
+      })
+      await fillValidForm(user)
+
+      await user.click(screen.getByRole('button', { name: 'Criar rascunho' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Confira os dados do evento e tente de novo.')
+      expect(screen.getByLabelText('Capacidade')).toHaveFocus()
+      expect(screen.getByText('A capacidade mínima é de 2 pessoas.')).toBeInTheDocument()
+    })
+
     it('keeps what was typed after a refusal', async () => {
       const { user } = renderNewEvent({
         [CREATE]: byMethod({ POST: problemAnswer(400, 'invalid', [{ field: 'capacity', code: 'BELOW_MINIMUM' }]) }),

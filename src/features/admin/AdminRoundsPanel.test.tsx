@@ -163,6 +163,14 @@ describe('rounds of the admin event page', () => {
       expect(callsTo(fetchMock, `${ROUNDS}/1`, 'PUT')).toHaveLength(0)
     })
 
+    it('counts one registration in the singular', async () => {
+      const { user } = renderRounds({ [PUBLIC_EVENT]: inRound(null) }, { ...ADMIN_PUBLISHED, registrationCount: 1 })
+
+      await askToStart(user)
+
+      expect(screen.getByText(/entre as 1 pessoa inscrita e o sorteio/)).toBeInTheDocument()
+    })
+
     it('goes back to the number field with what was typed, without sending anything', async () => {
       const { fetchMock, user } = renderRounds({ [PUBLIC_EVENT]: inRound(null) })
       await user.clear(await screen.findByLabelText('Número da rodada'))

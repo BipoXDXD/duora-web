@@ -8,6 +8,7 @@ import {
   readJsonBody,
   sendApiRequest,
 } from '../../shared/api/http.ts'
+import { BAD_REQUEST, CONFLICT, PRECONDITION_FAILED, UNAUTHORIZED } from '../../shared/api/httpStatus.ts'
 
 const PROFILE_PATH = '/api/me/profile'
 
@@ -95,11 +96,6 @@ export type EditProfileResult =
   | { readonly kind: 'invalid'; readonly fieldErrors: readonly FieldError[] }
   | { readonly kind: 'signedOut' }
   | { readonly kind: 'failed' }
-
-const BAD_REQUEST = 400
-const UNAUTHORIZED = 401
-const CONFLICT = 409
-const PRECONDITION_FAILED = 412
 
 export async function fetchProfile(): Promise<VersionedProfile> {
   return versionedProfileIn(await sendApiRequest({ method: 'GET', path: PROFILE_PATH }))

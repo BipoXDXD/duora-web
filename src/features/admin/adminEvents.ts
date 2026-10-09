@@ -1,12 +1,23 @@
 import { z } from 'zod/mini'
 import {
   ApiError,
+  type FieldError,
+  hasStatus,
   isApiFailure,
   readJsonBody,
-  sendApiRequest,
-  type FieldError,
   type RefusalReason,
+  sendApiRequest,
 } from '../../shared/api/http.ts'
+import {
+  BAD_REQUEST,
+  CONFLICT,
+  CREATED,
+  FORBIDDEN,
+  NOT_FOUND,
+  SERVICE_UNAVAILABLE,
+  TOO_MANY_REQUESTS,
+  UNAUTHORIZED,
+} from '../../shared/api/httpStatus.ts'
 import type { CreateEventRequest } from '../../shared/api/contract.ts'
 import { eventPhaseAt, instantSchema, type EventPhase } from '../events/events.ts'
 import { FIRST_ROUND, LAST_ROUND } from '../events/pairing.ts'
@@ -113,15 +124,6 @@ export type StartRoundResult =
   | AdminFailure
 
 const ADMIN_EVENTS_PATH = '/api/admin/events'
-
-const BAD_REQUEST = 400
-const UNAUTHORIZED = 401
-const FORBIDDEN = 403
-const NOT_FOUND = 404
-const CONFLICT = 409
-const TOO_MANY_REQUESTS = 429
-const SERVICE_UNAVAILABLE = 503
-const CREATED = 201
 
 function eventPath(eventId: string): string {
   return `${ADMIN_EVENTS_PATH}/${encodeURIComponent(eventId)}`
@@ -280,7 +282,7 @@ export async function fetchAdminRound(eventId: string, number: number): Promise<
     const response = await sendApiRequest({ method: 'GET', path: roundPath(eventId, number) })
     return await readJsonBody(response, adminRoundSchema)
   } catch (error) {
-    if (error instanceof ApiError && error.status === NOT_FOUND) {
+    if (hasStatus(error, NOT_FOUND)) {
       return null
     }
     throw error

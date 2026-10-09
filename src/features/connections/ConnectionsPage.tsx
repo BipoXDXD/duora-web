@@ -1,4 +1,5 @@
-import { ApiError } from '../../shared/api/http.ts'
+import { hasStatus } from '../../shared/api/http.ts'
+import { UNAUTHORIZED } from '../../shared/api/httpStatus.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { PATHS } from '../../shared/routing/routes.ts'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
@@ -11,8 +12,6 @@ import { usePagedList } from '../events/eventQueries.ts'
 import { accountCode, formatDay } from '../events/eventText.ts'
 import { CONNECTION_KEYS } from './connectionQueries.ts'
 import { fetchConnectionsPage, type Connection } from './connections.ts'
-
-const UNAUTHORIZED = 401
 
 /** "Conexões": as pessoas com quem houve interesse mútuo depois de uma rodada. */
 export function ConnectionsPage() {
@@ -62,7 +61,7 @@ function ListPlaceholder({ hasFailed, error, onRetry }: ListPlaceholderProps) {
       </p>
     )
   }
-  if (error instanceof ApiError && error.status === UNAUTHORIZED) {
+  if (hasStatus(error, UNAUTHORIZED)) {
     return (
       <div role="alert" className="flex flex-col items-start gap-4">
         <p className="text-lg text-fg">Sua sessão terminou. Entre de novo para ver suas conexões.</p>

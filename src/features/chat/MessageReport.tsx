@@ -1,5 +1,6 @@
 import { useId, useRef, useState, type FormEvent, type RefObject } from 'react'
-import { ApiError, isApiFailure } from '../../shared/api/http.ts'
+import { hasStatus, isApiFailure } from '../../shared/api/http.ts'
+import { UNAUTHORIZED } from '../../shared/api/httpStatus.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { PATHS } from '../../shared/routing/routes.ts'
 import { FIELD_CONTROL, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
@@ -236,15 +237,13 @@ function submitLabel(isSending: boolean, alsoBlock: boolean): string {
   return alsoBlock ? 'Enviar denúncia e bloquear' : 'Enviar denúncia'
 }
 
-const UNAUTHORIZED = 401
-
 /** Bloqueia depois da denúncia. Falha esperada vira resultado; bug sobe. */
 async function blockReported(accountId: string): Promise<BlockOutcome> {
   try {
     await blockAccount(accountId)
     return 'blocked'
   } catch (error) {
-    if (error instanceof ApiError && error.status === UNAUTHORIZED) {
+    if (hasStatus(error, UNAUTHORIZED)) {
       return 'signedOut'
     }
     if (isApiFailure(error)) {

@@ -265,6 +265,11 @@ export function isApiFailure(error: unknown): boolean {
   return error instanceof ApiError || error instanceof NetworkError || error instanceof InvalidResponseError
 }
 
+/** Um erro da API com este status; qualquer outra falha, ou outro status, não é. */
+export function hasStatus(error: unknown, status: number): error is ApiError {
+  return error instanceof ApiError && error.status === status
+}
+
 /** Para o `throwOnError` do TanStack Query: falha esperada vira estado na tela; bug sobe para o React. */
 export function isBug(error: Error): boolean {
   return !isApiFailure(error)

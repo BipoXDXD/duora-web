@@ -1,6 +1,21 @@
 import { z } from 'zod/mini'
 import type { SendMessageRequest } from '../../shared/api/contract.ts'
-import { ApiError, isApiFailure, readJsonBody, sendApiRequest, type FieldError } from '../../shared/api/http.ts'
+import {
+  ApiError,
+  type FieldError,
+  hasStatus,
+  isApiFailure,
+  readJsonBody,
+  sendApiRequest,
+} from '../../shared/api/http.ts'
+import {
+  BAD_REQUEST,
+  CONFLICT,
+  NOT_FOUND,
+  SERVICE_UNAVAILABLE,
+  TOO_MANY_REQUESTS,
+  UNAUTHORIZED,
+} from '../../shared/api/httpStatus.ts'
 import { instantSchema } from '../events/events.ts'
 
 /** Corpo de GET /api/events/{eventId}/rounds/{number}/chat (Chat). Só `open` segue para a tela. */
@@ -62,13 +77,6 @@ export type SendResult =
 /** O maior `maxPageSize` que a API aceita: quem volta à aba recupera o atraso com menos idas. */
 const MAX_PAGE_SIZE = 100
 
-const BAD_REQUEST = 400
-const UNAUTHORIZED = 401
-const NOT_FOUND = 404
-const CONFLICT = 409
-const TOO_MANY_REQUESTS = 429
-const SERVICE_UNAVAILABLE = 503
-
 function chatPath(eventId: string, roundNumber: number): string {
   return `/api/events/${encodeURIComponent(eventId)}/rounds/${roundNumber}/chat`
 }
@@ -79,7 +87,7 @@ export async function fetchChatAccess(eventId: string, roundNumber: number): Pro
     const { open } = await readJsonBody(response, chatSchema)
     return open ? { kind: 'open' } : { kind: 'closed' }
   } catch (error) {
-    if (error instanceof ApiError && error.status === NOT_FOUND) {
+    if (hasStatus(error, NOT_FOUND)) {
       return { kind: 'notPaired' }
     }
     throw error
@@ -97,7 +105,7 @@ export async function fetchMessagesAfter(
     const { items, nextAfterSeq } = await readJsonBody(await sendApiRequest({ method: 'GET', path }), messagePageSchema)
     return { items, hasMore: nextAfterSeq !== null }
   } catch (error) {
-    if (error instanceof ApiError && error.status === NOT_FOUND) {
+    if (hasStatus(error, NOT_FOUND)) {
       return null
     }
     throw error

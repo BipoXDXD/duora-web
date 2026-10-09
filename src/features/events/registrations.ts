@@ -1,5 +1,20 @@
 import { z } from 'zod/mini'
-import { ApiError, isApiFailure, readJsonBody, sendApiRequest, type RefusalReason } from '../../shared/api/http.ts'
+import {
+  ApiError,
+  hasStatus,
+  isApiFailure,
+  readJsonBody,
+  type RefusalReason,
+  sendApiRequest,
+} from '../../shared/api/http.ts'
+import {
+  CONFLICT,
+  FORBIDDEN,
+  NOT_FOUND,
+  SERVICE_UNAVAILABLE,
+  TOO_MANY_REQUESTS,
+  UNAUTHORIZED,
+} from '../../shared/api/httpStatus.ts'
 import { EVENT_STATUSES, instantSchema, pageQuery } from './events.ts'
 
 /** Corpo de PUT e GET /api/events/{id}/registration (RegistrationResponse). */
@@ -56,13 +71,6 @@ export type CancelResult =
   | { readonly kind: 'signedOut' }
   | { readonly kind: 'failed' }
 
-const UNAUTHORIZED = 401
-const FORBIDDEN = 403
-const NOT_FOUND = 404
-const CONFLICT = 409
-const TOO_MANY_REQUESTS = 429
-const SERVICE_UNAVAILABLE = 503
-
 const CLOSURE_BY_REASON: Readonly<Partial<Record<RefusalReason, EventClosure>>> = {
   EVENT_FULL: 'full',
   EVENT_CANCELLED: 'cancelled',
@@ -85,7 +93,7 @@ export async function fetchRegistration(eventId: string): Promise<Registration |
     const response = await sendApiRequest({ method: 'GET', path: registrationPath(eventId) })
     return await readJsonBody(response, registrationSchema)
   } catch (error) {
-    if (error instanceof ApiError && error.status === NOT_FOUND) {
+    if (hasStatus(error, NOT_FOUND)) {
       return null
     }
     throw error

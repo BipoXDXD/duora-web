@@ -1,6 +1,13 @@
 import { z } from 'zod/mini'
 import type { DecideRequest } from '../../shared/api/contract.ts'
-import { ApiError, isApiFailure, readJsonBody, sendApiRequest } from '../../shared/api/http.ts'
+import { ApiError, hasStatus, isApiFailure, readJsonBody, sendApiRequest } from '../../shared/api/http.ts'
+import {
+  CONFLICT,
+  NOT_FOUND,
+  SERVICE_UNAVAILABLE,
+  TOO_MANY_REQUESTS,
+  UNAUTHORIZED,
+} from '../../shared/api/httpStatus.ts'
 import { instantSchema } from '../events/events.ts'
 
 /**
@@ -39,12 +46,6 @@ export type DecideResult =
   | { readonly kind: 'signedOut' }
   | { readonly kind: 'failed' }
 
-const UNAUTHORIZED = 401
-const NOT_FOUND = 404
-const CONFLICT = 409
-const TOO_MANY_REQUESTS = 429
-const SERVICE_UNAVAILABLE = 503
-
 function decisionPath(eventId: string, roundNumber: number): string {
   return `/api/events/${encodeURIComponent(eventId)}/rounds/${roundNumber}/decision`
 }
@@ -55,7 +56,7 @@ export async function fetchDecision(eventId: string, roundNumber: number): Promi
     const response = await sendApiRequest({ method: 'GET', path: decisionPath(eventId, roundNumber) })
     return await readJsonBody(response, decisionSchema)
   } catch (error) {
-    if (error instanceof ApiError && error.status === NOT_FOUND) {
+    if (hasStatus(error, NOT_FOUND)) {
       return null
     }
     throw error

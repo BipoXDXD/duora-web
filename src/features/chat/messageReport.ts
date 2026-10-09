@@ -1,6 +1,13 @@
 import { z } from 'zod/mini'
 import type { ReportChatMessageRequest } from '../../shared/api/contract.ts'
 import { ApiError, isApiFailure, readJsonBody, sendApiRequest, type FieldError } from '../../shared/api/http.ts'
+import {
+  BAD_REQUEST,
+  NOT_FOUND,
+  SERVICE_UNAVAILABLE,
+  TOO_MANY_REQUESTS,
+  UNAUTHORIZED,
+} from '../../shared/api/httpStatus.ts'
 
 /** Os motivos de denúncia, na ordem da tela; o teste confere com a lista da spec (a mesma de `fileReport`). */
 export const REPORT_REASONS = [
@@ -44,12 +51,6 @@ export type ReportResult =
   | { readonly kind: 'unavailable'; readonly retryAfterSeconds: number | null }
   | { readonly kind: 'signedOut' }
   | { readonly kind: 'failed' }
-
-const BAD_REQUEST = 400
-const UNAUTHORIZED = 401
-const NOT_FOUND = 404
-const TOO_MANY_REQUESTS = 429
-const SERVICE_UNAVAILABLE = 503
 
 /** Denuncia a mensagem do par na posição `seq`. Falhas esperadas viram resultado; bug no código sobe. */
 export async function reportMessage(

@@ -1,5 +1,6 @@
 import type { JoinWaitlistRequest } from '../../shared/api/contract.ts'
 import { ApiError, NetworkError, sendApiRequest } from '../../shared/api/http.ts'
+import { BAD_REQUEST, TOO_MANY_REQUESTS } from '../../shared/api/httpStatus.ts'
 
 /** A API responde igual para e-mail novo ou repetido, então não existe um resultado "já inscrito". */
 export type JoinWaitlistResult =
@@ -7,9 +8,6 @@ export type JoinWaitlistResult =
   | { readonly kind: 'invalidEmail' }
   | { readonly kind: 'tooManyAttempts'; readonly retryAfterSeconds: number | null }
   | { readonly kind: 'failed' }
-
-const BAD_REQUEST = 400
-const TOO_MANY_REQUESTS = 429
 
 export async function joinWaitlist(email: string): Promise<JoinWaitlistResult> {
   const body: JoinWaitlistRequest = { email }

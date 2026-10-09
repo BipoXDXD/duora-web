@@ -5,6 +5,7 @@ import {
   ApiError,
   FIELD_ERROR_CODES,
   type FieldError,
+  hasStatus,
   InvalidResponseError,
   isApiFailure,
   isBug,
@@ -403,6 +404,20 @@ describe('isApiFailure', () => {
     ['something that is not an error', 'oops'],
   ])('does not count %s, so it is not hidden as a failed call', (_case, error) => {
     expect(isApiFailure(error)).toBe(false)
+  })
+})
+
+describe('hasStatus', () => {
+  it('recognizes an API error with that status', () => {
+    expect(hasStatus(new ApiError(404, null), 404)).toBe(true)
+  })
+
+  it.each([
+    ['an API error with another status', new ApiError(403, null)],
+    ['a network failure', new NetworkError({ cause: new TypeError('Failed to fetch') })],
+    ['a bug', new RangeError('404')],
+  ])('does not recognize %s', (_case, error) => {
+    expect(hasStatus(error, 404)).toBe(false)
   })
 })
 

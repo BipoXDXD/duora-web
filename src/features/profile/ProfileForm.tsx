@@ -1,34 +1,11 @@
-import { useQueryClient } from '@tanstack/react-query'
-import { useRef, useState, type FormEvent } from 'react'
-import { isApiFailure } from '../../shared/api/http.ts'
 import { FormField } from '../../shared/ui/FormField.tsx'
-import { focusFirstProblem } from '../../shared/ui/focusFirstProblem.ts'
 import { FIELD_CONTROL, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
 import { LOGIN_URL } from '../auth/loginUrl.ts'
-import {
-  editProfile,
-  isRegion,
-  PROFILE_FIELDS,
-  REGION_CODES,
-  REGION_NAMES,
-  type EditProfileResult,
-  type ProfileField,
-  type Region,
-  type VersionedProfile,
-} from './profile.ts'
-import {
-  BIO_MAX_LENGTH,
-  checkProfileForm,
-  formValuesOf,
-  rebaseFormValues,
-  todayIsoDate,
-  type FieldProblems,
-  type ProfileFormValues,
-} from './profileForm.ts'
-import { problemsFromApi } from './profileApiProblems.ts'
-import { PROFILE_QUERY } from './profileQuery.ts'
+import { isRegion, REGION_CODES, REGION_NAMES, type ProfileField, type Region, type VersionedProfile } from './profile.ts'
+import { BIO_MAX_LENGTH, type FieldProblems } from './profileForm.ts'
 import { formatBirthDate, problemMessage } from './profileText.ts'
+import { useProfileEditor, type FormNotice } from './useProfileEditor.ts'
 
 interface ProfileFormProps {
   readonly initial: VersionedProfile
@@ -36,91 +13,10 @@ interface ProfileFormProps {
   readonly onCancel: () => void
 }
 
-/** O aviso do formulário inteiro; os problemas de um campo ficam no próprio campo. */
-type FormNotice = 'unchanged' | 'outdated' | 'birthDateLocked' | 'rejected' | 'signedOut' | 'failed'
-
-/** Os estados pelo nome, na ordem alfabética do português. */
-const REGIONS_BY_NAME = REGION_CODES.toSorted((a, b) => REGION_NAMES[a].localeCompare(REGION_NAMES[b], 'pt-BR'))
-
 export function ProfileForm({ initial, onSaved, onCancel }: ProfileFormProps) {
-  const queryClient = useQueryClient()
-  const [baseline, setBaseline] = useState(initial)
-  const [values, setValues] = useState(() => formValuesOf(initial.profile))
-  const [problems, setProblems] = useState<FieldProblems>({})
-  const [notice, setNotice] = useState<FormNotice | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
-  const formRef = useRef<HTMLFormElement>(null)
+  const { formRef, baseline, values, problems, notice, isSaving, edit, save } = useProfileEditor(initial, onSaved)
   const nameRef = useFocusOnMount<HTMLInputElement>()
 
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setNotice(null)
-    const check = checkProfileForm(values, baseline.profile, todayIsoDate())
-    switch (check.kind) {
-      case 'unchanged':
-        setProblems({})
-        setNotice('unchanged')
-        return
-      case 'invalid':
-        showProblems(check.problems)
-        return
-      case 'changed':
-        setProblems({})
-        setIsSaving(true)
-        await apply(await editProfile(baseline.etag, check.changes))
-        setIsSaving(false)
-    }
-  }
-
-  async function apply(result: EditProfileResult) {
-    switch (result.kind) {
-      case 'saved':
-        queryClient.setQueryData(PROFILE_QUERY.queryKey, result.saved)
-        onSaved()
-        return
-      case 'outdated':
-      case 'birthDateLocked':
-        await reloadKeepingEdits(result.kind)
-        return
-      case 'invalid': {
-        const { problems: refused, hasUnplacedProblem } = problemsFromApi(result.fieldErrors)
-        showProblems(refused)
-        if (hasUnplacedProblem) {
-          setNotice('rejected')
-        }
-        return
-      }
-      case 'signedOut':
-      case 'failed':
-        setNotice(result.kind)
-    }
-  }
-
-  /** O perfil mudou desde a leitura: lê de novo e reaplica o que a pessoa digitou sobre a versão nova. */
-  async function reloadKeepingEdits(reason: 'outdated' | 'birthDateLocked') {
-    try {
-      const fresh = await queryClient.fetchQuery({ ...PROFILE_QUERY, staleTime: 0 })
-      setValues((typed) => rebaseFormValues(typed, baseline.profile, fresh.profile))
-      setBaseline(fresh)
-      setNotice(reason)
-    } catch (error) {
-      if (!isApiFailure(error)) {
-        throw error
-      }
-      setNotice('failed')
-    }
-  }
-
-  function showProblems(found: FieldProblems) {
-    setProblems(found)
-    focusFirstProblem(formRef.current, PROFILE_FIELDS, found)
-  }
-
-  function edit<K extends keyof ProfileFormValues>(field: K, value: ProfileFormValues[K]) {
-    setValues((current) => ({ ...current, [field]: value }))
-  }
-
-  const lockedBirthDate = baseline.profile.birthDate
   return (
     <form
       ref={formRef}
@@ -144,45 +40,18 @@ export function ProfileForm({ initial, onSaved, onCancel }: ProfileFormProps) {
           />
         )}
       </FormField>
-      {lockedBirthDate === null ? (
-        <FormField
-          label="Data de nascimento"
-          hint="O Duora é para maiores de 18 anos. Depois de salva, a data não muda."
-          problem={messageOf('birthDate', problems)}
-        >
-          {(control) => (
-            <input
-              {...control}
-              name="birthDate"
-              type="date"
-              autoComplete="bday"
-              value={values.birthDate}
-              onChange={(event) => edit('birthDate', event.currentTarget.value)}
-              className={FIELD_CONTROL}
-            />
-          )}
-        </FormField>
-      ) : (
-        <LockedBirthDate birthDate={lockedBirthDate} />
-      )}
-      <FormField label="Estado" hint="Só o estado, nunca a cidade ou o endereço." problem={messageOf('region', problems)}>
-        {(control) => (
-          <select
-            {...control}
-            name="region"
-            value={values.region}
-            onChange={(event) => edit('region', regionOf(event.currentTarget.value))}
-            className={FIELD_CONTROL}
-          >
-            {baseline.profile.region === null && <option value="">Escolha seu estado</option>}
-            {REGIONS_BY_NAME.map((code) => (
-              <option key={code} value={code}>
-                {REGION_NAMES[code]}
-              </option>
-            ))}
-          </select>
-        )}
-      </FormField>
+      <BirthDateField
+        lockedTo={baseline.birthDate}
+        value={values.birthDate}
+        problem={messageOf('birthDate', problems)}
+        onChange={(value) => edit('birthDate', value)}
+      />
+      <RegionField
+        value={values.region}
+        offersEmptyChoice={baseline.region === null}
+        problem={messageOf('region', problems)}
+        onChange={(value) => edit('region', value)}
+      />
       <FormField label="Apresentação" hint={`Opcional. Até ${BIO_MAX_LENGTH} caracteres.`} problem={messageOf('bio', problems)}>
         {(control) => (
           <textarea
@@ -204,6 +73,73 @@ export function ProfileForm({ initial, onSaved, onCancel }: ProfileFormProps) {
         </button>
       </div>
     </form>
+  )
+}
+
+interface BirthDateFieldProps {
+  /** A data já gravada, que não muda mais; `null` enquanto a pessoa ainda não a informou. */
+  readonly lockedTo: string | null
+  readonly value: string
+  readonly problem: string | null
+  readonly onChange: (value: string) => void
+}
+
+function BirthDateField({ lockedTo, value, problem, onChange }: BirthDateFieldProps) {
+  if (lockedTo !== null) {
+    return <LockedBirthDate birthDate={lockedTo} />
+  }
+  return (
+    <FormField
+      label="Data de nascimento"
+      hint="O Duora é para maiores de 18 anos. Depois de salva, a data não muda."
+      problem={problem}
+    >
+      {(control) => (
+        <input
+          {...control}
+          name="birthDate"
+          type="date"
+          autoComplete="bday"
+          value={value}
+          onChange={(event) => onChange(event.currentTarget.value)}
+          className={FIELD_CONTROL}
+        />
+      )}
+    </FormField>
+  )
+}
+
+/** Os estados pelo nome, na ordem alfabética do português. */
+const REGIONS_BY_NAME = REGION_CODES.toSorted((a, b) => REGION_NAMES[a].localeCompare(REGION_NAMES[b], 'pt-BR'))
+
+interface RegionFieldProps {
+  readonly value: Region | ''
+  /** O perfil ainda não tem estado: a lista abre com "Escolha seu estado". */
+  readonly offersEmptyChoice: boolean
+  readonly problem: string | null
+  readonly onChange: (value: Region | '') => void
+}
+
+function RegionField({ value, offersEmptyChoice, problem, onChange }: RegionFieldProps) {
+  return (
+    <FormField label="Estado" hint="Só o estado, nunca a cidade ou o endereço." problem={problem}>
+      {(control) => (
+        <select
+          {...control}
+          name="region"
+          value={value}
+          onChange={(event) => onChange(regionOf(event.currentTarget.value))}
+          className={FIELD_CONTROL}
+        >
+          {offersEmptyChoice && <option value="">Escolha seu estado</option>}
+          {REGIONS_BY_NAME.map((code) => (
+            <option key={code} value={code}>
+              {REGION_NAMES[code]}
+            </option>
+          ))}
+        </select>
+      )}
+    </FormField>
   )
 }
 

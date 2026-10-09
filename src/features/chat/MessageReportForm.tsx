@@ -212,16 +212,16 @@ function ReasonChoice({ reason, problem, firstReasonRef, onChange }: ReasonChoic
           {REASON_PROBLEM_TEXT[problem]}
         </p>
       )}
-      {REPORT_REASONS.map((value, index) => (
+      {REPORT_REASONS.map((option, index) => (
         <Choice
-          key={value}
+          key={option}
           type="radio"
           name={`${id}-reason`}
           inputRef={index === 0 ? firstReasonRef : undefined}
-          label={REASON_TEXT[value].label}
-          hint={REASON_TEXT[value].hint}
-          checked={reason === value}
-          onChange={() => onChange(value)}
+          label={REASON_TEXT[option].label}
+          hint={REASON_TEXT[option].hint}
+          checked={reason === option}
+          onChange={() => onChange(option)}
         />
       ))}
     </div>

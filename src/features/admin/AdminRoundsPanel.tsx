@@ -152,7 +152,7 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
   const [returnedFromConfirm, setReturnedFromConfirm] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const [shown, setShown] = useState<ShownNotice | null>(null)
-  const value = typed ?? suggested
+  const roundNumberText = typed ?? suggested
 
   const mutation = useMutation({
     mutationFn: ({ number }: { readonly number: number }) => startRound(event.id, number),
@@ -177,7 +177,7 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
   function ask(submitted: FormEvent<HTMLFormElement>) {
     submitted.preventDefault()
     setShown(null)
-    const number = roundNumberOf(value)
+    const number = roundNumberOf(roundNumberText)
     setHasProblem(number === null)
     setReturnedFromConfirm(false)
     setConfirming(number)
@@ -206,7 +206,7 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
               <RoundNumberInput
                 control={control}
                 takesFocus={returnedFromConfirm}
-                value={value}
+                value={roundNumberText}
                 onChange={setTyped}
               />
             )}

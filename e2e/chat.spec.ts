@@ -1,5 +1,5 @@
 import { EventPage } from './pages/EventPage.ts'
-import { expectUsableChatLayout } from './support/checks.ts'
+import { expectUsableLayout } from './support/checks.ts'
 import { aMessage, anEventInProgress, PARTNER_CODE } from './support/data.ts'
 import { gate, json } from './support/fakeApi.ts'
 import { expect, test } from './support/fixtures.ts'
@@ -24,7 +24,7 @@ test.describe('Conversa com a dupla da rodada', () => {
     await expect(pairing.partner(1, PARTNER_CODE)).toBeVisible()
     await expect(chat.message('Você está na mesa do canto?')).toBeVisible()
     await expect(chat.log()).toHaveAttribute('aria-live', 'polite')
-    await expectUsableChatLayout(page)
+    await expectUsableLayout(page)
 
     // O par escreve; a tela só sabe quando o polling (a cada 2 s) lê a partir do último `seq` que viu.
     round.partnerSays('Estou de camiseta verde, perto da janela.')
@@ -40,7 +40,7 @@ test.describe('Conversa com a dupla da rodada', () => {
     await expect(chat.sending()).toBeVisible()
     await expect(chat.field()).toHaveValue('')
     await expect(chat.field()).toBeFocused()
-    await expectUsableChatLayout(page)
+    await expectUsableLayout(page)
 
     confirmation.release(json(201, round.accept('Já vi você, estou indo.')))
 
@@ -49,7 +49,7 @@ test.describe('Conversa com a dupla da rodada', () => {
     const [sent] = api.callsTo('POST', `${CHAT_PATH}/messages`)
     expect(sent?.body).toEqual({ text: 'Já vi você, estou indo.' })
     expect(sent?.headers['idempotency-key']).toMatch(UUID)
-    await expectUsableChatLayout(page)
+    await expectUsableLayout(page)
   })
 
   test('mensagem que a API recusa fica marcada como não enviada e pode ser reenviada', async ({ page, api }) => {

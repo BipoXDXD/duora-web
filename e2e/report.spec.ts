@@ -1,6 +1,6 @@
 import type { ChatMessageReportResponse } from '../src/shared/api/contract.ts'
 import { EventPage } from './pages/EventPage.ts'
-import { expectUsableChatLayout } from './support/checks.ts'
+import { expectUsableLayout } from './support/checks.ts'
 import { aMessage, anEventInProgress, PARTNER_ID } from './support/data.ts'
 import { json, noContent, problem } from './support/fakeApi.ts'
 import { expect, test } from './support/fixtures.ts'
@@ -36,7 +36,7 @@ test.describe('Denúncia de mensagem da dupla', () => {
     await expect(chat.message(OWN_TEXT).getByRole('button', { name: /Denunciar/ })).toHaveCount(0)
     await chat.reportButtonFor(PARTNER_TEXT).click()
     await expect(chat.report.heading()).toBeFocused()
-    await expectUsableChatLayout(page)
+    await expectUsableLayout(page)
 
     // Sem motivo, nada é enviado.
     await chat.report.submitButton().click()
@@ -52,7 +52,7 @@ test.describe('Denúncia de mensagem da dupla', () => {
     await expect(chat.message(PARTNER_TEXT)).toContainText('Denunciada por você')
     expect(api.callsTo('POST', REPORT_PATH).map((call) => call.body)).toEqual([{ reason: 'HARASSMENT', description: null }])
     expect(api.callsTo('POST', BLOCK_PATH)).toHaveLength(1)
-    await expectUsableChatLayout(page)
+    await expectUsableLayout(page)
   })
 
   test('denunciar sem marcar o bloqueio não bloqueia ninguém', async ({ page, api }) => {

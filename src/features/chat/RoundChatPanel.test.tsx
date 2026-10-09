@@ -538,6 +538,15 @@ describe('RoundChatPanel', () => {
       expect(log()).toHaveAttribute('aria-relevant', 'additions')
     })
 
+    it('keeps the messages in a real list inside the log, so the items stay list items', async () => {
+      chatWithSend(jsonAnswer(message(2, 'x', true), 201))
+      await screen.findByText('Oi!')
+
+      expect(log().tagName).toBe('DIV')
+      expect(within(log()).getByRole('list').tagName).toBe('OL')
+      expect(within(within(log()).getByRole('list')).getAllByRole('listitem')).toHaveLength(1)
+    })
+
     it('sends on Enter and breaks the line on Shift+Enter', async () => {
       const { fetchMock, user } = chatWithSend(jsonAnswer(message(2, 'linha 1\nlinha 2', true), 201))
       await screen.findByText('Oi!')

@@ -27,13 +27,3 @@ export async function expectUsableLayout(page: Page, disabledRules: readonly str
   await expectNoHorizontalScroll(page)
   await expectNoAccessibilityViolations(page, disabledRules)
 }
-
-/**
- * Como `expectUsableLayout`, para as telas com a lista de mensagens do chat. Achado conhecido do axe: a lista é
- * `<ol role="log">`, e o papel `log` tira os `<li>` de dentro de uma lista (regra `listitem`, impacto "serious").
- * A correção é de produção (`<div role="log">` em volta de um `<ol>`) e está nas pendências do README; até lá só
- * esta regra fica de fora, nas telas do chat, e o resto continua valendo.
- */
-export async function expectUsableChatLayout(page: Page): Promise<void> {
-  await expectUsableLayout(page, ['listitem'])
-}

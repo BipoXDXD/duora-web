@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { EVENT_FIELDS, type EventFieldProblem } from './adminEventForm.ts'
-import { ADMIN_PHASE_LABELS, problemMessage, roundCountsText } from './adminText.ts'
+import { ADMIN_EVENT_STATUSES } from './adminEvents.ts'
+import {
+  ADMIN_PHASE_LABELS,
+  ALL_STATUSES_LABEL,
+  problemMessage,
+  registrationText,
+  roundCountsText,
+  STATUS_FILTER_LABELS,
+} from './adminText.ts'
 
 const PROBLEMS: readonly EventFieldProblem[] = [
   'blank',
@@ -65,5 +73,25 @@ describe('roundCountsText', () => {
     [{ pairCount: 0, sittingOutCount: 0 }, '0 pares; 0 pessoas ficaram de fora.'],
   ])('writes %o as %s', (round, text) => {
     expect(roundCountsText(round)).toBe(text)
+  })
+})
+
+describe('registrationText', () => {
+  it.each([
+    [0, 40, '0 pessoas inscritas de 40 vagas.'],
+    [1, 40, '1 pessoa inscrita de 40 vagas.'],
+    [2, 2, '2 pessoas inscritas de 2 vagas.'],
+    [12, 40, '12 pessoas inscritas de 40 vagas.'],
+  ])('says %i registered of %i places', (registrationCount, capacity, text) => {
+    expect(registrationText({ registrationCount, capacity })).toBe(text)
+  })
+})
+
+describe('status filter labels', () => {
+  it('has a distinct label for every status and for "all"', () => {
+    const labels = [ALL_STATUSES_LABEL, ...ADMIN_EVENT_STATUSES.map((status) => STATUS_FILTER_LABELS[status])]
+
+    expect(labels).toEqual(['Todos', 'Rascunhos', 'Publicados', 'Cancelados'])
+    expect(new Set(labels).size).toBe(labels.length)
   })
 })

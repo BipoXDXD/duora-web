@@ -9,6 +9,7 @@ export const PATHS = {
   events: '/eventos',
   registrations: '/inscricoes',
   connections: '/conexoes',
+  adminEvents: '/admin/eventos',
   adminNewEvent: '/admin/eventos/novo',
 } as const
 
@@ -29,6 +30,7 @@ const FIXED_PAGES: readonly FixedPage[] = [
   'events',
   'registrations',
   'connections',
+  'adminEvents',
   'adminNewEvent',
 ]
 
@@ -75,4 +77,12 @@ export function isProfileRoute(route: Route): boolean {
  */
 export function isEventsRoute(route: Route): boolean {
   return route.page === 'events' || route.page === 'event' || route.page === 'registrations'
+}
+
+/**
+ * A área da equipe: a lista, o formulário de novo evento e cada evento, para a navegação marcar "Equipe" como
+ * a página atual. Estar aqui não dá acesso a nada: quem pode abrir é decidido pela API.
+ */
+export function isStaffRoute(route: Route): boolean {
+  return route.page === 'adminEvents' || route.page === 'adminNewEvent' || route.page === 'adminEvent'
 }

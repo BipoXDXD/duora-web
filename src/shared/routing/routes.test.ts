@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adminEventPath, eventPath, isEventsRoute, isProfileRoute, PATHS, routeOf } from './routes.ts'
+import { adminEventPath, eventPath, isEventsRoute, isProfileRoute, isStaffRoute, PATHS, routeOf } from './routes.ts'
 
 const EVENT_ID = '0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7b'
 
@@ -15,6 +15,8 @@ describe('routeOf', () => {
     ['/inscricoes', 'registrations'],
     ['/conexoes', 'connections'],
     ['/conexoes/', 'connections'],
+    ['/admin/eventos', 'adminEvents'],
+    ['/admin/eventos/', 'adminEvents'],
     ['/admin/eventos/novo', 'adminNewEvent'],
     ['/admin/eventos/novo/', 'adminNewEvent'],
   ] as const)('maps %s to the %s page', (pathname, page) => {
@@ -39,8 +41,7 @@ describe('routeOf', () => {
 
   it.each([
     '/admin',
-    '/admin/eventos',
-    '/admin/eventos/',
+    '/Admin/eventos',
     '/admin/eventos/123',
     '/admin/eventos/Novo',
     '/admin/eventos/novo/outra',
@@ -87,17 +88,19 @@ describe('routeOf', () => {
 
 describe('route groups for the navigation', () => {
   it.each([
-    [{ page: 'profile' }, true, false],
-    [{ page: 'blockedAccounts' }, true, false],
-    [{ page: 'events' }, false, true],
-    [{ page: 'event', eventId: EVENT_ID }, false, true],
-    [{ page: 'registrations' }, false, true],
-    [{ page: 'home' }, false, false],
-    [{ page: 'adminNewEvent' }, false, false],
-    [{ page: 'adminEvent', eventId: EVENT_ID }, false, false],
-    [{ page: 'notFound' }, false, false],
-  ] as const)('places %o in the profile: %s, in the events: %s', (route, inProfile, inEvents) => {
+    [{ page: 'profile' }, true, false, false],
+    [{ page: 'blockedAccounts' }, true, false, false],
+    [{ page: 'events' }, false, true, false],
+    [{ page: 'event', eventId: EVENT_ID }, false, true, false],
+    [{ page: 'registrations' }, false, true, false],
+    [{ page: 'home' }, false, false, false],
+    [{ page: 'adminEvents' }, false, false, true],
+    [{ page: 'adminNewEvent' }, false, false, true],
+    [{ page: 'adminEvent', eventId: EVENT_ID }, false, false, true],
+    [{ page: 'notFound' }, false, false, false],
+  ] as const)('places %o in the profile: %s, in the events: %s, in the staff area: %s', (route, inProfile, inEvents, inStaff) => {
     expect(isProfileRoute(route)).toBe(inProfile)
     expect(isEventsRoute(route)).toBe(inEvents)
+    expect(isStaffRoute(route)).toBe(inStaff)
   })
 })

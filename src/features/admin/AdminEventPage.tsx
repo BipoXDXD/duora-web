@@ -4,15 +4,16 @@ import { eventPath } from '../../shared/routing/routes.ts'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { PageFrame } from '../../shared/ui/PageFrame.tsx'
 import { SECONDARY_BUTTON, TEXT_LINK } from '../../shared/ui/styles.ts'
-import { LOGIN_URL } from '../auth/loginUrl.ts'
 import { RequireSession } from '../auth/RequireSession.tsx'
 import { useSession } from '../auth/useSession.ts'
 import { READ_OPTIONS } from '../events/eventQueries.ts'
 import { formatEventTime } from '../events/eventText.ts'
 import { AdminEventActions } from './AdminEventActions.tsx'
+import { AdminPhaseBadge } from './AdminPhaseBadge.tsx'
+import { AdminSignedOutNotice } from './AdminSignedOutNotice.tsx'
 import { adminPhaseAt, fetchAdminEvent, type AdminEvent, type AdminPhase } from './adminEvents.ts'
 import { ADMIN_KEYS } from './adminQueries.ts'
-import { ADMIN_PHASE_LABELS, STAFF_ONLY_TEXT } from './adminText.ts'
+import { registrationText, STAFF_ONLY_TEXT } from './adminText.ts'
 import { AdminRoundsPanel } from './AdminRoundsPanel.tsx'
 
 const GENERIC_TITLE = 'Evento'
@@ -91,14 +92,7 @@ function AdminEventDetails({ eventId }: AdminEventPageProps) {
     case 'signedOut':
       return (
         <PageFrame key="signedOut" title={GENERIC_TITLE}>
-          <div className="flex flex-col items-start gap-4">
-            <p role="alert" className="text-fg">
-              Sua sessão terminou. Entre de novo para continuar.
-            </p>
-            <a href={LOGIN_URL} className={SECONDARY_BUTTON}>
-              Entrar de novo
-            </a>
-          </div>
+          <AdminSignedOutNotice />
         </PageFrame>
       )
     case 'failed':
@@ -120,9 +114,7 @@ interface EventSummaryProps {
 function EventSummary({ event, phase, isRefreshing, onRefresh }: EventSummaryProps) {
   return (
     <section aria-label="Resumo do evento" className="flex flex-col items-start gap-4">
-      <span className="rounded-full border border-edge px-3 py-1 text-sm font-semibold tracking-wide text-fg">
-        {ADMIN_PHASE_LABELS[phase]}
-      </span>
+      <AdminPhaseBadge phase={phase} />
       <p className="text-lg font-semibold text-fg">{formatEventTime(event.startsAt, event.endsAt)}</p>
       <p className="whitespace-pre-line text-fg">{event.description}</p>
       <p className="text-fg">{registrationText(event)}</p>
@@ -141,11 +133,4 @@ function EventSummary({ event, phase, isRefreshing, onRefresh }: EventSummaryPro
       </div>
     </section>
   )
-}
-
-/** "3 pessoas inscritas de 40 vagas.": só a contagem, a API nunca diz quem. */
-function registrationText(event: Pick<AdminEvent, 'registrationCount' | 'capacity'>): string {
-  const count = event.registrationCount
-  const people = count === 1 ? '1 pessoa inscrita' : `${count} pessoas inscritas`
-  return `${people} de ${event.capacity} vagas.`
 }

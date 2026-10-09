@@ -10,7 +10,8 @@ O projeto está no início. Por enquanto ele tem os dois layouts, a identidade v
 dois temas e contraste testado), o cliente HTTP compatível com o login da API, o estado de sessão (entrar e
 sair), a landing com a inscrição na **lista de espera**, as telas de **Meu perfil** e **Contas bloqueadas**, e as de
 **Eventos**: a lista, o evento com a inscrição, a dupla de cada rodada e a **decisão privada** depois dela, **Minhas
-inscrições** e **Conexões**.
+inscrições** e **Conexões**. Para o piloto há também a **área da equipe** (`/admin/...`): criar o rascunho de um evento,
+publicá-lo, cancelá-lo e iniciar as rodadas, sem `curl`.
 
 ## Pré-requisitos
 
@@ -79,10 +80,12 @@ Firefox, que tratam `localhost` como contexto seguro. O Safari não aceita: use 
 | `/eventos/{id}` | O evento: inscrição e, durante ele, a dupla da rodada | Quem entrou |
 | `/inscricoes` | Minhas inscrições | Quem entrou |
 | `/conexoes` | Conexões: quem também quis continuar em contato | Quem entrou |
+| `/admin/eventos/novo` | Novo evento: o formulário do rascunho | Só ADMIN, decidido pela API (veja [Área da equipe](#área-da-equipe-admin)) |
+| `/admin/eventos/{id}` | O evento para a equipe: estado, inscritos, publicar, cancelar e rodadas | Só ADMIN, decidido pela API |
 | outro | Página não encontrada | Todos |
 
 O roteamento é um módulo pequeno em `src/shared/routing/`, sem biblioteca: `routeOf` transforma o caminho numa
-união discriminada de rotas (`{ page: 'event', eventId }` é a única com parâmetro, e só aceita um UUID), `usePathname` o lê com `useSyncExternalStore` (como o `useIsDesktop` lê o `matchMedia`) e o
+união discriminada de rotas (`{ page: 'event', eventId }` e `{ page: 'adminEvent', eventId }` são as únicas com parâmetro, e só aceitam um UUID), `usePathname` o lê com `useSyncExternalStore` (como o `useIsDesktop` lê o `matchMedia`) e o
 `AppLink` troca de página com `pushState`, sem recarregar. O `AppLink` é um `<a>` de verdade, então Ctrl/Cmd+clique
 e o botão do meio abrem nova aba. Ao abrir uma página, o título (`h1`) recebe o foco, para o leitor de tela
 perceber a troca. Um parâmetro de id não justificou uma biblioteca; se as rotas passarem a precisar de vários
@@ -93,7 +96,8 @@ Os links para "Eventos", "Conexões" e o perfil só aparecem para quem entrou: n
 "Eventos" fica marcado também nela e em cada evento. As páginas do perfil mostram "Entre para ver…" a quem não entrou, sem chamar a API.
 
 Em produção, o servidor de arquivos estáticos precisa devolver o `index.html` para `/perfil`,
-`/perfil/bloqueios`, `/eventos`, `/eventos/{id}`, `/inscricoes` e `/conexoes` (SPA fallback), para o recarregar e o
+`/perfil/bloqueios`, `/eventos`, `/eventos/{id}`, `/inscricoes`, `/conexoes`, `/admin/eventos/novo` e
+`/admin/eventos/{id}` (SPA fallback), para o recarregar e o
 link direto funcionarem. O `vite dev` e o `vite preview` já fazem isso; no Azure Static Web Apps é o
 `public/staticwebapp.config.json` (veja [Publicação](#publicação-azure-static-web-apps)).
 
@@ -179,6 +183,43 @@ contato com a dupla; se as duas disserem sim, surge uma conexão.
 - `/conexoes` lista `GET /api/me/connections` com "Carregar mais", da mais recente para a mais antiga, cada uma
   pelos últimos 8 caracteres do id da outra conta e pela data. A lista vazia explica como uma conexão surge.
   Um "sim" registrado invalida a lista em cache, que é relida quando a página abre.
+
+### Área da equipe (ADMIN)
+
+O piloto precisa que a equipe opere eventos sem `curl`. As rotas são `/admin/eventos/novo` e `/admin/eventos/{id}`
+(`src/features/admin/`).
+
+- **O front não sabe quem é ADMIN.** `GET /api/me` devolve só `displayName` e `profileComplete`, sem papéis, e o front
+  não inventa um critério. Por isso **nenhum link da navegação leva à área da equipe**: ela se abre pelo endereço, e
+  quem manda é a API. Quem não é ADMIN recebe 403, e a tela diz "Área só para a equipe." (no formulário, só depois do
+  envio, porque antes não há como saber). Esconder a rota não protege nada; a segurança é da API, e a página nunca
+  mostra dado que a API não mandou.
+- **Novo evento.** Título (1 a 80 caracteres, uma linha), descrição (1 a 500, parágrafos com quebra de linha), início,
+  fim e capacidade (2 a 200). O formulário repete as regras da duora-api para o erro aparecer antes do envio: início no
+  futuro e em até 365 dias, fim depois do início e em até 12 horas dele, texto em NFC e sem caractere de controle ou
+  invisível. Os horários são `datetime-local` no fuso de quem usa o app (a dica diz qual) e vão no corpo como ISO 8601
+  com o deslocamento daquele dia (`2026-10-10T19:00:00-03:00`); uma hora que o horário de verão pula é recusada. No
+  400, `errors: [{field, code}]` vira uma mensagem em cada campo (a tabela está em `adminEventApiProblems.ts`), o foco
+  vai ao primeiro, e `code` desconhecido só marca o campo como recusado. Depois de criar, a tela abre o rascunho.
+  A API não tem `Idempotency-Key` na criação (ADR 0016): se a resposta se perder, repetir pode gerar um segundo
+  rascunho, e o aviso de falha diz isso.
+- **O evento.** Mostra o estado guardado (rascunho, publicado ou cancelado) junto com a fase pelos horários (em
+  andamento, encerrado), a contagem de inscritos (nunca quem) e "Atualizar", que relê o evento e recalcula a fase.
+  "Publicar evento" (só rascunho) e "Cancelar evento" (rascunho ou publicado que ainda não acabou) pedem confirmação
+  antes de enviar; o cancelamento avisa que não se desfaz. O 409 traz o `reason`: publicar (`EVENT_ALREADY_PUBLISHED`,
+  `EVENT_CANCELLED`, `EVENT_STARTED`, `EVENT_ENDED`) e cancelar (`EVENT_CANCELLED`, `EVENT_ENDED`) têm mensagem própria;
+  sem `reason`, ou com um desconhecido, vale a recusa genérica ("mudou ao mesmo tempo"). Depois de um 409 a tela relê
+  o evento.
+- **Rodadas.** Só o evento publicado e em andamento inicia rodada. O número sugerido é `currentRound + 1` do evento
+  público (`GET /api/events/{id}`), ou 1; o campo aceita outro número de 1 a 100, e repetir uma rodada que já existe
+  devolve a mesma, sem novo sorteio (200 em vez de 201). Iniciar pede confirmação, porque o sorteio não se desfaz.
+  O resultado da rodada atual (`GET /api/admin/events/{id}/rounds/{n}`) aparece só em contagens: pares e pessoas de
+  fora. `EVENT_NOT_UNDERWAY` e `ROUND_OUT_OF_SEQUENCE` têm mensagem própria; o **429** (limite de 30 rodadas por hora
+  da conta) e o **503** (a mesma rodada já está sendo iniciada, ou o limite não pôde ser contado; nada foi gravado)
+  têm textos diferentes e dizem quantos segundos esperar, pelo `Retry-After`.
+- **Acessibilidade.** Cada campo tem rótulo, dica e erro ligados por `aria-describedby`/`aria-invalid`; o aviso de uma
+  ação recebe o foco (sucesso é `status`, erro é `alert`); a confirmação recebe o foco e "Voltar" o devolve ao botão
+  que a abriu; o estado do evento é texto, não só cor; todo controle tem o alvo de 44px.
 
 ## Duas interfaces: desktop e smartphone
 
@@ -413,6 +454,18 @@ gerados da spec, testes com cobertura e build. Também roda o gitleaks sobre tod
 
 ## Pendências
 
+- Área da equipe (pendências para a **duora-api**):
+  - **Lista de eventos para o ADMIN, rascunhos incluídos.** A spec só tem a leitura de um evento por id
+    (`GET /api/admin/events/{id}`); `GET /api/events` não traz rascunhos. Hoje a equipe chega ao rascunho pelo
+    endereço que a criação abre, e um rascunho perdido (por exemplo, depois de fechar a aba) não tem como ser
+    encontrado. Com a lista, a área ganharia uma página de entrada.
+  - **Papéis em `GET /api/me`** (por exemplo `roles` ou `isAdmin`). Sem isso o front não sabe quem é ADMIN, e por isso
+    não há link para a área da equipe nem estado "sem acesso" antes de chamar a API. Quando existir, o link entra na
+    navegação só para ADMIN, sem tirar a recusa do servidor.
+  - **`Idempotency-Key` na criação do rascunho**, para repetir depois de uma falha de rede não criar um segundo.
+  - Não há como editar um rascunho (título, horário, capacidade): errou, cancela e cria outro.
+- A confirmação de ações que não se desfazem (cancelar evento, iniciar rodada) usa o botão primário, porque o tema
+  ainda não tem um token de vermelho sólido com contraste testado; o Refactoring UI pede o vermelho forte nesse passo.
 - A cópia da spec em `api/openapi.json` é atualizada à mão; o CI não a compara com a da duora-api, que é um
   repositório privado. Quando o contrato mudar na API, rode a atualização acima.
 - Como o SWA fala com o BFF (mesma origem, Front Door ou outra saída) está em aberto e depende de decisão do

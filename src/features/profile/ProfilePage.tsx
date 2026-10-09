@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { isBug } from '../../shared/api/http.ts'
+import { READ_OPTIONS } from '../../shared/api/readOptions.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { PATHS } from '../../shared/routing/routes.ts'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
@@ -36,7 +36,7 @@ export function ProfilePage() {
 type ReturnFromEditing = 'saved' | 'cancelled' | null
 
 function ProfileSection() {
-  const query = useQuery({ ...PROFILE_QUERY, retry: false, refetchOnWindowFocus: false, throwOnError: isBug })
+  const query = useQuery({ ...PROFILE_QUERY, ...READ_OPTIONS })
   const [isEditing, setIsEditing] = useState(false)
   const [returned, setReturned] = useState<ReturnFromEditing>(null)
 

@@ -1,6 +1,7 @@
-import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
+import { useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { useId, useState } from 'react'
-import { isApiFailure, isBug } from '../../shared/api/http.ts'
+import { isApiFailure } from '../../shared/api/http.ts'
+import { usePagedList } from '../../shared/api/usePagedList.ts'
 import { AppLink } from '../../shared/routing/AppLink.tsx'
 import { PATHS } from '../../shared/routing/routes.ts'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
@@ -12,7 +13,6 @@ import { RequireSession } from '../auth/RequireSession.tsx'
 import { fetchBlockedPage, unblockAccount, type BlockedAccount, type BlockedPage } from './blockedAccounts.ts'
 
 const BLOCKED_ACCOUNTS_KEY = ['blocked-accounts'] as const
-const FIRST_PAGE: string | null = null
 
 /** A API não manda o nome de quem foi bloqueado; o fim do id (aleatório no UUIDv7) distingue uma conta da outra. */
 const ACCOUNT_CODE_LENGTH = 8
@@ -37,20 +37,13 @@ export function BlockedAccountsPage() {
 
 function BlockedAccountsSection() {
   const queryClient = useQueryClient()
-  const query = useInfiniteQuery({
-    queryKey: BLOCKED_ACCOUNTS_KEY,
-    queryFn: ({ pageParam }) => fetchBlockedPage(pageParam),
-    initialPageParam: FIRST_PAGE,
-    getNextPageParam: (lastPage) => lastPage.nextPageToken,
-    retry: false,
-    refetchOnWindowFocus: false,
-    throwOnError: isBug,
-  })
+  const list = usePagedList(BLOCKED_ACCOUNTS_KEY, fetchBlockedPage)
   const [hasUnblocked, setHasUnblocked] = useState(false)
 
-  if (query.data === undefined) {
-    return query.isError ? (
-      <LoadFailure message="Não foi possível carregar as contas bloqueadas." onRetry={() => void query.refetch()} />
+  const accounts = list.items
+  if (accounts === undefined) {
+    return list.hasFailed ? (
+      <LoadFailure message="Não foi possível carregar as contas bloqueadas." onRetry={list.retry} />
     ) : (
       <p role="status" className="text-fg-muted">
         Carregando as contas bloqueadas…
@@ -60,12 +53,12 @@ function BlockedAccountsSection() {
 
   /** Tira a conta do cache em vez de recarregar: os tokens das páginas seguintes continuam valendo. */
   function removeFromList(accountId: string) {
-    queryClient.setQueryData<BlockedPages>(BLOCKED_ACCOUNTS_KEY, (data) =>
-      data === undefined
-        ? data
+    queryClient.setQueryData<BlockedPages>(BLOCKED_ACCOUNTS_KEY, (cached) =>
+      cached === undefined
+        ? cached
         : {
-            ...data,
-            pages: data.pages.map((page) => ({
+            ...cached,
+            pages: cached.pages.map((page) => ({
               ...page,
               items: page.items.filter((account) => account.accountId !== accountId),
             })),
@@ -74,8 +67,7 @@ function BlockedAccountsSection() {
     setHasUnblocked(true)
   }
 
-  const accounts = query.data.pages.flatMap((page) => page.items)
-  const hasNoBlocks = accounts.length === 0 && !query.hasNextPage
+  const hasNoBlocks = accounts.length === 0 && !list.loadMore.hasNextPage
   return (
     <div className="flex flex-col items-start gap-6">
       {hasUnblocked && <UnblockedNotice />}
@@ -93,12 +85,7 @@ function BlockedAccountsSection() {
           ))}
         </ul>
       )}
-      <LoadMore
-        hasNextPage={query.hasNextPage}
-        isFetchingNextPage={query.isFetchingNextPage}
-        hasFailed={query.isFetchNextPageError && !query.isFetchingNextPage}
-        onLoadMore={() => void query.fetchNextPage()}
-      />
+      <LoadMore {...list.loadMore} />
     </div>
   )
 }

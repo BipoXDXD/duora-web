@@ -2,9 +2,10 @@ import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-quer
 import { act, renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { READ_OPTIONS } from '../../shared/api/readOptions.ts'
 import { DINNER } from '../../test/eventFixtures.ts'
 import { jsonAnswer, networkFailure, problemAnswer, stubApi, type FakeRoute } from '../../test/fakeApi.ts'
-import { EVENT_KEYS, READ_OPTIONS } from './eventQueries.ts'
+import { EVENT_KEYS } from './eventQueries.ts'
 import { fetchEvent } from './events.ts'
 import { useEventRefresh } from './useEventRefresh.ts'
 

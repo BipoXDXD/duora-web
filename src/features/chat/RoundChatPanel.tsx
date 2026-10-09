@@ -104,12 +104,16 @@ interface MessageItemProps {
   readonly children: ReactNode
 }
 
-/** O texto vai como texto comum (o React escapa), com as quebras de linha de quem escreveu. */
+/**
+ * O texto vai como texto comum (o React escapa), com as quebras de linha de quem escreveu. `wrap-anywhere` e não
+ * `break-words`: só ele encolhe a largura mínima do balão, e sem isso uma mensagem sem espaços (500 caracteres
+ * seguidos, um link) alarga a coluna inteira da página em vez de quebrar.
+ */
 function MessageItem({ fromMe, text, children }: MessageItemProps) {
   return (
     <li className={`flex max-w-[85%] flex-col gap-1 ${fromMe ? 'items-end self-end' : 'items-start self-start'}`}>
       <p
-        className={`rounded-lg px-4 py-3 whitespace-pre-wrap break-words ${
+        className={`rounded-lg px-4 py-3 whitespace-pre-wrap wrap-anywhere ${
           fromMe ? 'bg-primary-subtle text-on-primary-subtle' : 'bg-surface text-fg shadow-raised'
         }`}
       >

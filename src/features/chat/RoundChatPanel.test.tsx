@@ -147,6 +147,15 @@ describe('RoundChatPanel', () => {
       expect(log().querySelector('b')).toBeNull()
     })
 
+    // O jsdom não faz layout: o teste guarda a regra de CSS que a revisão num Chromium real mostrou necessária
+    // (500 caracteres sem espaço alargavam a página com `break-words`), não a largura em si.
+    it('lets a message with no spaces break anywhere, so it never widens the page', async () => {
+      renderChat({ [CHAT]: OPEN, [after(0)]: page([message(1, 'A'.repeat(500))]) })
+
+      const bubble = (await screen.findByText('A'.repeat(500))).closest('p')
+      expect(bubble).toHaveClass('wrap-anywhere')
+    })
+
     it('asks for the next messages every 2 seconds, from the last position it has', async () => {
       const { fetchMock } = renderChat({
         [CHAT]: OPEN,

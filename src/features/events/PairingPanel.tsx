@@ -1,4 +1,4 @@
-import { useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useId, useState } from 'react'
 import { RoundChatPanel } from '../chat/RoundChatPanel.tsx'
 import { DecisionPanel } from '../connections/DecisionPanel.tsx'
@@ -7,6 +7,7 @@ import { SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
 import { EVENT_KEYS, READ_OPTIONS } from './eventQueries.ts'
 import { accountCode } from './eventText.ts'
 import { fetchPairing, FIRST_ROUND, type Pairing } from './pairing.ts'
+import { useRoundAnnouncement } from './useRoundAnnouncement.ts'
 
 interface PairingPanelProps {
   readonly eventId: string
@@ -16,15 +17,21 @@ interface PairingPanelProps {
 
 /**
  * "Sua dupla" para quem está inscrito num evento em andamento. A rodada vem do evento: a atual é a padrão, e
- * as anteriores (1 até a atual) ficam a um botão de distância. Rodada que ainda não começou não se pede.
+ * as anteriores (1 até a atual) ficam a um botão de distância. Rodada que ainda não começou não se pede. A
+ * página relê o evento sozinha (`useEventRefresh`): quando o anfitrião inicia uma rodada, quem acompanha a atual
+ * passa para ela, e uma região `role="status"` só para leitor de tela avisa.
  */
 export function PairingPanel({ eventId, currentRound }: PairingPanelProps) {
   const headingId = useId()
+  const announcement = useRoundAnnouncement(currentRound)
   return (
     <section aria-labelledby={headingId} className="flex flex-col items-start gap-4">
       <h2 id={headingId} className="font-display text-2xl font-medium text-fg">
         Sua dupla
       </h2>
+      <p role="status" className="sr-only">
+        {announcement}
+      </p>
       {currentRound === null ? (
         <NoRoundYet eventId={eventId} />
       ) : (
@@ -44,16 +51,28 @@ function NoRoundYet({ eventId }: { readonly eventId: string }) {
 }
 
 /**
- * Relê o evento, que é onde a API diz qual rodada está valendo. A página não muda sozinha quando o anfitrião
- * inicia uma rodada.
+ * Relê o evento na hora, que é onde a API diz qual rodada está valendo. A página já o relê sozinha a cada ~15 s;
+ * o botão fica para não esperar esse intervalo (o anfitrião acabou de avisar) e para quem não depende de uma
+ * atualização automática. Mostra "Verificando…" só na leitura que a pessoa pediu: a de segundo plano não pode
+ * piscar nem desabilitar o botão com o foco nele.
  */
 function CheckForRounds({ eventId, label }: { readonly eventId: string; readonly label: string }) {
   const queryClient = useQueryClient()
-  const isChecking = useIsFetching({ queryKey: EVENT_KEYS.event(eventId) }) > 0
+  const [isChecking, setChecking] = useState(false)
+
+  async function check() {
+    setChecking(true)
+    try {
+      await queryClient.invalidateQueries({ queryKey: EVENT_KEYS.event(eventId) })
+    } finally {
+      setChecking(false)
+    }
+  }
+
   return (
     <button
       type="button"
-      onClick={() => void queryClient.invalidateQueries({ queryKey: EVENT_KEYS.event(eventId) })}
+      onClick={() => void check()}
       disabled={isChecking}
       className={SECONDARY_BUTTON}
     >

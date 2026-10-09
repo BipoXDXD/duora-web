@@ -51,6 +51,21 @@ export function eventPhaseAt(event: Pick<SocialEvent, 'status' | 'startsAt' | 'e
   return now < event.endsAt ? 'inProgress' : 'ended'
 }
 
+/**
+ * O próximo instante em que a fase de `eventPhaseAt` muda (o início, depois o fim), ou `null` quando ela não muda
+ * mais: evento cancelado ou já encerrado. Em `now` igual ao limite a fase já mudou, então o limite devolvido é
+ * sempre depois de `now`.
+ */
+export function nextPhaseChange(event: Pick<SocialEvent, 'status' | 'startsAt' | 'endsAt'>, now: Date): Date | null {
+  if (event.status === 'CANCELLED') {
+    return null
+  }
+  if (now < event.startsAt) {
+    return event.startsAt
+  }
+  return now < event.endsAt ? event.endsAt : null
+}
+
 const EVENTS_PATH = '/api/events'
 const NOT_FOUND = 404
 

@@ -157,10 +157,29 @@ link direto funcionarem. O `vite dev` e o `vite preview` já fazem isso; no Azur
   `GET /api/events/{id}` (a última rodada iniciada, de 1 a 100). Não há campo para digitar. "Rodada anterior" e
   "Rodada seguinte" andam de 1 até a atual (só aparecem com mais de uma rodada). Se a pessoa estava na rodada, a
   tela mostra a conta da dupla ou que ela ficou de fora; um 404 numa rodada já iniciada é "você não estava nela".
-  Com `currentRound` `null`, a tela diz "Nenhuma rodada começou ainda". "Ver se começou outra rodada" relê o evento
-  (a página não muda sozinha): quem acompanha a atual passa para a nova, quem escolheu uma anterior fica nela. A
-  lista de eventos manda `currentRound` sempre `null`, porque só traz eventos que ainda vão começar. A API só manda
-  o id da dupla, então a tela mostra os últimos 8 caracteres, como nas contas bloqueadas.
+  Com `currentRound` `null`, a tela diz "Nenhuma rodada começou ainda". A lista de eventos manda `currentRound`
+  sempre `null`, porque só traz eventos que ainda vão começar. A API só manda o id da dupla, então a tela mostra os
+  últimos 8 caracteres, como nas contas bloqueadas.
+- **A página acompanha o evento sozinha**, em `/eventos/{id}` e só com a aba visível (Page Visibility):
+  - **A fase muda no instante certo, sem chamar a API.** `useEventPhase` marca um timer para o próximo limite
+    (`startsAt`, depois `endsAt`) com um `Clock` injetável (`src/shared/browser/clock.ts`) e recalcula a fase quando
+    ele chega: o início tira a inscrição e abre a dupla, o fim mostra "Este evento já terminou". Evento cancelado ou
+    encerrado não agenda nada. Com a aba oculta o timer para, e ao voltar a fase vem do relógio. O `setTimeout` não
+    aceita mais que 2^31-1 ms (cerca de 24,8 dias), então um início mais distante rearma o timer em passos.
+  - **Em andamento, o evento é relido a cada 15 s**, com espalhamento de 20% para mais ou para menos
+    (`useEventRefresh`), porque é nele que a API diz qual rodada vale (`currentRound`). Antes do início e depois do
+    fim não há leitura. Aba oculta não lê; ao voltar, lê na hora se já era a vez e senão espera o que faltava, então
+    alternar de aba não vira rajada. Falha (rede, 5xx, 429, 503) espera 30, 60 e no máximo 120 s, com o mesmo
+    espalhamento e nunca menos que o `Retry-After`; a tela segue mostrando o último evento lido. Não usa o
+    `refetchInterval` do TanStack Query: ele sorteia de novo a cada render e só reavalia o intervalo quando a consulta
+    muda, não quando a fase vira por timer.
+  - **Rodada nova.** Quem acompanha a atual passa para a nova (o painel da dupla troca de rodada, então a conversa da
+    anterior sai da tela e deixa de ser lida, e a da nova abre); quem escolheu uma anterior fica nela. Uma região
+    `role="status"` só para leitor de tela diz "A rodada N começou." uma vez por rodada: a rodada que já valia quando
+    a página abriu e as releituras que trazem a mesma rodada não são anunciadas.
+  - **"Ver se começou outra rodada" continua**, como atalho: não espera o intervalo (o anfitrião acabou de avisar), dá
+    controle a quem não quer depender de uma atualização automática e é a saída depois de uma sequência de falhas, com
+    a espera já longa. Só ele mostra "Verificando…" e se desabilita; a leitura de segundo plano não pisca o botão.
 
 ### Decisão privada e conexões
 
@@ -536,10 +555,11 @@ gerados da spec, testes com cobertura e build. Também roda o gitleaks sobre tod
 - A lista de bloqueios não tem o nome nem a foto de quem foi bloqueado, porque a API não os manda.
 - A dupla aparece só pelo fim do id da conta, porque a API não manda nome nem foto do par.
 - A lista de eventos não mostra vagas restantes, que a API não expõe.
-- A fase do evento (em andamento, encerrado) e a rodada atual são calculadas quando o evento é lido; a página não
-  muda sozinha quando o evento começa ou o anfitrião inicia uma rodada com ela aberta. Durante o evento, "Ver se
-  começou outra rodada" relê o evento; antes dele, é preciso recarregar a página. Um polling ou o Web PubSub
-  resolveriam, e dependem de decisão.
+- A rodada nova chega em até ~18 s (15 s mais o espalhamento) com a página aberta: é polling do evento. O Web PubSub
+  ou o SSE (`GET /api/me/stream`) trariam na hora e dependem de decisão. Aba oculta ou rede com falha atrasa mais; o
+  botão "Ver se começou outra rodada" lê na hora. A fase só é recalculada com a aba visível: com ela oculta no
+  instante do início ou do fim, a tela se corrige ao voltar. O relógio é o do aparelho: com a hora errada, a fase muda
+  na hora errada até a próxima leitura, e a fase que a API conta (inscrição, rodadas) segue valendo.
 - Conversa da rodada (ADR 0021 da duora-api):
   - **SSE** (`GET /api/me/stream`, opção (b) da ADR) no lugar do polling, quando a API tiver o stream. O protocolo de
     reconexão (cursor `afterSeq`) continua o mesmo; muda a latência.
@@ -550,8 +570,9 @@ gerados da spec, testes com cobertura e build. Também roda o gitleaks sobre tod
     some e denunciar de novo gasta a cota). Um "Bloquear" próprio no chat depende de decisão de UX.
   - Os círculos e as caixas de marcar ficam no tamanho nativo (20px); o alvo de 44px é a linha inteira com o
     rótulo. Não foi conferido num navegador nem no celular.
-  - O `open` é relido só ao abrir, ao voltar à aba e num 409. Quem só lê não vê o chat fechar quando começa a rodada
-    seguinte até tentar enviar ou voltar à aba; o SSE resolve isso.
+  - O `open` é relido só ao abrir, ao voltar à aba e num 409. Rodada nova agora troca o painel sozinha (a página relê o
+    evento a cada ~15 s e a conversa da rodada anterior sai da tela), mas o chat fechado por outro motivo (fim do
+    evento, chat cheio, bloqueio) só é percebido ao tentar enviar ou voltar à aba; o SSE resolve isso.
   - Se uma leitura trouxer a própria mensagem antes da resposta do envio, ela aparece por um instante duas vezes
     (a gravada e a pendente) e é anunciada de novo; a resposta do envio desfaz a duplicata.
   - O Playwright em homologação do "Pronto quando" da fatia 1 não foi feito.

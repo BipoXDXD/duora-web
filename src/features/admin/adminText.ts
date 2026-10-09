@@ -1,4 +1,4 @@
-import type { AdminPhase, AdminRound } from './adminEvents.ts'
+import type { AdminEvent, AdminEventStatus, AdminPhase, AdminRound } from './adminEvents.ts'
 import {
   DESCRIPTION_MAX_LENGTH,
   MAX_CAPACITY,
@@ -81,3 +81,19 @@ function sittingOutText(count: number): string {
 export function roundCountsText(round: Pick<AdminRound, 'pairCount' | 'sittingOutCount'>): string {
   return `${pairsText(round.pairCount)}; ${sittingOutText(round.sittingOutCount)}.`
 }
+
+/** "3 pessoas inscritas de 40 vagas.": só a contagem, a API nunca diz quem. */
+export function registrationText(event: Pick<AdminEvent, 'registrationCount' | 'capacity'>): string {
+  const count = event.registrationCount
+  const people = count === 1 ? '1 pessoa inscrita' : `${count} pessoas inscritas`
+  return `${people} de ${event.capacity} vagas.`
+}
+
+/** O que o filtro da lista oferece: um estado guardado ou todos. */
+export const STATUS_FILTER_LABELS: Readonly<Record<AdminEventStatus, string>> = {
+  DRAFT: 'Rascunhos',
+  PUBLISHED: 'Publicados',
+  CANCELLED: 'Cancelados',
+}
+
+export const ALL_STATUSES_LABEL = 'Todos'

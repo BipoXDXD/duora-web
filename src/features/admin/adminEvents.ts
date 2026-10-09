@@ -13,6 +13,8 @@ import { FIRST_ROUND, LAST_ROUND } from '../events/pairing.ts'
 
 export const ADMIN_EVENT_STATUSES = ['DRAFT', 'PUBLISHED', 'CANCELLED'] as const
 
+export type AdminEventStatus = (typeof ADMIN_EVENT_STATUSES)[number]
+
 /** Corpo de GET /api/admin/events/{id} e dos POST que o devolvem (AdminEventResponse). */
 const adminEventSchema = z.object({
   id: z.uuid(),
@@ -35,11 +37,19 @@ const adminRoundSchema = z.object({
   startedAt: instantSchema,
 })
 
+/** Corpo de GET /api/admin/events: a última página vem com `nextPageToken` nulo. */
+const adminEventPageSchema = z.object({
+  items: z.array(adminEventSchema),
+  nextPageToken: z.nullable(z.string()),
+})
+
 /** O que os schemas aceitam da API; o teste compara com os tipos gerados da spec. */
 export type AdminEventWire = z.input<typeof adminEventSchema>
+export type AdminEventPageWire = z.input<typeof adminEventPageSchema>
 export type AdminRoundWire = z.input<typeof adminRoundSchema>
 
 export type AdminEvent = Readonly<z.output<typeof adminEventSchema>>
+export type AdminEventPage = Readonly<z.output<typeof adminEventPageSchema>>
 export type AdminRound = Readonly<z.output<typeof adminRoundSchema>>
 
 /**
@@ -159,6 +169,32 @@ export async function createEvent(newEvent: NewEvent): Promise<CreateEventResult
     }
     return unexpectedFailure(error)
   }
+}
+
+/**
+ * Uma página dos eventos de qualquer estado, do início mais distante ao mais antigo. `status` escolhe um só
+ * estado; `null` traz todos. Quem não é ADMIN recebe 403 e sem sessão 401, e ambos sobem como `ApiError` para
+ * a lista decidir o aviso (`adminFailureOf`).
+ */
+export async function fetchAdminEventsPage(
+  pageToken: string | null,
+  status: AdminEventStatus | null,
+): Promise<AdminEventPage> {
+  const query = new URLSearchParams()
+  if (status !== null) {
+    query.set('status', status)
+  }
+  if (pageToken !== null) {
+    query.set('pageToken', pageToken)
+  }
+  const queryText = query.size === 0 ? '' : `?${query.toString()}`
+  const response = await sendApiRequest({ method: 'GET', path: `${ADMIN_EVENTS_PATH}${queryText}` })
+  return readJsonBody(response, adminEventPageSchema)
+}
+
+/** Como uma leitura que falhou aparece na lista: a sessão acabou, falta o papel ou deu erro. */
+export function adminFailureOf(error: unknown): AdminFailure {
+  return (error instanceof ApiError ? failureOf(error) : null) ?? FAILED
 }
 
 /** O evento com o estado guardado e a contagem de inscritos, rascunho incluído. */

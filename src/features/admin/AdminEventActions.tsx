@@ -63,8 +63,10 @@ export function AdminEventActions({ event, now }: AdminEventActionsProps) {
       queryClient.setQueryData(ADMIN_KEYS.event(event.id), { kind: 'found', event: result.event })
       void queryClient.invalidateQueries({ queryKey: EVENT_KEYS.list })
       void queryClient.invalidateQueries({ queryKey: EVENT_KEYS.event(event.id) })
+      void queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.lists })
     } else if (result.kind === 'refused' || result.kind === 'notFound') {
       void queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.event(event.id) })
+      void queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.lists })
     }
     setConfirming(null)
     setReturnFocusTo(null)

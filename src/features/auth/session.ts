@@ -1,10 +1,24 @@
 import { z } from 'zod/mini'
 import { ApiError, readJsonBody, sendApiRequest } from '../../shared/api/http.ts'
 
+/** Os papéis que o front conhece; o teste confere que são os mesmos que a spec declara. */
+export const KNOWN_ROLES = ['ADMIN'] as const
+
+export type Role = (typeof KNOWN_ROLES)[number]
+
+/**
+ * Allowlist: papel que o front não conhece é ignorado, não é erro, para a API poder acrescentar papéis sem
+ * derrubar a sessão. O resultado segue a ordem de `KNOWN_ROLES` e não repete.
+ */
+const rolesSchema = z.pipe(
+  z.array(z.string()),
+  z.transform((names) => KNOWN_ROLES.filter((role) => names.includes(role))),
+)
+
 /**
  * Corpo de GET /api/me (CurrentUserResponse da duora-api). Nome em branco conta como sem nome. O
  * schema lê só o que o front usa; `session.test.ts` confere que esses campos batem com o tipo gerado
- * da spec, que é a fonte do contrato.
+ * da spec, que é a fonte do contrato. Os papéis só decidem o que mostrar: cada rota confere o papel na API.
  */
 const currentUserSchema = z.object({
   displayName: z.pipe(
@@ -14,6 +28,7 @@ const currentUserSchema = z.object({
       return trimmed === '' ? null : trimmed
     }),
   ),
+  roles: rolesSchema,
 })
 
 /**

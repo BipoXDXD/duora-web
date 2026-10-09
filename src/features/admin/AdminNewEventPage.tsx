@@ -83,6 +83,7 @@ function NewEventForm() {
     switch (result.kind) {
       case 'created':
         queryClient.setQueryData(ADMIN_KEYS.event(result.event.id), { kind: 'found', event: result.event })
+        void queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.lists })
         goTo(adminEventPath(result.event.id))
         return
       case 'invalid': {

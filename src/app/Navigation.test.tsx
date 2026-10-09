@@ -1,12 +1,16 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
-import { ANONYMOUS_SESSION, jsonAnswer, neverAnswer, stubApi, type FakeRoute } from '../test/fakeApi.ts'
+import { ANONYMOUS_SESSION, jsonAnswer, neverAnswer, problemAnswer, stubApi, type FakeRoute } from '../test/fakeApi.ts'
 import { stubMatchMedia } from '../test/fakeMatchMedia.ts'
 import { App } from './App.tsx'
 
-const SESSION = { '/api/me': jsonAnswer({ displayName: 'Ana Souza', profileComplete: true }) }
+const SESSION = { '/api/me': jsonAnswer({ displayName: 'Ana Souza', profileComplete: true, roles: [] }) }
+const ADMIN_SESSION = {
+  '/api/me': jsonAnswer({ displayName: 'Ana Souza', profileComplete: true, roles: ['ADMIN'] }),
+}
 const PAGES = {
+  '/api/admin/events': neverAnswer(),
   '/api/me/profile': neverAnswer(),
   '/api/me/blocked-accounts': neverAnswer(),
   '/api/events': neverAnswer(),
@@ -27,7 +31,7 @@ describe.each([
   function renderAt(path: string, session: Readonly<Record<string, FakeRoute>> = SESSION) {
     stubMatchMedia(isDesktop)
     window.history.replaceState(null, '', path)
-    stubApi({ ...session, ...PAGES })
+    stubApi({ ...PAGES, ...session })
     render(<App />)
     return { user: userEvent.setup(), navigation: screen.getByRole('navigation', { name: navigationName }) }
   }
@@ -117,12 +121,60 @@ describe.each([
     expect(screen.getByRole('heading', { level: 1, name: 'Contas bloqueadas' })).toBeInTheDocument()
   })
 
-  it('links to no admin page, because the front does not know who is ADMIN', async () => {
+  it('links to no admin page for a user without the ADMIN role', async () => {
     const { navigation } = renderAt('/')
 
     await within(navigation).findByRole('link', { name: profileLinkName })
+    expect(within(navigation).queryByRole('link', { name: 'Equipe' })).not.toBeInTheDocument()
     const adminLinks = screen.queryAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('/admin'))
     expect(adminLinks).toEqual([])
+  })
+
+  it('links to no admin page for a role the front does not know', async () => {
+    const { navigation } = renderAt('/', {
+      '/api/me': jsonAnswer({ displayName: 'Ana Souza', profileComplete: true, roles: ['MODERATOR'] }),
+    })
+
+    await within(navigation).findByRole('link', { name: profileLinkName })
+    expect(within(navigation).queryByRole('link', { name: 'Equipe' })).not.toBeInTheDocument()
+  })
+
+  it('offers no staff link to a visitor who is not logged in', async () => {
+    const { navigation } = renderAt('/', ANONYMOUS_SESSION)
+
+    await screen.findAllByRole('link', { name: 'Entrar' })
+    expect(within(navigation).queryByRole('link', { name: 'Equipe' })).not.toBeInTheDocument()
+  })
+
+  it('takes an ADMIN to the staff events and marks them as the current page', async () => {
+    const { user, navigation } = renderAt('/', ADMIN_SESSION)
+
+    await user.click(await within(navigation).findByRole('link', { name: 'Equipe' }))
+
+    expect(window.location.pathname).toBe('/admin/eventos')
+    expect(screen.getByRole('heading', { level: 1, name: 'Eventos da equipe' })).toBeInTheDocument()
+    expect(within(navigation).getByRole('link', { name: 'Equipe' })).toHaveAttribute('aria-current', 'page')
+    expect(within(navigation).getByRole('link', { name: 'Eventos' })).not.toHaveAttribute('aria-current')
+  })
+
+  it.each(['/admin/eventos/novo', '/admin/eventos/0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7b'])(
+    'keeps "Equipe" as the current page for an ADMIN on %s',
+    async (path) => {
+      const { navigation } = renderAt(path, ADMIN_SESSION)
+
+      expect(await within(navigation).findByRole('link', { name: 'Equipe' })).toHaveAttribute('aria-current', 'page')
+      expect(within(navigation).queryAllByRole('link', { current: 'page' })).toHaveLength(1)
+    },
+  )
+
+  it('still answers "Área só para a equipe." on the staff events when the API refuses a user the front shows no link to', async () => {
+    const { navigation } = renderAt('/admin/eventos', {
+      ...SESSION,
+      '/api/admin/events': problemAnswer(403),
+    })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Área só para a equipe.')
+    expect(within(navigation).queryByRole('link', { name: 'Equipe' })).not.toBeInTheDocument()
   })
 
   it.each(['/admin/eventos/novo', '/admin/eventos/0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7b'])(

@@ -65,8 +65,12 @@ describe('chatLogReducer', () => {
       expect(log).toEqual(ready({ messages: [received(1), own, received(3)] }))
     })
 
-    it('ignores a page before the chat was read', () => {
-      expect(chatLogReducer(INITIAL_CHAT_LOG, { type: 'pageReceived', items: [message(1)] })).toBe(INITIAL_CHAT_LOG)
+    it.each([
+      ['a page', { type: 'pageReceived', items: [message(1)] }],
+      ['a send', { type: 'sendStarted', outgoing: { key: 'key-1', text: 'Oi!' } }],
+      ['an answer to a send', { type: 'sendSettled', key: 'key-1', result: { kind: 'failed' } }],
+    ] as const)('ignores %s before the chat was read', (_case, action) => {
+      expect(chatLogReducer(INITIAL_CHAT_LOG, action)).toBe(INITIAL_CHAT_LOG)
     })
   })
 

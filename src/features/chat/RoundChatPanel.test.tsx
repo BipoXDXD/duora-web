@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { Component, type ReactNode } from 'react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { LOGIN_URL } from '../auth/loginUrl.ts'
@@ -257,6 +258,116 @@ describe('RoundChatPanel', () => {
     })
   })
 
+  describe('reads on their way', () => {
+    it('stops reading when the panel goes away', async () => {
+      const read = held()
+      const fetchMock = stubApi({ [CHAT]: OPEN, [after(0)]: read.route })
+      const { unmount } = render(<RoundChatPanel eventId={EVENT_ID} roundNumber={2} />)
+      await wait(0)
+
+      unmount()
+      read.release(page([message(1, 'Oi!')]))
+      await wait(10_000)
+
+      expect(readsOf(fetchMock)).toEqual([CHAT, after(0)])
+    })
+
+    it('stops before the messages when the panel goes away while the chat is read', async () => {
+      const read = held()
+      const fetchMock = stubApi({ [CHAT]: read.route, [after(0)]: EMPTY })
+      const { unmount } = render(<RoundChatPanel eventId={EVENT_ID} roundNumber={2} />)
+      await wait(0)
+
+      unmount()
+      read.release(OPEN)
+      await wait(10_000)
+
+      expect(readsOf(fetchMock)).toEqual([CHAT])
+    })
+
+    it('does not mark the next read when the tab was hidden while a read was on its way', async () => {
+      const read = held()
+      const { fetchMock } = renderChat({ [CHAT]: OPEN, [after(0)]: read.route })
+      await wait(0)
+
+      setVisibility('hidden')
+      read.release(EMPTY)
+      await wait(60_000)
+
+      expect(readsOf(fetchMock)).toEqual([CHAT, after(0)])
+    })
+
+    it('reads the chat again after the read on its way when the tab comes back during it', async () => {
+      const read = held()
+      const { fetchMock } = renderChat({ [CHAT]: OPEN, [after(0)]: inSequence(read.route, EMPTY) })
+      await wait(0)
+      setVisibility('hidden')
+      setVisibility('visible')
+      expect(readsOf(fetchMock)).toEqual([CHAT, after(0)])
+
+      read.release(EMPTY)
+      await wait(2000)
+
+      expect(readsOf(fetchMock)).toEqual([CHAT, after(0), CHAT, after(0)])
+    })
+  })
+
+  describe('bugs', () => {
+    it('lets a bug in the reading reach the error boundary, instead of calling it a lost connection', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      stubApi({ [CHAT]: () => Promise.reject(new RangeError('bug')) })
+
+      render(
+        <CrashBoundary>
+          <RoundChatPanel eventId={EVENT_ID} roundNumber={2} />
+        </CrashBoundary>,
+      )
+
+      expect(await screen.findByText('quebrou: bug')).toBeInTheDocument()
+    })
+
+    it('lets a bug in the sending reach the error boundary', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      stubApi({
+        [CHAT]: OPEN,
+        [after(0)]: EMPTY,
+        [MESSAGES]: byMethod({ POST: () => Promise.reject(new RangeError('bug no envio')) }),
+      })
+      render(
+        <CrashBoundary>
+          <RoundChatPanel eventId={EVENT_ID} roundNumber={2} />
+        </CrashBoundary>,
+      )
+      await screen.findByText('Nenhuma mensagem ainda.')
+
+      fireEvent.change(field(), { target: { value: 'Oi' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+      expect(await screen.findByText('quebrou: bug no envio')).toBeInTheDocument()
+    })
+
+    it('lets a bug in a resend reach the error boundary', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      stubApi({
+        [CHAT]: OPEN,
+        [after(0)]: EMPTY,
+        [MESSAGES]: byMethod({ POST: inSequence(networkFailure(), () => Promise.reject(new RangeError('bug no reenvio'))) }),
+      })
+      render(
+        <CrashBoundary>
+          <RoundChatPanel eventId={EVENT_ID} roundNumber={2} />
+        </CrashBoundary>,
+      )
+      await screen.findByText('Nenhuma mensagem ainda.')
+      fireEvent.change(field(), { target: { value: 'Oi' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Tentar enviar de novo' }))
+
+      expect(await screen.findByText('quebrou: bug no reenvio')).toBeInTheDocument()
+    })
+  })
+
   describe('failed reads', () => {
     it('waits longer after each failure, says it is trying again, and goes back to 2 seconds', async () => {
       const { fetchMock } = renderChat({
@@ -493,6 +604,20 @@ describe('RoundChatPanel', () => {
     })
   })
 
+  it('keeps a new draft when the API refuses the previous text', async () => {
+    const post = held()
+    const { user } = chatWithSend(post.route)
+    await screen.findByText('Oi!')
+    await user.type(field(), 'Oi\u200b{Enter}')
+    await user.type(field(), 'Outra')
+
+    post.release(problemAnswer(400, 'Bad Request', [{ field: 'text', code: 'FORBIDDEN_CHARACTER' }]))
+    await wait(0)
+
+    expect(field()).toHaveValue('Outra')
+    expect(screen.getByText('A mensagem tem um caractere que não é aceito. Tire-o e envie de novo.')).toBeInTheDocument()
+  })
+
   describe('draft', () => {
     it('labels the field and counts characters as the API does', async () => {
       chatToWrite()
@@ -581,4 +706,16 @@ function chatToWrite() {
     [after(0)]: EMPTY,
     [MESSAGES]: byMethod({ POST: jsonAnswer(message(1, 'x', true), 201) }),
   })
+}
+
+class CrashBoundary extends Component<{ readonly children: ReactNode }, { readonly message: string | null }> {
+  override state = { message: null }
+
+  static getDerivedStateFromError(error: unknown) {
+    return { message: error instanceof Error ? error.message : String(error) }
+  }
+
+  override render() {
+    return this.state.message === null ? this.props.children : <p>{`quebrou: ${this.state.message}`}</p>
+  }
 }

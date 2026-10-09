@@ -36,7 +36,7 @@ export function RoundChatPanel({ eventId, roundNumber }: RoundChatPanelProps) {
         Conversa com sua dupla
       </h3>
       {log.kind === 'notPaired' && <p className="text-fg">Não há conversa sua nesta rodada.</p>}
-      {isLoading(log) && !chat.isReconnecting && (
+      {isLoading(log) && !chat.isReconnecting && !chat.isSignedOut && (
         <p role="status" className="text-fg-muted">
           Carregando a conversa…
         </p>
@@ -45,6 +45,11 @@ export function RoundChatPanel({ eventId, roundNumber }: RoundChatPanelProps) {
         <p role="status" className="text-fg-muted">
           Sem conexão com a conversa. Tentando de novo…
         </p>
+      )}
+      {chat.isSignedOut && (
+        <div role="status">
+          <SignedOutNotice className="items-start" />
+        </div>
       )}
       {log.kind === 'ready' && (
         <>
@@ -178,17 +183,21 @@ function PendingStatus({ pending: { status }, onRetry }: PendingStatusProps) {
         </div>
       )
     case 'signedOut':
-      return (
-        <div className="flex flex-col items-end gap-1">
-          <p className="text-sm font-semibold text-danger">Sua sessão terminou. Entre de novo para enviar.</p>
-          <a href={LOGIN_URL} className={TEXT_LINK}>
-            Entrar de novo
-          </a>
-        </div>
-      )
+      return <SignedOutNotice className="items-end" />
     case 'notSent':
       return <p className="text-sm font-semibold text-danger">Não foi enviada.</p>
   }
+}
+
+function SignedOutNotice({ className }: { readonly className: string }) {
+  return (
+    <div className={`flex flex-col gap-1 ${className}`}>
+      <p className="text-sm font-semibold text-danger">Sua sessão terminou. Entre de novo para enviar.</p>
+      <a href={LOGIN_URL} className={TEXT_LINK}>
+        Entrar de novo
+      </a>
+    </div>
+  )
 }
 
 const PROBLEM_TEXT: Readonly<Record<DraftProblem, string>> = {

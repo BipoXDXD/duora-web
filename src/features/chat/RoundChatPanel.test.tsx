@@ -419,6 +419,51 @@ describe('RoundChatPanel', () => {
     })
   })
 
+  describe('session ended while reading', () => {
+    const SESSION_ENDED = 'Sua sessão terminou. Entre de novo para enviar.'
+    const LOST_CONNECTION = 'Sem conexão com a conversa. Tentando de novo…'
+
+    it('stops polling and offers signing in again, keeping what was already read', async () => {
+      const { fetchMock } = renderChat({
+        [CHAT]: OPEN,
+        [after(0)]: inSequence(page([message(1, 'Oi!')]), problemAnswer(401)),
+        [after(1)]: problemAnswer(401),
+      })
+      await screen.findByText('Oi!')
+
+      await wait(2000)
+
+      expect(screen.getByText(SESSION_ENDED)).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Entrar de novo' })).toHaveAttribute('href', LOGIN_URL)
+      expect(screen.queryByText(LOST_CONNECTION)).not.toBeInTheDocument()
+      expect(shownTexts()).toEqual(['Oi!'])
+      const readsSoFar = readsOf(fetchMock).length
+      await wait(120_000)
+      expect(readsOf(fetchMock)).toHaveLength(readsSoFar)
+    })
+
+    it('says so, instead of loading forever, when the session is already over on the first read', async () => {
+      const { fetchMock } = renderChat({ [CHAT]: problemAnswer(401) })
+
+      expect(await screen.findByText(SESSION_ENDED)).toBeInTheDocument()
+      expect(screen.queryByText('Carregando a conversa…')).not.toBeInTheDocument()
+      expect(screen.queryByText(LOST_CONNECTION)).not.toBeInTheDocument()
+      await wait(120_000)
+      expect(readsOf(fetchMock)).toEqual([CHAT])
+    })
+
+    it('reads again when the person comes back to the tab, and drops the notice if the session is back', async () => {
+      renderChat({ [CHAT]: OPEN, [after(0)]: inSequence(problemAnswer(401), page([message(1, 'Voltei')])) })
+      await screen.findByText(SESSION_ENDED)
+
+      setVisibility('hidden')
+      setVisibility('visible')
+
+      expect(await screen.findByText('Voltei')).toBeInTheDocument()
+      expect(screen.queryByText(SESSION_ENDED)).not.toBeInTheDocument()
+    })
+  })
+
   describe('messages not read yet', () => {
     const NO_MESSAGES = 'Nenhuma mensagem ainda.'
     const LOST_CONNECTION = 'Sem conexão com a conversa. Tentando de novo…'

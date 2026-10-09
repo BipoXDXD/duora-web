@@ -1,0 +1,4 @@
+# Falsos positivos revisados (fingerprint commit:arquivo:regra:linha).
+# UUIDs fictícios de teste em variáveis chamadas "key" (Idempotency-Key), não são segredo.
+32ce8a9f479ff0a123522c3723f8341683daa098:src/shared/api/http.test.ts:generic-api-key:127
+e4691cf72e4ebebfd877048630e9405efb496b2f:src/features/chat/chat.test.ts:generic-api-key:28

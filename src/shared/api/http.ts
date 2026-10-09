@@ -9,6 +9,8 @@ export interface ApiRequest {
   readonly body?: unknown
   /** O ETag da última leitura, para a API recusar com 412 uma edição sobre versão desatualizada. */
   readonly ifMatch?: string
+  /** Gerada por quem envia e repetida em cada reenvio da mesma operação, para a API gravá-la uma vez só. */
+  readonly idempotencyKey?: string
 }
 
 /** Os `code` que a spec da API declara para um campo recusado (`FieldError.code`); o teste confere com ela. */
@@ -48,6 +50,8 @@ export const REFUSAL_REASONS = [
   'UNDERAGE',
   'BIRTH_DATE_ALREADY_SET',
   'DECISION_ALREADY_MADE',
+  'CHAT_CLOSED',
+  'IDEMPOTENCY_KEY_REUSED',
 ] as const
 
 export type KnownRefusalReason = (typeof REFUSAL_REASONS)[number]
@@ -156,6 +160,9 @@ function headersFor(request: ApiRequest): Headers {
   }
   if (request.ifMatch !== undefined) {
     headers.set('If-Match', request.ifMatch)
+  }
+  if (request.idempotencyKey !== undefined) {
+    headers.set('Idempotency-Key', request.idempotencyKey)
   }
   const csrfToken = SAFE_METHODS.has(request.method) ? null : readCookie(CSRF_COOKIE)
   if (csrfToken !== null) {

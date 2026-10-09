@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../app/App.tsx'
-import { DINNER, SESSION } from '../../test/eventFixtures.ts'
+import { DINNER, emptyChatRoutes, SESSION } from '../../test/eventFixtures.ts'
 import {
   byMethod,
   inSequence,
@@ -70,6 +70,7 @@ async function openRound(
     [`${ROUNDS}/2/pairing`]: jsonAnswer({ eventId: DINNER.id, roundNumber: 2, partnerAccountId: PARTNER_ID }),
     [`${ROUNDS}/2/decision`]: NOT_DECIDED,
     [DECISION]: decision,
+    ...emptyChatRoutes(currentRound),
     ...more,
   })
   render(<App />)

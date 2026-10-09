@@ -123,6 +123,19 @@ describe('sendApiRequest', () => {
     expect(sentHeaders().has('If-Match')).toBe(false)
   })
 
+  it('sends Idempotency-Key when the request carries one', async () => {
+    const attemptId = '0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7c'
+    await sendApiRequest({ method: 'POST', path: '/api/x', idempotencyKey: attemptId, body: {} })
+
+    expect(sentHeaders().get('Idempotency-Key')).toBe(attemptId)
+  })
+
+  it('sends no Idempotency-Key when the request has none', async () => {
+    await sendApiRequest({ method: 'POST', path: '/api/x', body: {} })
+
+    expect(sentHeaders().has('Idempotency-Key')).toBe(false)
+  })
+
   it('returns the response when the status is 2xx', async () => {
     const response = new Response(null, { status: 202 })
     fetchMock.mockResolvedValue(response)

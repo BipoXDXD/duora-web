@@ -9,8 +9,8 @@ React 19, TypeScript 6 (`strict`), Vite 8 e Tailwind CSS 4. O backend é a
 O projeto está no início. Por enquanto ele tem os dois layouts, a identidade visual "Mesa posta" (tokens,
 dois temas e contraste testado), o cliente HTTP compatível com o login da API, o estado de sessão (entrar e
 sair), a landing com a inscrição na **lista de espera**, as telas de **Meu perfil** e **Contas bloqueadas**, e as de
-**Eventos**: a lista, o evento com a inscrição, a dupla de cada rodada e a **decisão privada** depois dela, **Minhas
-inscrições** e **Conexões**. Para o piloto há também a **área da equipe** (`/admin/...`): criar o rascunho de um evento,
+**Eventos**: a lista, o evento com a inscrição, a dupla de cada rodada, a **conversa com a dupla** da rodada atual e a
+**decisão privada** depois dela, **Minhas inscrições** e **Conexões**. Para o piloto há também a **área da equipe** (`/admin/...`): criar o rascunho de um evento,
 publicá-lo, cancelá-lo e iniciar as rodadas, sem `curl`.
 
 ## Pré-requisitos
@@ -183,6 +183,41 @@ contato com a dupla; se as duas disserem sim, surge uma conexão.
 - `/conexoes` lista `GET /api/me/connections` com "Carregar mais", da mais recente para a mais antiga, cada uma
   pelos últimos 8 caracteres do id da outra conta e pela data. A lista vazia explica como uma conexão surge.
   Um "sim" registrado invalida a lista em cache, que é relida quando a página abre.
+
+### Conversa da rodada
+
+O chat temporário com a dupla da rodada (ADR 0021 da duora-api), fatia 1 do lado web: **polling a cada 2 s**, com SSE
+depois. O código está em `src/features/chat/`.
+
+- Aparece só na **rodada atual** e só para quem formou par, abaixo da dupla e fora da região viva dela. Rodada
+  anterior e quem ficou de fora não leem nada do chat.
+- **Leitura.** `GET .../rounds/{n}/chat` diz se o chat aceita mensagens (`open`); depois,
+  `GET .../chat/messages?afterSeq={cursor}&maxPageSize=100` traz as novas, em ordem de `seq`, e as páginas seguintes
+  vêm na hora enquanto `nextAfterSeq` não for `null`. O cursor é a maior posição que **a leitura** trouxe, nunca a de
+  um envio: a mensagem do par gravada logo antes da própria ainda não chegou e seria pulada. As mensagens se juntam
+  por `seq`, então uma página repetida não duplica nada.
+- **Só com a aba visível** (Page Visibility): a aba oculta para o polling; ao voltar, o front relê o `open` e as
+  mensagens desde o cursor. Falha de leitura mostra "Sem conexão com a conversa. Tentando de novo…" e espera 4, 8,
+  16 e no máximo 30 s, com até 20% a mais sorteado e nunca menos que o `Retry-After` (429 e 503). Chat fechado é lido
+  até o fim e o polling para. 404 é "Não há conversa sua nesta rodada".
+- **Envio.** O texto sai do campo na hora e aparece como pendente ("Enviando…"). O `POST .../chat/messages` leva uma
+  `Idempotency-Key` nova (`crypto.randomUUID`) por texto, e a **mesma** chave em cada "Tentar enviar de novo" depois de
+  falha de rede, erro inesperado, 429 ou 503 (com "Tente de novo em N s" quando veio o `Retry-After`). O 201 ou 200
+  troca o pendente pela mensagem gravada, no mesmo item da lista.
+- **Chat fechado** (`open=false` ou 409 `CHAT_CLOSED`): só leitura, sem campo, com "Esta conversa não recebe mais
+  mensagens. O que foi dito continua aqui para ler." O aviso não diz o motivo, porque rodada nova, fim do evento,
+  chat cheio e bloqueio chegam iguais da API, de propósito. O 409 também relê o chat. 409 `IDEMPOTENCY_KEY_REUSED`
+  marca o texto como "Não foi enviada.", sem reenvio; 401 pede para entrar de novo.
+- **Limite de 500 caracteres**, contados como a API conta (code points depois do NFC, sem o espaço das pontas): o
+  contador fica embaixo do campo, e texto vazio ou longo demais não sai. O 400 devolve o texto ao campo com o motivo
+  lido de `errors[]` (`TOO_LONG`, `FORBIDDEN_CHARACTER`, o resto como recusa genérica), a menos que a pessoa já tenha
+  começado outro.
+- **Acessibilidade.** A lista é `role="log"` com `aria-live="polite"` e `aria-relevant="additions"`: a mensagem nova
+  é anunciada, e a própria, que continua no mesmo item quando é gravada, não é anunciada de novo. Cada mensagem diz
+  quem escreveu ("Você", "Sua dupla"). O campo tem rótulo ("Sua mensagem") e o contador como descrição; **Enter
+  envia, Shift+Enter quebra a linha** (Enter durante a composição de um caractere não envia). O foco fica no campo
+  depois de enviar e volta a ele depois de "Tentar enviar de novo". Botões e link com 44px.
+- O texto é mostrado como texto comum, com as quebras de linha, nunca como HTML ou link.
 
 ### Área da equipe (ADMIN)
 
@@ -368,6 +403,7 @@ src/
   features/
     auth/              sessão (GET /api/me), logout, URL de login, os controles dos cabeçalhos e o RequireSession
     blocks/            contas bloqueadas: listagem paginada e desbloqueio
+    chat/              conversa da rodada: API, junção por posição, polling com recuo e o painel
     connections/       decisão privada depois da rodada e a lista de conexões
     profile/           meu perfil: leitura e edição com ETag, regras do formulário e as telas
     landing/           seções da landing: hero com a frase interativa, como funciona, minijogo, segurança, FAQ
@@ -477,6 +513,15 @@ gerados da spec, testes com cobertura e build. Também roda o gitleaks sobre tod
   muda sozinha quando o evento começa ou o anfitrião inicia uma rodada com ela aberta. Durante o evento, "Ver se
   começou outra rodada" relê o evento; antes dele, é preciso recarregar a página. Um polling ou o Web PubSub
   resolveriam, e dependem de decisão.
+- Conversa da rodada (ADR 0021 da duora-api):
+  - **SSE** (`GET /api/me/stream`, opção (b) da ADR) no lugar do polling, quando a API tiver o stream. O protocolo de
+    reconexão (cursor `afterSeq`) continua o mesmo; muda a latência.
+  - **Denúncia de mensagem** (fatia da API com `Reports.fileWithEvidence`): não há botão ainda.
+  - O `open` é relido só ao abrir, ao voltar à aba e num 409. Quem só lê não vê o chat fechar quando começa a rodada
+    seguinte até tentar enviar ou voltar à aba; o SSE resolve isso.
+  - Se uma leitura trouxer a própria mensagem antes da resposta do envio, ela aparece por um instante duas vezes
+    (a gravada e a pendente) e é anunciada de novo; a resposta do envio desfaz a duplicata.
+  - O Playwright em homologação do "Pronto quando" da fatia 1 não foi feito.
 - Decisão e conexões (UX, dependem de decisões da API, ADR 0019):
   - A conexão aparece só pelo fim do id e pela data; nome e foto dependem de uma API publicada do perfil. Também não
     há como chegar dela à pessoa (chat, desconectar).

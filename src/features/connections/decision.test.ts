@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import type { DecideRequest, DecisionResponse } from '../../shared/api/contract.ts'
 import { InvalidResponseError } from '../../shared/api/http.ts'
+import { jsonResponse } from '../../test/responses.ts'
 import { decide, fetchDecision, type DecideBody, type Decision, type DecisionWire } from './decision.ts'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -13,13 +14,9 @@ const EVENT_ID = '0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7b'
 const PATH = `/api/events/${EVENT_ID}/rounds/2/decision`
 const YES = { eventId: EVENT_ID, roundNumber: 2, interested: true, decidedAt: '2026-10-10T23:30:00Z' }
 
-function json(body: unknown, status = 200, headers: Readonly<Record<string, string>> = {}): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } })
-}
-
 describe('fetchDecision', () => {
   it('reads the own decision of the round', async () => {
-    fetchMock.mockResolvedValue(json(YES))
+    fetchMock.mockResolvedValue(jsonResponse(YES))
 
     await expect(fetchDecision(EVENT_ID, 2)).resolves.toEqual({
       interested: true,
@@ -46,13 +43,13 @@ describe('fetchDecision', () => {
     ['interested missing', { eventId: EVENT_ID, roundNumber: 2, decidedAt: YES.decidedAt }],
     ['a date without a time zone', { ...YES, decidedAt: '2026-10-10T23:30:00' }],
   ])('fails on %s', async (_case, body) => {
-    fetchMock.mockResolvedValue(json(body))
+    fetchMock.mockResolvedValue(jsonResponse(body))
 
     await expect(fetchDecision(EVENT_ID, 2)).rejects.toBeInstanceOf(InvalidResponseError)
   })
 
   it('keeps only the own choice and its date, whatever else the body brings', async () => {
-    fetchMock.mockResolvedValue(json({ ...YES, partnerInterested: false, connected: true }))
+    fetchMock.mockResolvedValue(jsonResponse({ ...YES, partnerInterested: false, connected: true }))
 
     const decision = await fetchDecision(EVENT_ID, 2)
 
@@ -63,7 +60,7 @@ describe('fetchDecision', () => {
 describe('decide', () => {
   it('sends the choice with PUT and the CSRF header', async () => {
     document.cookie = 'XSRF-TOKEN=token-1; path=/'
-    fetchMock.mockResolvedValue(json({ ...YES, interested: false }, 201))
+    fetchMock.mockResolvedValue(jsonResponse({ ...YES, interested: false }, 201))
 
     await decide(EVENT_ID, 2, false)
 
@@ -76,7 +73,7 @@ describe('decide', () => {
   })
 
   it.each([201, 200])('reports the recorded decision on %i', async (status) => {
-    fetchMock.mockResolvedValue(json(YES, status))
+    fetchMock.mockResolvedValue(jsonResponse(YES, status))
 
     await expect(decide(EVENT_ID, 2, true)).resolves.toEqual({
       kind: 'decided',
@@ -97,7 +94,7 @@ describe('decide', () => {
   })
 
   it('turns a 409 with the reason DECISION_ALREADY_MADE into already decided', async () => {
-    fetchMock.mockResolvedValue(json({ title: 'Conflict', status: 409, reason: 'DECISION_ALREADY_MADE' }, 409))
+    fetchMock.mockResolvedValue(jsonResponse({ title: 'Conflict', status: 409, reason: 'DECISION_ALREADY_MADE' }, 409))
 
     await expect(decide(EVENT_ID, 2, true)).resolves.toEqual({ kind: 'alreadyDecided' })
   })
@@ -105,7 +102,7 @@ describe('decide', () => {
   it.each(['EVENT_FULL', 'SOMETHING_NEW'])(
     'does not call a 409 with the reason %s an already made decision',
     async (reason) => {
-      fetchMock.mockResolvedValue(json({ title: 'Conflict', status: 409, reason }, 409))
+      fetchMock.mockResolvedValue(jsonResponse({ title: 'Conflict', status: 409, reason }, 409))
 
       await expect(decide(EVENT_ID, 2, true)).resolves.toEqual({ kind: 'failed' })
     },
@@ -130,7 +127,7 @@ describe('decide', () => {
   })
 
   it('reports a failure on a body outside the contract', async () => {
-    fetchMock.mockResolvedValue(json({ ...YES, interested: 1 }, 201))
+    fetchMock.mockResolvedValue(jsonResponse({ ...YES, interested: 1 }, 201))
 
     await expect(decide(EVENT_ID, 2, true)).resolves.toEqual({ kind: 'failed' })
   })

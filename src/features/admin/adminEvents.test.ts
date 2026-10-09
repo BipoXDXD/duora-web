@@ -6,6 +6,7 @@ import type {
 } from '../../shared/api/contract.ts'
 import type { operations } from '../../shared/api/schema.d.ts'
 import { ApiError, InvalidResponseError } from '../../shared/api/http.ts'
+import { firstRequest, jsonResponse, problemResponse } from '../../test/responses.ts'
 import {
   ADMIN_EVENT_STATUSES,
   adminFailureOf,
@@ -70,33 +71,14 @@ const NEW_EVENT: NewEvent = {
 const EVENT_PATH = `/api/admin/events/${EVENT_ID}`
 const ROUND_PATH = `${EVENT_PATH}/rounds/2`
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
-}
-
-function problem(status: number, extra: Readonly<Record<string, unknown>> = {}, headers = {}): Response {
-  return new Response(JSON.stringify({ title: 'Erro', status, ...extra }), {
-    status,
-    headers: { 'Content-Type': 'application/problem+json', ...headers },
-  })
-}
-
-function sentRequest(): { path: unknown; init: RequestInit } {
-  const call = fetchMock.mock.calls[0]
-  if (call === undefined) {
-    throw new Error('fetch não foi chamado')
-  }
-  return { path: call[0], init: call[1] ?? {} }
-}
-
 describe('createEvent', () => {
   it('posts the draft as JSON with the CSRF token', async () => {
     document.cookie = 'XSRF-TOKEN=csrf-123; path=/'
-    fetchMock.mockResolvedValue(json(WIRE_EVENT, 201))
+    fetchMock.mockResolvedValue(jsonResponse(WIRE_EVENT, 201))
 
     await createEvent(NEW_EVENT)
 
-    const { path, init } = sentRequest()
+    const { path, init } = firstRequest(fetchMock)
     expect(path).toBe('/api/admin/events')
     expect(init.method).toBe('POST')
     expect(JSON.parse(String(init.body))).toEqual(NEW_EVENT)
@@ -104,14 +86,14 @@ describe('createEvent', () => {
   })
 
   it('returns the created draft with the times as dates', async () => {
-    fetchMock.mockResolvedValue(json(WIRE_EVENT, 201))
+    fetchMock.mockResolvedValue(jsonResponse(WIRE_EVENT, 201))
 
     await expect(createEvent(NEW_EVENT)).resolves.toEqual({ kind: 'created', event: EVENT })
   })
 
   it('returns the refused fields of a 400', async () => {
     fetchMock.mockResolvedValue(
-      problem(400, { errors: [{ field: 'capacity', code: 'ABOVE_MAXIMUM' }, { code: 'MALFORMED_BODY' }] }),
+      problemResponse(400, { errors: [{ field: 'capacity', code: 'ABOVE_MAXIMUM' }, { code: 'MALFORMED_BODY' }] }),
     )
 
     await expect(createEvent(NEW_EVENT)).resolves.toEqual({
@@ -124,7 +106,7 @@ describe('createEvent', () => {
   })
 
   it('returns an invalid result without fields when the 400 lists none', async () => {
-    fetchMock.mockResolvedValue(problem(400))
+    fetchMock.mockResolvedValue(problemResponse(400))
 
     await expect(createEvent(NEW_EVENT)).resolves.toEqual({ kind: 'invalid', fieldErrors: [] })
   })
@@ -135,7 +117,7 @@ describe('createEvent', () => {
     [415, { kind: 'failed' }],
     [500, { kind: 'failed' }],
   ] as const)('reports %s as %o', async (status, result) => {
-    fetchMock.mockResolvedValue(problem(status))
+    fetchMock.mockResolvedValue(problemResponse(status))
 
     await expect(createEvent(NEW_EVENT)).resolves.toEqual(result)
   })
@@ -147,7 +129,7 @@ describe('createEvent', () => {
   })
 
   it('reports a body out of the contract as failed', async () => {
-    fetchMock.mockResolvedValue(json({ id: 'x' }, 201))
+    fetchMock.mockResolvedValue(jsonResponse({ id: 'x' }, 201))
 
     await expect(createEvent(NEW_EVENT)).resolves.toEqual({ kind: 'failed' })
   })
@@ -161,15 +143,15 @@ describe('createEvent', () => {
 
 describe('fetchAdminEvent', () => {
   it('reads the event with its status and registration count', async () => {
-    fetchMock.mockResolvedValue(json(WIRE_EVENT))
+    fetchMock.mockResolvedValue(jsonResponse(WIRE_EVENT))
 
     await expect(fetchAdminEvent(EVENT_ID)).resolves.toEqual({ kind: 'found', event: EVENT })
-    expect(sentRequest().path).toBe(EVENT_PATH)
-    expect(sentRequest().init.method).toBe('GET')
+    expect(firstRequest(fetchMock).path).toBe(EVENT_PATH)
+    expect(firstRequest(fetchMock).init.method).toBe('GET')
   })
 
   it('ignores a field the spec does not declare', async () => {
-    fetchMock.mockResolvedValue(json({ ...WIRE_EVENT, registrations: ['quem'] }))
+    fetchMock.mockResolvedValue(jsonResponse({ ...WIRE_EVENT, registrations: ['quem'] }))
 
     const result = await fetchAdminEvent(EVENT_ID)
 
@@ -182,13 +164,13 @@ describe('fetchAdminEvent', () => {
     [404, { kind: 'notFound' }],
     [500, { kind: 'failed' }],
   ] as const)('reports %s as %o', async (status, result) => {
-    fetchMock.mockResolvedValue(problem(status))
+    fetchMock.mockResolvedValue(problemResponse(status))
 
     await expect(fetchAdminEvent(EVENT_ID)).resolves.toEqual(result)
   })
 
   it('reports a status out of the contract as failed', async () => {
-    fetchMock.mockResolvedValue(json({ ...WIRE_EVENT, status: 'ARCHIVED' }))
+    fetchMock.mockResolvedValue(jsonResponse({ ...WIRE_EVENT, status: 'ARCHIVED' }))
 
     await expect(fetchAdminEvent(EVENT_ID)).resolves.toEqual({ kind: 'failed' })
   })
@@ -204,12 +186,12 @@ describe('fetchAdminEventsPage', () => {
   const LIST_PATH = '/api/admin/events'
 
   it('asks GET /api/admin/events for the first page of every status', async () => {
-    fetchMock.mockResolvedValue(json({ items: [], nextPageToken: null }))
+    fetchMock.mockResolvedValue(jsonResponse({ items: [], nextPageToken: null }))
 
     await fetchAdminEventsPage(null, null)
 
-    expect(sentRequest().path).toBe(LIST_PATH)
-    expect(sentRequest().init.method).toBe('GET')
+    expect(firstRequest(fetchMock).path).toBe(LIST_PATH)
+    expect(firstRequest(fetchMock).init.method).toBe('GET')
   })
 
   it.each([
@@ -218,21 +200,21 @@ describe('fetchAdminEventsPage', () => {
     ['both', 'abc', 'CANCELLED', `${LIST_PATH}?status=CANCELLED&pageToken=abc`],
     ['a page token with characters that need escaping', 'a b&c=d', null, `${LIST_PATH}?pageToken=a+b%26c%3Dd`],
   ] as const)('sends %s as query parameters', async (_case, pageToken, status, path) => {
-    fetchMock.mockResolvedValue(json({ items: [], nextPageToken: null }))
+    fetchMock.mockResolvedValue(jsonResponse({ items: [], nextPageToken: null }))
 
     await fetchAdminEventsPage(pageToken, status)
 
-    expect(sentRequest().path).toBe(path)
+    expect(firstRequest(fetchMock).path).toBe(path)
   })
 
   it('reads the events with the dates as instants, and the next page token', async () => {
-    fetchMock.mockResolvedValue(json({ items: [WIRE_EVENT], nextPageToken: 'next' }))
+    fetchMock.mockResolvedValue(jsonResponse({ items: [WIRE_EVENT], nextPageToken: 'next' }))
 
     await expect(fetchAdminEventsPage(null, null)).resolves.toEqual({ items: [EVENT], nextPageToken: 'next' })
   })
 
   it('reads the last page, which has no next page token', async () => {
-    fetchMock.mockResolvedValue(json({ items: [], nextPageToken: null }))
+    fetchMock.mockResolvedValue(jsonResponse({ items: [], nextPageToken: null }))
 
     await expect(fetchAdminEventsPage(null, null)).resolves.toEqual({ items: [], nextPageToken: null })
   })
@@ -243,13 +225,13 @@ describe('fetchAdminEventsPage', () => {
     ['a page without the token field', { items: [] }],
     ['a page whose items are not a list', { items: 'x', nextPageToken: null }],
   ])('fails on a 200 with %s', async (_case, body) => {
-    fetchMock.mockResolvedValue(json(body))
+    fetchMock.mockResolvedValue(jsonResponse(body))
 
     await expect(fetchAdminEventsPage(null, null)).rejects.toBeInstanceOf(InvalidResponseError)
   })
 
   it.each([400, 401, 403, 500])('fails with the API status on %i', async (status) => {
-    fetchMock.mockResolvedValue(problem(status))
+    fetchMock.mockResolvedValue(problemResponse(status))
 
     await expect(fetchAdminEventsPage(null, null)).rejects.toMatchObject({ name: 'ApiError', status })
   })
@@ -276,11 +258,11 @@ describe.each([
 ] as const)('%s', (_name, change, verb) => {
   it('posts the action on the event, without a body and with the CSRF token', async () => {
     document.cookie = 'XSRF-TOKEN=csrf-123; path=/'
-    fetchMock.mockResolvedValue(json({ ...WIRE_EVENT, status: 'PUBLISHED' }))
+    fetchMock.mockResolvedValue(jsonResponse({ ...WIRE_EVENT, status: 'PUBLISHED' }))
 
     await change(EVENT_ID)
 
-    const { path, init } = sentRequest()
+    const { path, init } = firstRequest(fetchMock)
     expect(path).toBe(`${EVENT_PATH}:${verb}`)
     expect(init.method).toBe('POST')
     expect(init.body).toBeUndefined()
@@ -288,7 +270,7 @@ describe.each([
   })
 
   it('returns the event as it is now', async () => {
-    fetchMock.mockResolvedValue(json({ ...WIRE_EVENT, status: 'CANCELLED' }))
+    fetchMock.mockResolvedValue(jsonResponse({ ...WIRE_EVENT, status: 'CANCELLED' }))
 
     await expect(change(EVENT_ID)).resolves.toEqual({ kind: 'done', event: { ...EVENT, status: 'CANCELLED' } })
   })
@@ -296,14 +278,14 @@ describe.each([
   it.each(['EVENT_ALREADY_PUBLISHED', 'EVENT_CANCELLED', 'EVENT_STARTED', 'EVENT_ENDED', 'UNRECOGNIZED'] as const)(
     'returns the reason %s of a 409',
     async (reason) => {
-      fetchMock.mockResolvedValue(problem(409, { reason: reason === 'UNRECOGNIZED' ? 'EVENT_FROM_THE_FUTURE' : reason }))
+      fetchMock.mockResolvedValue(problemResponse(409, { reason: reason === 'UNRECOGNIZED' ? 'EVENT_FROM_THE_FUTURE' : reason }))
 
       await expect(change(EVENT_ID)).resolves.toEqual({ kind: 'refused', reason })
     },
   )
 
   it('returns a 409 without a reason as a refusal without a reason', async () => {
-    fetchMock.mockResolvedValue(problem(409))
+    fetchMock.mockResolvedValue(problemResponse(409))
 
     await expect(change(EVENT_ID)).resolves.toEqual({ kind: 'refused', reason: null })
   })
@@ -315,7 +297,7 @@ describe.each([
     [400, { kind: 'failed' }],
     [500, { kind: 'failed' }],
   ] as const)('reports %s as %o', async (status, result) => {
-    fetchMock.mockResolvedValue(problem(status))
+    fetchMock.mockResolvedValue(problemResponse(status))
 
     await expect(change(EVENT_ID)).resolves.toEqual(result)
   })
@@ -330,11 +312,11 @@ describe.each([
 describe('startRound', () => {
   it('puts the round without a body and with the CSRF token', async () => {
     document.cookie = 'XSRF-TOKEN=csrf-123; path=/'
-    fetchMock.mockResolvedValue(json(WIRE_ROUND, 201))
+    fetchMock.mockResolvedValue(jsonResponse(WIRE_ROUND, 201))
 
     await startRound(EVENT_ID, 2)
 
-    const { path, init } = sentRequest()
+    const { path, init } = firstRequest(fetchMock)
     expect(path).toBe(ROUND_PATH)
     expect(init.method).toBe('PUT')
     expect(init.body).toBeUndefined()
@@ -345,7 +327,7 @@ describe('startRound', () => {
     [201, true],
     [200, false],
   ])('reports %s as a round that is new: %s', async (status, isNew) => {
-    fetchMock.mockResolvedValue(json(WIRE_ROUND, status))
+    fetchMock.mockResolvedValue(jsonResponse(WIRE_ROUND, status))
 
     await expect(startRound(EVENT_ID, 2)).resolves.toEqual({ kind: 'started', round: ROUND, isNew })
   })
@@ -356,13 +338,13 @@ describe('startRound', () => {
     ['EVENT_CANCELLED', { kind: 'refused' }],
     ['EVENT_FROM_THE_FUTURE', { kind: 'refused' }],
   ] as const)('reports a 409 with the reason %s as %o', async (reason, result) => {
-    fetchMock.mockResolvedValue(problem(409, { reason }))
+    fetchMock.mockResolvedValue(problemResponse(409, { reason }))
 
     await expect(startRound(EVENT_ID, 2)).resolves.toEqual(result)
   })
 
   it('reports a 409 without a reason as the generic refusal', async () => {
-    fetchMock.mockResolvedValue(problem(409))
+    fetchMock.mockResolvedValue(problemResponse(409))
 
     await expect(startRound(EVENT_ID, 2)).resolves.toEqual({ kind: 'refused' })
   })
@@ -371,13 +353,13 @@ describe('startRound', () => {
     [429, 'rateLimited'],
     [503, 'contended'],
   ] as const)('reports %s as busy because of %s, with the seconds to wait', async (status, cause) => {
-    fetchMock.mockResolvedValue(problem(status, {}, { 'Retry-After': '7' }))
+    fetchMock.mockResolvedValue(problemResponse(status, {}, { 'Retry-After': '7' }))
 
     await expect(startRound(EVENT_ID, 2)).resolves.toEqual({ kind: 'busy', cause, retryAfterSeconds: 7 })
   })
 
   it('reports a 429 without Retry-After as busy, without a wait', async () => {
-    fetchMock.mockResolvedValue(problem(429))
+    fetchMock.mockResolvedValue(problemResponse(429))
 
     await expect(startRound(EVENT_ID, 2)).resolves.toEqual({ kind: 'busy', cause: 'rateLimited', retryAfterSeconds: null })
   })
@@ -389,13 +371,13 @@ describe('startRound', () => {
     [400, { kind: 'failed' }],
     [500, { kind: 'failed' }],
   ] as const)('reports %s as %o', async (status, result) => {
-    fetchMock.mockResolvedValue(problem(status))
+    fetchMock.mockResolvedValue(problemResponse(status))
 
     await expect(startRound(EVENT_ID, 2)).resolves.toEqual(result)
   })
 
   it('reports a round out of the contract as failed', async () => {
-    fetchMock.mockResolvedValue(json({ ...WIRE_ROUND, number: 101 }, 201))
+    fetchMock.mockResolvedValue(jsonResponse({ ...WIRE_ROUND, number: 101 }, 201))
 
     await expect(startRound(EVENT_ID, 2)).resolves.toEqual({ kind: 'failed' })
   })
@@ -415,21 +397,21 @@ describe('startRound', () => {
 
 describe('fetchAdminRound', () => {
   it('reads the counts of the round', async () => {
-    fetchMock.mockResolvedValue(json(WIRE_ROUND))
+    fetchMock.mockResolvedValue(jsonResponse(WIRE_ROUND))
 
     await expect(fetchAdminRound(EVENT_ID, 2)).resolves.toEqual(ROUND)
-    expect(sentRequest().path).toBe(ROUND_PATH)
-    expect(sentRequest().init.method).toBe('GET')
+    expect(firstRequest(fetchMock).path).toBe(ROUND_PATH)
+    expect(firstRequest(fetchMock).init.method).toBe('GET')
   })
 
   it('returns null when the event has no such round', async () => {
-    fetchMock.mockResolvedValue(problem(404))
+    fetchMock.mockResolvedValue(problemResponse(404))
 
     await expect(fetchAdminRound(EVENT_ID, 2)).resolves.toBeNull()
   })
 
   it.each([403, 500])('fails with the API status %s', async (status) => {
-    fetchMock.mockResolvedValue(problem(status))
+    fetchMock.mockResolvedValue(problemResponse(status))
 
     await expect(fetchAdminRound(EVENT_ID, 2)).rejects.toMatchObject({ name: 'ApiError', status })
   })

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import type { ChatMessageReportResponse, ReportChatMessageRequest } from '../../shared/api/contract.ts'
+import { jsonResponse, problemResponse } from '../../test/responses.ts'
 import {
   REPORT_REASONS,
   reportMessage,
@@ -26,17 +27,6 @@ const REPORT = {
 }
 const REPORT_PATH = `/api/events/${EVENT_ID}/rounds/2/chat/messages/7:report`
 
-function json(body: unknown, status = 200, headers: Readonly<Record<string, string>> = {}): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } })
-}
-
-function problem(status: number, body: unknown = {}, headers: Readonly<Record<string, string>> = {}): Response {
-  return new Response(JSON.stringify({ title: 'Erro', status, ...(body as object) }), {
-    status,
-    headers: { 'Content-Type': 'application/problem+json', ...headers },
-  })
-}
-
 function lastCall() {
   const [path, init] = fetchMock.mock.calls.at(-1) ?? []
   return { path, method: init?.method, body: init?.body, headers: new Headers(init?.headers) }
@@ -45,7 +35,7 @@ function lastCall() {
 describe('reportMessage', () => {
   it('posts the reason and the description to the report action of the message, with the CSRF header', async () => {
     document.cookie = 'XSRF-TOKEN=token-1; path=/'
-    fetchMock.mockResolvedValue(json(REPORT, 201, { Location: `/api/reports/${REPORT.id}` }))
+    fetchMock.mockResolvedValue(jsonResponse(REPORT, 201, { Location: `/api/reports/${REPORT.id}` }))
 
     await reportMessage(EVENT_ID, 2, 7, { reason: 'OTHER', description: 'Pediu meu endereço.' })
 
@@ -55,7 +45,7 @@ describe('reportMessage', () => {
   })
 
   it('sends a missing description as null', async () => {
-    fetchMock.mockResolvedValue(json(REPORT, 201))
+    fetchMock.mockResolvedValue(jsonResponse(REPORT, 201))
 
     await reportMessage(EVENT_ID, 2, 7, { reason: 'HARASSMENT', description: null })
 
@@ -63,7 +53,7 @@ describe('reportMessage', () => {
   })
 
   it('returns the reported account on 201, to block it afterwards', async () => {
-    fetchMock.mockResolvedValue(json(REPORT, 201))
+    fetchMock.mockResolvedValue(jsonResponse(REPORT, 201))
 
     await expect(reportMessage(EVENT_ID, 2, 7, { reason: 'HARASSMENT', description: null })).resolves.toEqual({
       kind: 'reported',
@@ -72,7 +62,7 @@ describe('reportMessage', () => {
   })
 
   it('returns the field errors of a 400', async () => {
-    fetchMock.mockResolvedValue(problem(400, { errors: [{ field: 'description', code: 'REQUIRED' }] }))
+    fetchMock.mockResolvedValue(problemResponse(400, { errors: [{ field: 'description', code: 'REQUIRED' }] }))
 
     await expect(reportMessage(EVENT_ID, 2, 7, { reason: 'OTHER', description: null })).resolves.toEqual({
       kind: 'invalid',
@@ -86,13 +76,13 @@ describe('reportMessage', () => {
     [403, { kind: 'failed' }],
     [500, { kind: 'failed' }],
   ] as const)('reads %s as %o', async (status, result) => {
-    fetchMock.mockResolvedValue(problem(status))
+    fetchMock.mockResolvedValue(problemResponse(status))
 
     await expect(reportMessage(EVENT_ID, 2, 7, { reason: 'HARASSMENT', description: null })).resolves.toEqual(result)
   })
 
   it('reads 429 as the daily quota used up, with the seconds of the Retry-After', async () => {
-    fetchMock.mockResolvedValue(problem(429, {}, { 'Retry-After': '7200' }))
+    fetchMock.mockResolvedValue(problemResponse(429, {}, { 'Retry-After': '7200' }))
 
     await expect(reportMessage(EVENT_ID, 2, 7, { reason: 'HARASSMENT', description: null })).resolves.toEqual({
       kind: 'quotaExhausted',
@@ -101,7 +91,7 @@ describe('reportMessage', () => {
   })
 
   it('reads 503 as reports unavailable for now, with the seconds of the Retry-After', async () => {
-    fetchMock.mockResolvedValue(problem(503, {}, { 'Retry-After': '1' }))
+    fetchMock.mockResolvedValue(problemResponse(503, {}, { 'Retry-After': '1' }))
 
     await expect(reportMessage(EVENT_ID, 2, 7, { reason: 'HARASSMENT', description: null })).resolves.toEqual({
       kind: 'unavailable',
@@ -121,7 +111,7 @@ describe('reportMessage', () => {
     ['a reported account that is not a UUID', { ...REPORT, reportedAccountId: '../me' }],
     ['no reported account', { ...REPORT, reportedAccountId: undefined }],
   ])('fails on a 201 with %s', async (_case, body) => {
-    fetchMock.mockResolvedValue(json(body, 201))
+    fetchMock.mockResolvedValue(jsonResponse(body, 201))
 
     await expect(reportMessage(EVENT_ID, 2, 7, { reason: 'HARASSMENT', description: null })).resolves.toEqual({
       kind: 'failed',

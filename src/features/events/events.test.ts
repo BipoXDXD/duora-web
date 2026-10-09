@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import type { EventResponse, EventsPageResponse } from '../../shared/api/contract.ts'
 import { InvalidResponseError } from '../../shared/api/http.ts'
+import { jsonResponse } from '../../test/responses.ts'
 import {
   type EventPageWire,
   type EventWire,
@@ -27,17 +28,13 @@ const DINNER = {
   currentRound: null,
 } as const
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
-}
-
 function sentPath(): unknown {
   return fetchMock.mock.calls[0]?.[0]
 }
 
 describe('fetchEventsPage', () => {
   it('asks for the first page without a token', async () => {
-    fetchMock.mockResolvedValue(json({ items: [], nextPageToken: null }))
+    fetchMock.mockResolvedValue(jsonResponse({ items: [], nextPageToken: null }))
 
     await fetchEventsPage(null)
 
@@ -46,7 +43,7 @@ describe('fetchEventsPage', () => {
   })
 
   it('asks for the next page with the token of the previous one', async () => {
-    fetchMock.mockResolvedValue(json({ items: [], nextPageToken: null }))
+    fetchMock.mockResolvedValue(jsonResponse({ items: [], nextPageToken: null }))
 
     await fetchEventsPage('abc_-1')
 
@@ -54,7 +51,7 @@ describe('fetchEventsPage', () => {
   })
 
   it('returns the events with the times as dates, and the next page token', async () => {
-    fetchMock.mockResolvedValue(json({ items: [DINNER], nextPageToken: 'next' }))
+    fetchMock.mockResolvedValue(jsonResponse({ items: [DINNER], nextPageToken: 'next' }))
 
     const page = await fetchEventsPage(null)
 
@@ -75,7 +72,7 @@ describe('fetchEventsPage', () => {
     ['a current round with a fraction', { ...DINNER, currentRound: 1.5 }],
     ['a current round as text', { ...DINNER, currentRound: '2' }],
   ])('fails on an event with %s', async (_case, event) => {
-    fetchMock.mockResolvedValue(json({ items: [event], nextPageToken: null }))
+    fetchMock.mockResolvedValue(jsonResponse({ items: [event], nextPageToken: null }))
 
     await expect(fetchEventsPage(null)).rejects.toBeInstanceOf(InvalidResponseError)
   })
@@ -89,7 +86,7 @@ describe('fetchEventsPage', () => {
 
 describe('fetchEvent', () => {
   it('reads the event by its id', async () => {
-    fetchMock.mockResolvedValue(json(DINNER))
+    fetchMock.mockResolvedValue(jsonResponse(DINNER))
 
     const event = await fetchEvent(DINNER.id)
 
@@ -98,7 +95,7 @@ describe('fetchEvent', () => {
   })
 
   it.each([null, 1, 2, 100])('reads the current round %s as it came', async (currentRound) => {
-    fetchMock.mockResolvedValue(json({ ...DINNER, currentRound }))
+    fetchMock.mockResolvedValue(jsonResponse({ ...DINNER, currentRound }))
 
     const event = await fetchEvent(DINNER.id)
 

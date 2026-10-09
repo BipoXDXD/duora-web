@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import type { PairingResponse } from '../../shared/api/contract.ts'
 import { InvalidResponseError } from '../../shared/api/http.ts'
+import { jsonResponse } from '../../test/responses.ts'
 import { fetchPairing, type PairingWire } from './pairing.ts'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -12,13 +13,9 @@ beforeEach(() => {
 const EVENT_ID = '0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7b'
 const PARTNER_ID = '0199a1d2-1111-7aaa-8bbb-cccccccccccc'
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
-}
-
 describe('fetchPairing', () => {
   it('asks for the own place in the round of the event', async () => {
-    fetchMock.mockResolvedValue(json({ eventId: EVENT_ID, roundNumber: 2, partnerAccountId: PARTNER_ID }))
+    fetchMock.mockResolvedValue(jsonResponse({ eventId: EVENT_ID, roundNumber: 2, partnerAccountId: PARTNER_ID }))
 
     await fetchPairing(EVENT_ID, 2)
 
@@ -26,13 +23,13 @@ describe('fetchPairing', () => {
   })
 
   it('reports the partner', async () => {
-    fetchMock.mockResolvedValue(json({ eventId: EVENT_ID, roundNumber: 2, partnerAccountId: PARTNER_ID }))
+    fetchMock.mockResolvedValue(jsonResponse({ eventId: EVENT_ID, roundNumber: 2, partnerAccountId: PARTNER_ID }))
 
     await expect(fetchPairing(EVENT_ID, 2)).resolves.toEqual({ kind: 'paired', partnerAccountId: PARTNER_ID })
   })
 
   it('reports sitting out when the partner is null', async () => {
-    fetchMock.mockResolvedValue(json({ eventId: EVENT_ID, roundNumber: 1, partnerAccountId: null }))
+    fetchMock.mockResolvedValue(jsonResponse({ eventId: EVENT_ID, roundNumber: 1, partnerAccountId: null }))
 
     await expect(fetchPairing(EVENT_ID, 1)).resolves.toEqual({ kind: 'sittingOut' })
   })
@@ -50,7 +47,7 @@ describe('fetchPairing', () => {
   })
 
   it('fails on a partner id that is not a UUID', async () => {
-    fetchMock.mockResolvedValue(json({ eventId: EVENT_ID, roundNumber: 1, partnerAccountId: 'ana' }))
+    fetchMock.mockResolvedValue(jsonResponse({ eventId: EVENT_ID, roundNumber: 1, partnerAccountId: 'ana' }))
 
     await expect(fetchPairing(EVENT_ID, 1)).rejects.toBeInstanceOf(InvalidResponseError)
   })

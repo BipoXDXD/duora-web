@@ -1,4 +1,5 @@
 import { vi } from 'vitest'
+import { jsonResponse, problemResponse } from './responses.ts'
 
 /**
  * Resposta de uma rota da API no teste, que pode olhar a requisição (método, corpo). Pode não resolver
@@ -21,10 +22,7 @@ export function stubApi(routes: Readonly<Record<string, FakeRoute>>) {
 }
 
 export function jsonAnswer(body: unknown, status = 200, headers: Readonly<Record<string, string>> = {}): FakeRoute {
-  return () =>
-    Promise.resolve(
-      new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } }),
-    )
+  return () => Promise.resolve(jsonResponse(body, status, headers))
 }
 
 /**
@@ -32,24 +30,12 @@ export function jsonAnswer(body: unknown, status = 200, headers: Readonly<Record
  * validação de corpo (`ValidationProblemDetail`).
  */
 export function problemAnswer(status: number, detail?: string, errors?: unknown): FakeRoute {
-  return () =>
-    Promise.resolve(
-      new Response(JSON.stringify({ title: 'Erro', status, detail, errors }), {
-        status,
-        headers: { 'Content-Type': 'application/problem+json' },
-      }),
-    )
+  return () => Promise.resolve(problemResponse(status, { detail, errors }))
 }
 
 /** Recusa por regra de negócio (403 ou 409), com o `reason` que a API manda (ADR 0020 da duora-api). */
 export function refusalAnswer(status: number, reason: string): FakeRoute {
-  return () =>
-    Promise.resolve(
-      new Response(JSON.stringify({ title: 'Erro', status, reason }), {
-        status,
-        headers: { 'Content-Type': 'application/problem+json' },
-      }),
-    )
+  return () => Promise.resolve(problemResponse(status, { reason }))
 }
 
 /** Uma resposta por método no mesmo caminho, como GET e PATCH do perfil. Método sem resposta falha alto. */

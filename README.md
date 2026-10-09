@@ -407,6 +407,8 @@ navegador o contraste do texto sobre ela com o véu aplicado (a ADR descreve com
 | `npm test` | Testes com Vitest |
 | `npm run test:watch` | Testes em modo watch |
 | `npm run coverage` | Testes com cobertura (relatório em `coverage/`) |
+| `npm run e2e` | Testes de ponta a ponta com Playwright: faz o build, sobe o `vite preview` e roda as jornadas no Chromium (veja [Testes de ponta a ponta](#testes-de-ponta-a-ponta-e2e)) |
+| `npm run e2e:install` | Baixa o Chromium do Playwright (uma vez por máquina e a cada versão nova do Playwright) |
 
 ## Tipos da API
 
@@ -446,6 +448,74 @@ não navega. O
 `matchMedia`, que o jsdom não tem, é simulado em `src/test/fakeMatchMedia.ts`. O contraste das cores é medido
 com o `culori` sobre os tokens lidos do `index.css` (veja [Tokens e temas](#tokens-e-temas)).
 
+## Testes de ponta a ponta (E2E)
+
+Playwright (`@playwright/test`) com o Chromium, em `e2e/`. São poucas jornadas, escolhidas pelo risco (o que é final, como a decisão privada;
+o que protege pessoas, como a denúncia e o bloqueio; a edição concorrente, com o 412; e a área restrita, com o 403),
+e cada uma roda em **duas larguras**, 360 px e 1280 px, porque o app tem dois layouts. Regra de negócio fica nos testes
+de unidade; aqui só se confere que as telas, o roteamento e o cliente HTTP funcionam juntos no build real.
+
+| Jornada | Arquivo | O que cobre |
+|---|---|---|
+| Inscrição | `registration.spec.ts` | Abre o evento, se inscreve (201) e vê a confirmação com o foco nela; o 409 `EVENT_FULL` mostra o motivo |
+| Conversa da rodada | `chat.spec.ts` | Vê a dupla da rodada atual; o polling traz a mensagem nova do par a partir do `afterSeq`; a mensagem enviada fica pendente ("Enviando…") e vira enviada; a que falha é reenviada com a mesma `Idempotency-Key` |
+| Decisão privada | `decision.spec.ts` | Escolher, confirmar, ver a decisão registrada e, depois de recarregar, ainda vê-la (GET); o 409 `DECISION_ALREADY_MADE` mostra a que vale |
+| Denúncia | `report.spec.ts` | Denuncia a mensagem do par com ou sem bloqueio; só a mensagem do par oferece a ação; falha do bloqueio depois do 201 |
+| Perfil | `profile.spec.ts` | Edição com `If-Match`; 412 de outra aba recarrega, mantém o digitado e reaplica só o campo mudado |
+| Área da equipe | `admin.spec.ts` | ADMIN lista os eventos, cria um rascunho e o publica; sem o papel, 403 e só o aviso |
+
+Cada estado importante de uma jornada passa por duas checagens (`e2e/support/checks.ts`): **nenhuma rolagem
+horizontal** e **nenhuma violação WCAG A/AA** do `@axe-core/playwright`. O axe entrou porque pega o que as
+consultas por papel e nome do Playwright não pegam (atributo `lang`, papéis ARIA inválidos, nome de controle,
+contraste medido na tela), e já achou um problema real (veja [Pendências](#pendências)). As consultas dos testes
+são por papel e nome acessível (`getByRole`, `getByLabel`), então uma jornada que passa também prova que o
+controle tem nome.
+
+### Como rodar
+
+```bash
+npm ci
+npm run e2e:install   # só na primeira vez (baixa o Chromium)
+npm run e2e           # builda, sobe o preview na porta 4173 e roda as 6 jornadas nas 2 larguras
+npx playwright test chat --project=celular-360   # uma jornada, uma largura
+npx playwright test --ui                          # modo interativo, com o trace de cada passo
+npx playwright show-report                        # relatório HTML da última execução
+```
+
+Com um `vite preview` já rodando na porta 4173, o Playwright o reaproveita (fora do CI) e não refaz o build.
+Uma jornada que falha guarda o trace em `test-results/`.
+
+### A API é simulada: o login real fica de fora
+
+O login real passa pelo Entra (OIDC no BFF da duora-api), que o CI não alcança, e não há ambiente de teste com
+conta fixa. Por isso os E2E **rodam contra o build (`vite preview`) com a duora-api simulada no navegador**, por
+`page.route('/api/**')`, no formato de `api/openapi.json`. Consequências:
+
+- **Não testam** o login, o redirect do Entra, o cookie de sessão de verdade, o CORS/proxy nem o Spring: isso é da
+  duora-api e de uma verificação manual (ou de um E2E futuro com um IdP de teste e a API no ar).
+- **Testam** o app como o navegador o executa: build de produção, roteamento, os dois layouts, o cliente HTTP, o
+  tratamento de cada status e a acessibilidade.
+- A simulação (`e2e/support/fakeApi.ts`) é rígida de propósito: rota sem resposta declarada, mutação sem o token
+  CSRF (`X-XSRF-TOKEN`, que o fixture planta no cookie) e erro não tratado na página **falham o teste**; o
+  `vite preview` responderia `index.html` a um `/api/...` esquecido e esconderia o erro. Os servidores simulados
+  (`ongoingRound.ts`, `profileServer.ts`, `adminServer.ts`) guardam estado e aplicam o que importa do contrato
+  (corpo estrito, `If-Match`, cursor `afterSeq`), para o teste ser sobre comportamento, não sobre chamadas.
+- Os tipos das respostas vêm de `src/shared/api/schema.d.ts`, então mudar o contrato quebra a compilação dos E2E
+  (`npm run typecheck` cobre `e2e/`).
+
+### Estrutura
+
+```
+e2e/
+  pages/       Page Objects: um por tela ou painel; só localizam e agem, a asserção fica no teste
+  support/     API simulada, fixture do Playwright, dados de teste, servidores simulados e as checagens
+  *.spec.ts    uma jornada por arquivo
+playwright.config.ts   Chromium; projetos celular-360 e desktop-1280; webServer = build + vite preview
+tsconfig.e2e.json      tipos dos E2E e do playwright.config.ts (entra no `tsc -b`)
+```
+
+O Vitest ignora `e2e/` (`test.exclude` em `vite.config.ts`).
+
 ## Estrutura
 
 ```
@@ -469,6 +539,7 @@ src/
     ui/                moldura das páginas, classes dos controles, falha de leitura e imagem de fundo
   test/                setup do Vitest, fakes e leitor dos tokens do tema
   index.css            tokens visuais e estilos base (foco, movimento reduzido, grão, gradiente)
+e2e/                   testes de ponta a ponta com Playwright (veja [Testes de ponta a ponta](#testes-de-ponta-a-ponta-e2e))
 api/                   cópia versionada da spec OpenAPI da duora-api (fonte dos tipos gerados)
 docs/
   adr/                 decisões do front (0001: identidade visual)
@@ -539,10 +610,17 @@ na API); **C** se o objetivo for a opção mais simples até haver usuários rea
 ## CI
 
 O GitHub Actions (`.github/workflows/ci.yml`) roda lint, checagem de tipos, a checagem de drift dos tipos
-gerados da spec, testes com cobertura e build. Também roda o gitleaks sobre todo o histórico. As actions ficam fixadas por SHA.
+gerados da spec, testes com cobertura e build. Num job à parte, em paralelo, roda os
+[E2E](#testes-de-ponta-a-ponta-e2e) no Chromium (o navegador fica em cache pela versão do Playwright; o relatório e os
+traces das falhas saem como artefato). Também roda o gitleaks sobre todo o histórico. As actions ficam fixadas por SHA.
 
 ## Pendências
 
+- **Acessibilidade da lista de mensagens do chat** (achado do axe nos E2E, regra `listitem`, impacto "serious"): a
+  lista é `<ol role="log">`, e o papel `log` tira os `<li>` de dentro de uma lista. A correção é de produção: um
+  `<div role="log" aria-live="polite" aria-relevant="additions">` em volta de um `<ol>`. Até lá os E2E das telas do
+  chat deixam só essa regra de fora (`expectUsableChatLayout`, em `e2e/support/checks.ts`); remova a exceção junto
+  com a correção.
 - Área da equipe (pendências para a **duora-api**):
   - **`Idempotency-Key` na criação do rascunho**, para repetir depois de uma falha de rede não criar um segundo.
   - Não há como editar um rascunho (título, horário, capacidade): errou, cancela e cria outro.

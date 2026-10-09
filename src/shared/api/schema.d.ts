@@ -15,7 +15,7 @@ export interface paths {
         put?: never;
         /**
          * Bloqueia outra conta
-         * @description Idempotente: bloquear quem já está bloqueado também responde 204 e mantém a data do primeiro bloqueio. A resposta é a mesma se a outra pessoa tiver bloqueado você.
+         * @description Idempotente: bloquear quem já está bloqueado também responde 204 e mantém a data do primeiro bloqueio. A resposta é a mesma se a outra pessoa tiver bloqueado você. Cada chamada, repetida ou não, gasta o limite da conta, somado com o do outro: 60 por hora, repostas aos poucos.
          */
         post: operations["blockAccount"];
         delete?: never;
@@ -35,7 +35,7 @@ export interface paths {
         put?: never;
         /**
          * Desfaz o próprio bloqueio de outra conta
-         * @description Idempotente: sem bloqueio, ou com id que não é de conta, também responde 204. Um bloqueio que a outra pessoa fez continua valendo.
+         * @description Idempotente: sem bloqueio, ou com id que não é de conta, também responde 204. Um bloqueio que a outra pessoa fez continua valendo. Cada chamada, repetida ou não, gasta o limite da conta, somado com o do outro: 60 por hora, repostas aos poucos.
          */
         post: operations["unblockAccount"];
         delete?: never;
@@ -447,7 +447,7 @@ export interface paths {
         head?: never;
         /**
          * Edita o próprio perfil
-         * @description Merge patch de um nível: campo ausente não muda, null apaga e valor troca. Nome, data de nascimento e região não podem ser apagados; a data de nascimento só pode ser informada uma vez e precisa ser de maior de idade. A edição é inteira ou nada.
+         * @description Merge patch de um nível: campo ausente não muda, null apaga e valor troca. Nome, data de nascimento e região não podem ser apagados; a data de nascimento só pode ser informada uma vez e precisa ser de maior de idade. A edição é inteira ou nada. Cada edição enviada, aceita ou não, gasta o limite da conta: 120 por hora, repostas aos poucos.
          */
         patch: operations["editMyProfile"];
         trace?: never;
@@ -1117,9 +1117,33 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetail"];
                 };
             };
+            /** @description Limite de bloqueios e desbloqueios desta conta esgotado; nada foi gravado */
+            429: {
+                headers: {
+                    /** @description Segundos até a próxima chamada ficar disponível */
+                    "Retry-After": number;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
             /** @description Erro inesperado */
             500: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description O limite desta conta não pôde ser contado; nada foi gravado */
+            503: {
+                headers: {
+                    /** @description Segundos até tentar de novo */
+                    "Retry-After": number;
                     "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
@@ -1179,9 +1203,33 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetail"];
                 };
             };
+            /** @description Limite de bloqueios e desbloqueios desta conta esgotado; nada foi gravado */
+            429: {
+                headers: {
+                    /** @description Segundos até a próxima chamada ficar disponível */
+                    "Retry-After": number;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
             /** @description Erro inesperado */
             500: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description O limite desta conta não pôde ser contado; nada foi gravado */
+            503: {
+                headers: {
+                    /** @description Segundos até tentar de novo */
+                    "Retry-After": number;
                     "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };
@@ -3261,9 +3309,33 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetail"];
                 };
             };
+            /** @description Limite de edições desta conta esgotado; nada foi gravado */
+            429: {
+                headers: {
+                    /** @description Segundos até a próxima edição ficar disponível */
+                    "Retry-After": number;
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
             /** @description Erro inesperado */
             500: {
                 headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description O limite desta conta não pôde ser contado; nada foi gravado */
+            503: {
+                headers: {
+                    /** @description Segundos até tentar de novo */
+                    "Retry-After": number;
                     "X-Request-Id": components["headers"]["RequestId"];
                     [name: string]: unknown;
                 };

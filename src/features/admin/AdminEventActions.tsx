@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useId, useState } from 'react'
+import { useId } from 'react'
 import { isBug } from '../../shared/api/http.ts'
 import { ConfirmStep } from '../../shared/ui/ConfirmStep.tsx'
 import { FocusReturnButton } from '../../shared/ui/FocusReturnButton.tsx'
 import { PRIMARY_BUTTON } from '../../shared/ui/styles.ts'
+import { useConfirmStep } from '../../shared/ui/useConfirmStep.ts'
 import { useShownNotice } from '../../shared/ui/useShownNotice.ts'
 import { EVENT_KEYS } from '../events/eventQueries.ts'
 import { cancelEvent, canCancelAt, publishEvent, type AdminEvent, type EventActionResult } from './adminEvents.ts'
@@ -38,9 +39,8 @@ const CONFIRMATION: Readonly<Record<EventChange, { readonly question: string; re
 export function AdminEventActions({ event, now }: AdminEventActionsProps) {
   const queryClient = useQueryClient()
   const headingId = useId()
-  const [confirming, setConfirming] = useState<EventChange | null>(null)
   /** O botão que abriu a confirmação recebe o foco de volta quando a pessoa desiste. */
-  const [returnFocusTo, setReturnFocusTo] = useState<EventChange | null>(null)
+  const confirmation = useConfirmStep<EventChange>()
   const { shown, show: showNotice } = useShownNotice<{ readonly notice: AdminNotice }>()
 
   const mutation = useMutation({
@@ -63,11 +63,11 @@ export function AdminEventActions({ event, now }: AdminEventActionsProps) {
       void queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.event(event.id) })
       void queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.lists })
     }
-    setConfirming(null)
-    setReturnFocusTo(null)
+    confirmation.close()
     showNotice({ notice: noticeOfChange(change, result) })
   }
 
+  const { confirming } = confirmation
   const canPublish = event.status === 'DRAFT'
   const canCancel = canCancelAt(event, now)
   return (
@@ -78,30 +78,27 @@ export function AdminEventActions({ event, now }: AdminEventActionsProps) {
       {shown !== null && <AdminNoticeMessage key={shown.id} notice={shown.notice} />}
       {confirming !== null ? (
         <ConfirmStep
-          confirmLabel={CONFIRMATION[confirming].confirm}
-          pendingLabel={CONFIRMATION[confirming].pending}
+          confirmLabel={CONFIRMATION[confirming.subject].confirm}
+          pendingLabel={CONFIRMATION[confirming.subject].pending}
           isPending={mutation.isPending}
-          onConfirm={() => mutation.mutate({ change: confirming })}
-          onBack={() => {
-            setReturnFocusTo(confirming)
-            setConfirming(null)
-          }}
+          onConfirm={() => mutation.mutate({ change: confirming.subject })}
+          onBack={confirmation.back}
         >
-          <p className="text-fg">{CONFIRMATION[confirming].question}</p>
+          <p className="text-fg">{CONFIRMATION[confirming.subject].question}</p>
         </ConfirmStep>
       ) : (
         <div className="flex flex-wrap gap-4">
           {canPublish && (
             <FocusReturnButton
               className={PRIMARY_BUTTON}
-              hasFocus={returnFocusTo === 'publish'}
-              onClick={() => setConfirming('publish')}
+              hasFocus={confirmation.returnsFocusTo('publish')}
+              onClick={() => confirmation.ask('publish')}
             >
               Publicar evento
             </FocusReturnButton>
           )}
           {canCancel && (
-            <FocusReturnButton hasFocus={returnFocusTo === 'cancel'} onClick={() => setConfirming('cancel')}>
+            <FocusReturnButton hasFocus={confirmation.returnsFocusTo('cancel')} onClick={() => confirmation.ask('cancel')}>
               Cancelar evento
             </FocusReturnButton>
           )}

@@ -52,18 +52,21 @@ são relativos a `src/`.
 
 ### Design de código (refactor maior, sem bug)
 
-6. **Máquina de estados "confirmar e devolver o foco" codificada de cinco jeitos.** `blocks/BlockedAccountsPage.tsx:115`
-   (união + `wasCancelled`), `events/RegistrationPanel.tsx:148` (dois booleanos `isConfirming`/`wasKept`, contra a
-   regra TS 5 de união discriminada), `admin/AdminEventActions.tsx:43` (`confirming` + `returnFocusTo`),
-   `admin/AdminRoundsPanel.tsx:148` (`returnedFromConfirm`) e `connections/DecisionPanel.tsx:131` (`ChoiceStep`, a
-   melhor forma). Proposta: um hook `useConfirmStep<T>()` com a união do `DecisionPanel`. Ficou de fora porque mexe
-   no fluxo de cinco telas de uma vez; vale um PR próprio.
-7. **Long Function em componentes de formulário.** `profile/ProfileForm.tsx:45` (~167 linhas, 6 `useState`),
-   `admin/AdminNewEventPage.tsx` `NewEventForm` (~160 linhas), `chat/MessageReportForm.tsx:68` `ReportForm` (~110
-   linhas, 7 `useState`) e `chat/useRoundChat.ts:30` (~150 linhas). A maior parte é JSX de campo; a lógica já mora
-   em módulos puros (`profileForm.ts`, `adminEventForm.ts`, `reportForm.ts`, `chatLog.ts`). Próximo passo sugerido:
-   extrair os campos de `ProfileForm` e `NewEventForm` em componentes por campo e trocar os `useState` do
-   `ReportForm` por um reducer com o rascunho.
+6. **Máquina de estados "confirmar e devolver o foco" codificada de cinco jeitos.** *Feito para quatro, no PR
+   `refactor/web-quality-followups`:* `shared/ui/useConfirmStep.ts` guarda a união `idle` (com o `focusOn`) /
+   `confirming` (com o `subject`); `events/RegistrationPanel.tsx` (que tinha dois booleanos),
+   `admin/AdminEventActions.tsx`, `admin/AdminRoundsPanel.tsx` e `connections/DecisionPanel.tsx` usam o hook.
+   **Fica de fora** `blocks/BlockedAccountsPage.tsx`: ali existe um quarto estado, `failed`, e o `wasCancelled`
+   sobrevive a ele, de modo que, depois de uma falha, o foco só volta ao botão se a pessoa já tinha desistido uma
+   vez. A união do hook não carrega esse resto; migrar muda onde o foco cai depois de uma falha. Se for desejável
+   que ele sempre volte ao botão, é uma decisão de acessibilidade (fica ao lado da 2).
+7. **Long Function em componentes de formulário.** *Feito:* `profile/ProfileForm.tsx` (167 para 62 linhas na
+   função) perdeu o rascunho e o salvar para `profile/useProfileEditor.ts`, e a data de nascimento e o estado viraram
+   `BirthDateField` e `RegionField`; `admin/AdminNewEventPage.tsx` (`NewEventForm`) perdeu o rascunho e o envio para
+   `admin/useNewEventForm.ts` (160 para 105 linhas, quase todas de campo); `chat/MessageReportForm.tsx` (`ReportForm`) trocou seis `useState` por um reducer
+   puro em `chat/reportFormState.ts`, com testes (a função continua com ~100 linhas, quase só JSX); `chat/useRoundChat.ts` (150 para 45 linhas) entregou o laço de leitura
+   (cursor, timer, visibilidade) a `chat/chatPolling.ts` (`startChatPolling`). Não extraí um componente por campo no
+   `NewEventForm`: um `EventInput` repetiria as props de `<input>` sem um nome mais abstrato que o código.
 8. **Relógio.** As páginas leem `new Date()` direto (`events/EventsPage.tsx:30`, `events/MyRegistrationsPage.tsx:32`,
    `admin/AdminEventsPage.tsx:134`, `admin/AdminNewEventPage.tsx` `currentInstant`, `profile/profileForm.ts:103`), e só
    `useEventPhase`/`useEventRefresh` recebem `Clock`. Ler a hora na casca é aceitável (Testes 17); os testes fixam a
@@ -73,38 +76,42 @@ são relativos a `src/`.
    faz `new Date(...)`; eventos, decisões e conexões usam `instantSchema` e recebem `Date`. Usar `instantSchema`
    exige movê-lo de `features/events/events.ts` para `shared/api` (hoje blocks importaria events). Pequeno, mas mexe
    no contrato interno de três features.
-10. **Backoff com jitter em dois módulos.** `chat/pollDelay.ts` (jitter só para cima) e `events/refreshDelay.ts`
-    (jitter simétrico) têm a mesma forma com regras diferentes. São dois usos e o jitter difere de propósito? Se
-    não for de propósito, unificar com o intervalo, o teto e o jitter como parâmetros.
+10. **Backoff com jitter em dois módulos.** *Feito:* era a mesma regra (dobra por falha, teto, espalhamento, piso do
+    `Retry-After`) com números diferentes. Mora em `shared/api/backoffDelay.ts`; `chat/pollDelay.ts` e
+    `events/refreshDelay.ts` guardam só o intervalo, o teto e o espalhamento. A diferença do espalhamento (chat só
+    para cima, eventos para os dois lados) **continua**: nada no histórico diz se é proposital, e unificar mudaria
+    o texto dos testes dos dois lados. Fica registrado como parâmetro `spread`; se a diferença não tiver razão, é
+    trocar dois literais.
 11. **Contagem da API depois do `trim`.** `chat/chatDraft.ts:14` (`messageLength`) e `chat/reportForm.ts:28`
     (`descriptionLength`) são `characterCount(text.trim())`. Dois usos; na terceira, mover para
     `shared/text/characterCount.ts`.
 
 ### Testes
 
-12. **Mystery Guest.** Testes de página asseveram textos que só existem nas fixtures: `events/EventsPage.test.tsx`
-    (por volta das linhas 58-113, títulos e datas de `DINNER`/`WINE`), `events/EventPage.test.tsx` (por volta de 96 e
-    109-112), `events/MyRegistrationsPage.test.tsx`, `admin/AdminEventPage.test.tsx` ("de 40 vagas" vem de
-    `ADMIN_DRAFT`) e `admin/AdminEventsPage.test.tsx`. Ação: assertar `DINNER.title` ou declarar o override no teste.
-    São dezenas de asserts; ficou para um PR só de testes.
-13. **Asserts acoplados ao estilo.** `.className).toBe(PRIMARY_BUTTON | SECONDARY_BUTTON)` em `events/EventPage.test.tsx`
-    (7 vezes) e `connections/DecisionPanel.test.tsx` (3 vezes) testam a pirâmide de botões pela string inteira de
-    classes; `toHaveClass('text-danger')` em `chat/MessageReport.test.tsx` (contador acima do limite). A hierarquia
-    visual é o comportamento aqui e não há semântica que a exponha; manter, ou expor `data-variant` nos botões.
-    `toHaveClass` de alvo de toque em `app/theme/ThemeToggle.test.tsx`, `landing/HeroInvitation.test.tsx` e
-    `chat/MessageReport.test.tsx` pode usar `elementsWithoutTouchTarget` de `test/touchTarget.ts`.
-14. **Seletores estruturais.** `events/EventPageLive.test.tsx` (`parentElement` + `querySelector(':scope > [role="status"]')`),
-    `connections/DecisionPanel.test.tsx` (`closest('[role="status"]')`), `events/EventPage.test.tsx`
-    (`closest('[aria-live]')`) e `blocks/BlockedAccountsPage.test.tsx` (`closest('li')` dentro de um helper com guarda).
-    Dar nome acessível às regiões permitiria `getByRole('status', { name })`; muda a produção, então ficou registrado.
-15. **Helpers que ainda se repetem.** O `render<Página>` (`stubMatchMedia` + `replaceState` + `stubApi` + `<App />`) em
-    `BlockedAccountsPage.test.tsx`, `ConnectionsPage.test.tsx`, `EventsPage.test.tsx`, `MyRegistrationsPage.test.tsx`,
-    `AdminEventsPage.test.tsx` e outros, candidato a `renderAppAt(path, routes)`; as respostas 429/503 com `Retry-After`
-    (`busyAnswer` em `EventPage.test.tsx` e `AdminRoundsPanel.test.tsx`, `busy` em `RoundChatPanel.test.tsx` e
-    `useEventRefresh.test.tsx`, `retryAfter` em `MessageReport.test.tsx`, `waitAnswer` em `DecisionPanel.test.tsx`),
-    candidatas a um `busyAnswer(status, seconds)` em `test/fakeApi.ts`; e `message(seq, text, fromMe)`, igual em
-    `MessageReport.test.tsx` e `RoundChatPanel.test.tsx` e com outra ordem de parâmetros em `chatLog.test.ts`. Cada um
-    tem variações pequenas por arquivo; unificar pede revisar caso a caso.
+12. **Mystery Guest.** *Parcialmente feito:* os títulos, a descrição curta e o texto do horário das fixtures
+    `DINNER`/`WINE`/`PICNIC`/`ADMIN_DRAFT` são lidos da fixture (`DINNER.title`, `DINNER_BLURB`, `DINNER_TIME_TEXT`
+    em `test/eventFixtures.ts`) em `EventsPage`, `EventPage`, `EventPageLive`, `MyRegistrationsPage`,
+    `AdminEventPage`, `AdminEventsPage` e `useEventRefresh`. **Falta:** o "de 40 vagas" e as contagens de
+    inscrições (`ADMIN_DRAFT.capacity`/`registrationCount`) e o "Inscrição feita em 5 de outubro de 2026" de
+    `MyRegistrationsPage` ainda são literais que vêm da fixture; e `DecisionPanel.test` afirma a data
+    "10 de outubro de 2026" que vem do `DECIDED_AT` do próprio arquivo, sem o valor à vista.
+13. **Asserts acoplados ao estilo.** *Feito para a pirâmide de botões:* `expectPrimaryAction`/`expectSecondaryAction`
+    (`test/buttonHierarchy.ts`) substituem os dez `className).toBe(PRIMARY_BUTTON | SECONDARY_BUTTON)`; a regra
+    `vitest/expect-expect` do `.oxlintrc.json` conhece os dois nomes. **Falta:** `toHaveClass('text-danger')` em
+    `chat/MessageReport.test.tsx` e os `toHaveClass` de alvo de toque em `ThemeToggle`, `HeroInvitation` e
+    `MessageReport`, que podem usar `elementsWithoutTouchTarget`.
+14. **Seletores estruturais.** *Feito onde a produção já dá a semântica:* `BlockedAccountsPage.test` acha o item
+    por `listitem` + `within`; `DecisionPanel.test` pega a região `status`; `EventPageLive.test` pega a região
+    "Sua dupla" e o primeiro `status` dela; `RoundChatPanel.test` pega o `paragraph` do `listitem`. **Fica:**
+    `EventPage.test` (`heading.closest('[aria-live]')`), porque o que se afirma é o aninhamento (o chat não pode
+    estar dentro da região viva) e não há papel que o expresse; `RoundChatPanel.test` (`[data-message-text]`, gancho
+    de teste da produção) e `MessageReport.test` (`closest('label')` do alvo de toque). Dar nome acessível às
+    regiões de status continua mudando a produção.
+15. **Helpers que ainda se repetem.** *Feito:* `renderAppAt(path, routes, { isDesktop })` em `test/renderApp.tsx`
+    (dez arquivos); `busyAnswer(status, retryAfterSeconds?)` em `test/fakeApi.ts` (substitui `busyAnswer`, `busy`,
+    `retryAfter` e `waitAnswer`); `message(seq, text, fromMe)` em `test/chatFixtures.ts` (as duas suítes do chat).
+    `Navigation.test` (devolve também a `navigation`) e `SessionControls.test` (sem caminho) ficam com o `render`
+    próprio. O `message` de `chatLog.test.ts` fica: constrói o `ChatMessage` já lido (com `Date`), não o corpo da API.
 16. **Type assertions.** Depois desta branch não sobra nenhum `as Tipo` nem `!` em teste ou produção (fora `as const`);
     os guardas que lançam erro substituíram os casts.
 

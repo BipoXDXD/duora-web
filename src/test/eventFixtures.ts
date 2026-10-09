@@ -1,10 +1,19 @@
 import { jsonAnswer, type FakeRoute } from './fakeApi.ts'
 
+/** A primeira linha da descrição do jantar, que as telas mostram sozinha nas listas. */
+export const DINNER_BLURB = 'Uma noite de jogos de mesa.'
+
+/**
+ * Como as telas escrevem o horário do jantar (`startsAt` 22:00Z, `endsAt` 01:00Z): 19:00 às 22:00 em Brasília,
+ * que é o fuso dos testes.
+ */
+export const DINNER_TIME_TEXT = /sábado, 10 de outubro.*19:00.*22:00/
+
 /** Eventos como a API os manda, para os testes das telas de eventos. */
 export const DINNER = {
   id: '0199b0c4-7f3a-7c2e-9a1b-2c3d4e5f6a7b',
   title: 'Jantar às cegas',
-  description: 'Uma noite de jogos de mesa.\nTraga sua curiosidade.',
+  description: `${DINNER_BLURB}\nTraga sua curiosidade.`,
   startsAt: '2026-10-10T22:00:00Z',
   endsAt: '2026-10-11T01:00:00Z',
   status: 'PUBLISHED',

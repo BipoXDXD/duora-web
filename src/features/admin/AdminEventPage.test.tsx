@@ -1,7 +1,5 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { App } from '../../app/App.tsx'
 import {
   ADMIN_CANCELLED,
   ADMIN_DRAFT,
@@ -9,7 +7,7 @@ import {
   AFTER_DINNER,
   BEFORE_DINNER,
 } from '../../test/adminFixtures.ts'
-import { SESSION } from '../../test/eventFixtures.ts'
+import { DINNER_BLURB, DINNER_TIME_TEXT, SESSION } from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
   callsTo,
@@ -19,9 +17,8 @@ import {
   neverAnswer,
   problemAnswer,
   refusalAnswer,
-  stubApi,
 } from '../../test/fakeApi.ts'
-import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
+import { renderAppAt } from '../../test/renderApp.tsx'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
 const EVENT = `/api/admin/events/${ADMIN_DRAFT.id}`
@@ -40,11 +37,7 @@ afterEach(() => {
 })
 
 function renderAdminEvent(routes: Readonly<Record<string, FakeRoute>>, session = SESSION) {
-  stubMatchMedia(false)
-  window.history.replaceState(null, '', `/admin/eventos/${ADMIN_DRAFT.id}`)
-  const fetchMock = stubApi({ ...session, ...routes })
-  render(<App />)
-  return { fetchMock, user: userEvent.setup() }
+  return renderAppAt(`/admin/eventos/${ADMIN_DRAFT.id}`, { ...session, ...routes })
 }
 
 function titleOf(name: string) {
@@ -71,7 +64,7 @@ describe('admin event page', () => {
     expect(await screen.findByText('Não foi possível carregar o evento.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
 
-    expect(await titleOf('Jantar às cegas')).toBeInTheDocument()
+    expect(await titleOf(ADMIN_DRAFT.title)).toBeInTheDocument()
   })
 
   it('says "Área só para a equipe." on a 403, with nothing of the event', async () => {
@@ -99,10 +92,10 @@ describe('admin event page', () => {
     it('shows the state, the time in the time zone of the user and the count of registrations', async () => {
       renderAdminEvent({ [EVENT]: jsonAnswer(ADMIN_DRAFT) })
 
-      expect(await titleOf('Jantar às cegas')).toHaveFocus()
+      expect(await titleOf(ADMIN_DRAFT.title)).toHaveFocus()
       expect(screen.getByText('Rascunho')).toBeInTheDocument()
-      expect(screen.getByText(/sábado, 10 de outubro.*19:00.*22:00/)).toBeInTheDocument()
-      expect(screen.getByText(/Uma noite de jogos de mesa\./)).toBeInTheDocument()
+      expect(screen.getByText(DINNER_TIME_TEXT)).toBeInTheDocument()
+      expect(screen.getByText(DINNER_BLURB, { exact: false })).toBeInTheDocument()
       expect(screen.getByText('0 pessoas inscritas de 40 vagas.')).toBeInTheDocument()
       expect(screen.getByText(/só a equipe o vê até ele ser publicado/)).toBeInTheDocument()
     })

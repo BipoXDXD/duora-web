@@ -1,7 +1,5 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { App } from '../../app/App.tsx'
 import { pageOf, SESSION } from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
@@ -10,10 +8,9 @@ import {
   neverAnswer,
   problemAnswer,
   statusAnswer,
-  stubApi,
   type FakeRoute,
 } from '../../test/fakeApi.ts'
-import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
+import { renderAppAt } from '../../test/renderApp.tsx'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
 const LIST = '/api/me/blocked-accounts'
@@ -28,11 +25,7 @@ afterEach(() => {
 })
 
 function renderBlockedPage(routes: Readonly<Record<string, FakeRoute>>, session = SESSION) {
-  stubMatchMedia(false)
-  window.history.replaceState(null, '', '/perfil/bloqueios')
-  const fetchMock = stubApi({ ...session, ...routes })
-  render(<App />)
-  return { fetchMock, user: userEvent.setup() }
+  return renderAppAt('/perfil/bloqueios', { ...session, ...routes })
 }
 
 function unblockPath(accountId: string): string {
@@ -40,10 +33,10 @@ function unblockPath(accountId: string): string {
 }
 
 async function findItem(date: string): Promise<HTMLElement> {
-  const text = await screen.findByText(`Bloqueada em ${date}`)
-  const item = text.closest('li')
-  if (item === null) {
-    throw new Error(`item sem <li>: ${date}`)
+  const items = await screen.findAllByRole('listitem')
+  const item = items.find((candidate) => within(candidate).queryByText(`Bloqueada em ${date}`) !== null)
+  if (item === undefined) {
+    throw new Error(`nenhum item bloqueado em ${date}`)
   }
   return item
 }

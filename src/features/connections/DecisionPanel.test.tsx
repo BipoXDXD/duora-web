@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../app/App.tsx'
 import { DINNER, emptyChatRoutes, SESSION } from '../../test/eventFixtures.ts'
 import {
+  busyAnswer,
   byMethod,
   inSequence,
   jsonAnswer,
@@ -15,8 +16,8 @@ import {
   stubApi,
   type FakeRoute,
 } from '../../test/fakeApi.ts'
+import { expectPrimaryAction, expectSecondaryAction } from '../../test/buttonHierarchy.ts'
 import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
 const EVENT = `/api/events/${DINNER.id}`
@@ -33,13 +34,6 @@ const NOT_DECIDED = problemAnswer(404)
 
 function decisionAnswer(interested: boolean, status = 200, extra: object = {}): FakeRoute {
   return jsonAnswer({ eventId: DINNER.id, roundNumber: 1, interested, decidedAt: DECIDED_AT, ...extra }, status)
-}
-
-function waitAnswer(status: number, retryAfter?: string): FakeRoute {
-  return () =>
-    Promise.resolve(
-      new Response(null, { status, headers: retryAfter === undefined ? {} : { 'Retry-After': retryAfter } }),
-    )
 }
 
 beforeEach(() => {
@@ -165,8 +159,9 @@ describe('private decision after a round', () => {
 
     await chooseAndConfirm(user, choice)
 
-    const recorded = await within(panel()).findByText('Decisão registrada.')
-    expect(recorded.closest('[role="status"]')).toHaveFocus()
+    const recorded = await within(panel()).findByRole('status')
+    expect(recorded).toHaveTextContent('Decisão registrada.')
+    expect(recorded).toHaveFocus()
     expect(within(panel()).getByText(shownText)).toBeInTheDocument()
     expect(putsTo(fetchMock)[0]?.[1]?.body).toBe(JSON.stringify({ interested }))
     expect(within(panel()).queryByRole('button', { name: choice })).not.toBeInTheDocument()
@@ -255,12 +250,12 @@ describe('private decision after a round', () => {
     })
 
     it.each([
-      [503, '3', 'Não foi possível registrar agora. Tente de novo em 3 segundos.'],
-      [429, '1', 'Não foi possível registrar agora. Tente de novo em 1 segundo.'],
+      [503, 3, 'Não foi possível registrar agora. Tente de novo em 3 segundos.'],
+      [429, 1, 'Não foi possível registrar agora. Tente de novo em 1 segundo.'],
       [503, undefined, 'Não foi possível registrar agora. Tente de novo em instantes.'],
     ])('on %i with Retry-After %s asks to wait, keeping the confirmation to try again', async (status, retry, text) => {
       const { fetchMock, user } = await openRound(
-        byMethod({ GET: NOT_DECIDED, PUT: inSequence(waitAnswer(status, retry), decisionAnswer(false, 201)) }),
+        byMethod({ GET: NOT_DECIDED, PUT: inSequence(busyAnswer(status, retry), decisionAnswer(false, 201)) }),
       )
 
       await chooseAndConfirm(user, 'Não quero')
@@ -288,12 +283,12 @@ describe('private decision after a round', () => {
     it('keeps a single primary button while the notice asks to sign in again', async () => {
       const { user } = await openRound(byMethod({ GET: NOT_DECIDED, PUT: statusAnswer(401) }))
       await user.click(await within(await findPanel()).findByRole('button', { name: 'Não quero' }))
-      expect(within(panel()).getByRole('button', { name: 'Confirmar minha decisão' }).className).toBe(PRIMARY_BUTTON)
+      expectPrimaryAction(within(panel()).getByRole('button', { name: 'Confirmar minha decisão' }))
 
       await user.click(within(panel()).getByRole('button', { name: 'Confirmar minha decisão' }))
 
-      expect((await within(panel()).findByRole('link', { name: 'Entrar de novo' })).className).toBe(PRIMARY_BUTTON)
-      expect(within(panel()).getByRole('button', { name: 'Confirmar minha decisão' }).className).toBe(SECONDARY_BUTTON)
+      expectPrimaryAction(await within(panel()).findByRole('link', { name: 'Entrar de novo' }))
+      expectSecondaryAction(within(panel()).getByRole('button', { name: 'Confirmar minha decisão' }))
     })
 
     it.each([

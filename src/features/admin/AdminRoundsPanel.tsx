@@ -7,6 +7,7 @@ import { ConfirmStep } from '../../shared/ui/ConfirmStep.tsx'
 import { FormField } from '../../shared/ui/FormField.tsx'
 import { LoadFailure } from '../../shared/ui/LoadFailure.tsx'
 import { FIELD_CONTROL, PRIMARY_BUTTON } from '../../shared/ui/styles.ts'
+import { useConfirmStep } from '../../shared/ui/useConfirmStep.ts'
 import { useFocusOnMount } from '../../shared/ui/useFocusOnMount.ts'
 import { useShownNotice } from '../../shared/ui/useShownNotice.ts'
 import { EVENT_KEYS } from '../events/eventQueries.ts'
@@ -142,10 +143,9 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
   const suggested = currentRound === null ? String(FIRST_ROUND) : currentRound < LAST_ROUND ? String(currentRound + 1) : ''
   /** `null` enquanto a pessoa não digitou: o campo acompanha a rodada seguinte, que muda quando uma começa. */
   const [typed, setTyped] = useState<string | null>(null)
-  const [confirming, setConfirming] = useState<number | null>(null)
-  const [hasProblem, setHasProblem] = useState(false)
   /** Ao desistir da confirmação o foco volta para o campo do número. */
-  const [returnedFromConfirm, setReturnedFromConfirm] = useState(false)
+  const confirmation = useConfirmStep<number>()
+  const [hasProblem, setHasProblem] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const { shown, show: showNotice, hide: hideNotice } = useShownNotice<{ readonly notice: AdminNotice }>()
   const roundNumberText = typed ?? suggested
@@ -166,7 +166,7 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
     } else if (result.kind === 'notUnderway' || result.kind === 'refused' || result.kind === 'notFound') {
       void queryClient.invalidateQueries({ queryKey: ADMIN_KEYS.event(event.id) })
     }
-    setConfirming(null)
+    confirmation.close()
     showNotice({ notice: noticeOfRound(number, result) })
   }
 
@@ -175,9 +175,10 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
     hideNotice()
     const number = roundNumberOf(roundNumberText)
     setHasProblem(number === null)
-    setReturnedFromConfirm(false)
-    setConfirming(number)
-    if (number === null) {
+    if (number !== null) {
+      confirmation.ask(number)
+    } else {
+      confirmation.close()
       const control = formRef.current?.elements.namedItem('roundNumber')
       if (control instanceof HTMLElement) {
         control.focus()
@@ -185,6 +186,7 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
     }
   }
 
+  const { confirming } = confirmation
   if (currentRound === LAST_ROUND) {
     return <p className="text-fg">{`Todas as ${LAST_ROUND} rodadas já começaram.`}</p>
   }
@@ -201,7 +203,7 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
             {(control) => (
               <RoundNumberInput
                 control={control}
-                takesFocus={returnedFromConfirm}
+                takesFocus={confirmation.returnsFocus}
                 value={roundNumberText}
                 onChange={setTyped}
               />
@@ -213,16 +215,13 @@ function RoundStarter({ event, currentRound }: RoundStarterProps) {
         </form>
       ) : (
         <ConfirmStep
-          confirmLabel={`Sim, iniciar a rodada ${confirming}`}
+          confirmLabel={`Sim, iniciar a rodada ${confirming.subject}`}
           pendingLabel="Iniciando…"
           isPending={mutation.isPending}
-          onConfirm={() => mutation.mutate({ number: confirming })}
-          onBack={() => {
-            setReturnedFromConfirm(true)
-            setConfirming(null)
-          }}
+          onConfirm={() => mutation.mutate({ number: confirming.subject })}
+          onBack={confirmation.back}
         >
-          <p className="text-fg">{confirmQuestion(confirming, event.registrationCount)}</p>
+          <p className="text-fg">{confirmQuestion(confirming.subject, event.registrationCount)}</p>
         </ConfirmStep>
       )}
     </>

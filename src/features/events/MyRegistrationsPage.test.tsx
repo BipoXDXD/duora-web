@@ -1,7 +1,5 @@
-import { render, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { App } from '../../app/App.tsx'
 import { DINNER, pageOf, PICNIC, SESSION, WINE } from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
@@ -9,10 +7,9 @@ import {
   networkFailure,
   neverAnswer,
   problemAnswer,
-  stubApi,
   type FakeRoute,
 } from '../../test/fakeApi.ts'
-import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
+import { renderAppAt } from '../../test/renderApp.tsx'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
 const LIST = '/api/me/registrations'
@@ -42,11 +39,7 @@ afterEach(() => {
 })
 
 function renderPage(routes: Readonly<Record<string, FakeRoute>>, session = SESSION) {
-  stubMatchMedia(false)
-  window.history.replaceState(null, '', '/inscricoes')
-  const fetchMock = stubApi({ ...session, ...routes })
-  render(<App />)
-  return { fetchMock, user: userEvent.setup() }
+  return renderAppAt('/inscricoes', { ...session, ...routes })
 }
 
 describe('my registrations page', () => {
@@ -69,7 +62,7 @@ describe('my registrations page', () => {
     expect(await screen.findByText('Não foi possível carregar suas inscrições.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
 
-    expect(await screen.findByRole('link', { name: 'Vinho e cartas' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: WINE.title })).toBeInTheDocument()
   })
 
   it('invites to choose an event when there is no registration', async () => {
@@ -84,12 +77,12 @@ describe('my registrations page', () => {
 
     const items = within(await screen.findByRole('list', { name: 'Suas inscrições' })).getAllByRole('listitem')
     expect(items).toHaveLength(3)
-    expect(items[0]).toHaveTextContent('Jantar às cegas')
+    expect(items[0]).toHaveTextContent(DINNER.title)
     expect(items[0]).toHaveTextContent('Em andamento')
     expect(items[0]).toHaveTextContent('Inscrição feita em 5 de outubro de 2026')
     expect(items[1]).toHaveTextContent('Cancelado')
     expect(items[2]).not.toHaveTextContent(/Em andamento|Cancelado|Encerrado/)
-    expect(within(items[0] ?? document.body).getByRole('link', { name: 'Jantar às cegas' })).toHaveAttribute(
+    expect(within(items[0] ?? document.body).getByRole('link', { name: DINNER.title })).toHaveAttribute(
       'href',
       `/eventos/${DINNER.id}`,
     )
@@ -105,8 +98,8 @@ describe('my registrations page', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar mais. Tente de novo.')
     await user.click(screen.getByRole('button', { name: 'Carregar mais' }))
 
-    expect(await screen.findByRole('link', { name: 'Piquenique no parque' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Jantar às cegas' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: PICNIC.title })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: DINNER.title })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Carregar mais' })).not.toBeInTheDocument()
   })
 

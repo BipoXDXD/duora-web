@@ -1,7 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
+import type userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { App } from '../../app/App.tsx'
 import { ADMIN_DRAFT, BEFORE_DINNER } from '../../test/adminFixtures.ts'
 import { SESSION } from '../../test/eventFixtures.ts'
 import {
@@ -11,10 +10,10 @@ import {
   networkFailure,
   neverAnswer,
   problemAnswer,
-  stubApi,
+  type stubApi,
   type FakeRoute,
 } from '../../test/fakeApi.ts'
-import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
+import { renderAppAt } from '../../test/renderApp.tsx'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
 const CREATE = '/api/admin/events'
@@ -32,11 +31,7 @@ afterEach(() => {
 })
 
 function renderNewEvent(routes: Readonly<Record<string, FakeRoute>>, session = SESSION) {
-  stubMatchMedia(false)
-  window.history.replaceState(null, '', '/admin/eventos/novo')
-  const fetchMock = stubApi({ ...session, ...routes })
-  render(<App />)
-  return { fetchMock, user: userEvent.setup() }
+  return renderAppAt('/admin/eventos/novo', { ...session, ...routes })
 }
 
 function createCalls(fetchMock: ReturnType<typeof stubApi>) {

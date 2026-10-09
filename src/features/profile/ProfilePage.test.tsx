@@ -1,7 +1,6 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { screen, waitFor, within } from '@testing-library/react'
+import type userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { App } from '../../app/App.tsx'
 import { SESSION } from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
@@ -11,12 +10,12 @@ import {
   networkFailure,
   neverAnswer,
   problemAnswer,
+  type stubApi,
   refusalAnswer,
-  stubApi,
   type FakeRoute,
 } from '../../test/fakeApi.ts'
-import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
+import { renderAppAt } from '../../test/renderApp.tsx'
 
 
 const ANA = {
@@ -39,11 +38,7 @@ function profileAnswer(profile: object, version: number): FakeRoute {
 }
 
 function renderProfilePage(profileRoute: FakeRoute, session: Readonly<Record<string, FakeRoute>> = SESSION) {
-  stubMatchMedia(true)
-  window.history.replaceState(null, '', '/perfil')
-  const fetchMock = stubApi({ ...session, '/api/me/profile': profileRoute })
-  render(<App />)
-  return { fetchMock, user: userEvent.setup() }
+  return renderAppAt('/perfil', { ...session, '/api/me/profile': profileRoute }, { isDesktop: true })
 }
 
 function patchCalls(fetchMock: ReturnType<typeof stubApi>): RequestInit[] {

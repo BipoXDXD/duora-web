@@ -1,23 +1,29 @@
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { App } from '../../app/App.tsx'
-import { BEFORE_EVENTS, DINNER, emptyChatRoutes, SESSION } from '../../test/eventFixtures.ts'
+import {
+  BEFORE_EVENTS,
+  DINNER,
+  DINNER_BLURB,
+  DINNER_TIME_TEXT,
+  emptyChatRoutes,
+  SESSION,
+} from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
+  busyAnswer,
   byMethod,
   callsTo,
-  type FakeRoute,
   inSequence,
   jsonAnswer,
   neverAnswer,
   problemAnswer,
   refusalAnswer,
   statusAnswer,
-  stubApi,
+  type FakeRoute,
+  type stubApi,
 } from '../../test/fakeApi.ts'
-import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../shared/ui/styles.ts'
+import { expectPrimaryAction, expectSecondaryAction } from '../../test/buttonHierarchy.ts'
+import { renderAppAt } from '../../test/renderApp.tsx'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
 const EVENT = `/api/events/${DINNER.id}`
@@ -25,11 +31,8 @@ const REGISTRATION = `${EVENT}/registration`
 const REGISTERED = jsonAnswer({ eventId: DINNER.id, registeredAt: '2026-10-05T12:00:00Z' })
 const NOT_REGISTERED = problemAnswer(404)
 
-function busyAnswer(status: number): FakeRoute {
-  return () => Promise.resolve(new Response(null, { status, headers: { 'Retry-After': '3' } }))
-}
-
-const BUSY = busyAnswer(503)
+const RETRY_AFTER_SECONDS = 3
+const BUSY = busyAnswer(503, RETRY_AFTER_SECONDS)
 
 function pairingAnswer(roundNumber: number, partnerAccountId: string | null): FakeRoute {
   return jsonAnswer({ eventId: DINNER.id, roundNumber, partnerAccountId })
@@ -60,11 +63,7 @@ afterEach(() => {
 })
 
 function renderEventPage(routes: Readonly<Record<string, FakeRoute>>, session = SESSION) {
-  stubMatchMedia(false)
-  window.history.replaceState(null, '', `/eventos/${DINNER.id}`)
-  const fetchMock = stubApi({ ...session, ...routes })
-  render(<App />)
-  return { fetchMock, user: userEvent.setup() }
+  return renderAppAt(`/eventos/${DINNER.id}`, { ...session, ...routes })
 }
 
 describe('event page', () => {
@@ -90,7 +89,7 @@ describe('event page', () => {
     expect(await screen.findByText('Não foi possível carregar o evento.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Jantar às cegas' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: DINNER.title })).toBeInTheDocument()
   })
 
   it('says the event does not exist on 404, with the way back to the events', async () => {
@@ -103,10 +102,10 @@ describe('event page', () => {
   it('shows the event with the time in the time zone of the user, and focuses its title', async () => {
     renderEventPage({ [EVENT]: jsonAnswer(DINNER), [REGISTRATION]: NOT_REGISTERED })
 
-    const title = await screen.findByRole('heading', { level: 1, name: 'Jantar às cegas' })
+    const title = await screen.findByRole('heading', { level: 1, name: DINNER.title })
     expect(title).toHaveFocus()
-    expect(screen.getByText(/sábado, 10 de outubro.*19:00.*22:00/)).toBeInTheDocument()
-    expect(screen.getByText(/Uma noite de jogos de mesa\./)).toBeInTheDocument()
+    expect(screen.getByText(DINNER_TIME_TEXT)).toBeInTheDocument()
+    expect(screen.getByText(DINNER_BLURB, { exact: false })).toBeInTheDocument()
   })
 
   describe('registration before the event', () => {
@@ -188,7 +187,7 @@ describe('event page', () => {
       const alert = await screen.findByRole('alert')
       expect(alert).toHaveTextContent('Os eventos do Duora são só para maiores de 18 anos')
       expect(screen.queryByRole('link', { name: 'Completar meu perfil' })).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Quero me inscrever' }).className).toBe(PRIMARY_BUTTON)
+      expectPrimaryAction(screen.getByRole('button', { name: 'Quero me inscrever' }))
     })
 
     it.each([
@@ -215,13 +214,13 @@ describe('event page', () => {
         '/api/me/profile': neverAnswer(),
       })
       const register = await screen.findByRole('button', { name: 'Quero me inscrever' })
-      expect(register.className).toBe(PRIMARY_BUTTON)
+      expectPrimaryAction(register)
 
       await user.click(register)
 
       const next = await screen.findByRole('link', { name: 'Completar meu perfil' })
-      expect(next.className).toBe(PRIMARY_BUTTON)
-      expect(screen.getByRole('button', { name: 'Quero me inscrever' }).className).toBe(SECONDARY_BUTTON)
+      expectPrimaryAction(next)
+      expectSecondaryAction(screen.getByRole('button', { name: 'Quero me inscrever' }))
     })
 
     it('demotes "Quero me inscrever" while the notice asks to sign in again', async () => {
@@ -232,8 +231,8 @@ describe('event page', () => {
 
       await user.click(await screen.findByRole('button', { name: 'Quero me inscrever' }))
 
-      expect((await screen.findByRole('link', { name: 'Entrar de novo' })).className).toBe(PRIMARY_BUTTON)
-      expect(screen.getByRole('button', { name: 'Quero me inscrever' }).className).toBe(SECONDARY_BUTTON)
+      expectPrimaryAction(await screen.findByRole('link', { name: 'Entrar de novo' }))
+      expectSecondaryAction(screen.getByRole('button', { name: 'Quero me inscrever' }))
     })
 
     it('keeps "Quero me inscrever" primary when the notice has no next step', async () => {
@@ -245,7 +244,7 @@ describe('event page', () => {
       await user.click(await screen.findByRole('button', { name: 'Quero me inscrever' }))
 
       await screen.findByRole('alert')
-      expect(screen.getByRole('button', { name: 'Quero me inscrever' }).className).toBe(PRIMARY_BUTTON)
+      expectPrimaryAction(screen.getByRole('button', { name: 'Quero me inscrever' }))
     })
 
     it('explains a cancelled event on 409 EVENT_CANCELLED and reads the event again', async () => {
@@ -296,7 +295,7 @@ describe('event page', () => {
     it.each([503, 429])('asks to wait the seconds of Retry-After on a %s', async (status) => {
       const { user } = renderEventPage({
         [EVENT]: jsonAnswer(DINNER),
-        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: busyAnswer(status) }),
+        [REGISTRATION]: byMethod({ GET: NOT_REGISTERED, PUT: busyAnswer(status, RETRY_AFTER_SECONDS) }),
       })
 
       await user.click(await screen.findByRole('button', { name: 'Quero me inscrever' }))
@@ -410,7 +409,7 @@ describe('event page', () => {
     it.each([503, 429])('keeps the registration and asks to wait on a %s of the cancel', async (status) => {
       const { user } = renderEventPage({
         [EVENT]: jsonAnswer(DINNER),
-        [REGISTRATION]: byMethod({ GET: REGISTERED, DELETE: busyAnswer(status) }),
+        [REGISTRATION]: byMethod({ GET: REGISTERED, DELETE: busyAnswer(status, RETRY_AFTER_SECONDS) }),
       })
 
       await user.click(await screen.findByRole('button', { name: 'Cancelar inscrição' }))

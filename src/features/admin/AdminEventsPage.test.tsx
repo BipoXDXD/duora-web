@@ -1,7 +1,5 @@
-import { render, screen, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { App } from '../../app/App.tsx'
 import {
   ADMIN_CANCELLED,
   ADMIN_DRAFT,
@@ -10,7 +8,7 @@ import {
   BEFORE_DINNER,
   DURING_DINNER,
 } from '../../test/adminFixtures.ts'
-import { pageOf, SESSION } from '../../test/eventFixtures.ts'
+import { DINNER_TIME_TEXT, pageOf, SESSION } from '../../test/eventFixtures.ts'
 import {
   ANONYMOUS_SESSION,
   inSequence,
@@ -18,10 +16,9 @@ import {
   networkFailure,
   neverAnswer,
   problemAnswer,
-  stubApi,
   type FakeRoute,
 } from '../../test/fakeApi.ts'
-import { stubMatchMedia } from '../../test/fakeMatchMedia.ts'
+import { renderAppAt } from '../../test/renderApp.tsx'
 import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
 const LIST = '/api/admin/events'
@@ -54,11 +51,7 @@ afterEach(() => {
 })
 
 function renderAdminEvents(routes: Readonly<Record<string, FakeRoute>>, session = SESSION) {
-  stubMatchMedia(true)
-  window.history.replaceState(null, '', '/admin/eventos')
-  const fetchMock = stubApi({ ...session, ...routes })
-  render(<App />)
-  return { fetchMock, user: userEvent.setup() }
+  return renderAppAt('/admin/eventos', { ...session, ...routes }, { isDesktop: true })
 }
 
 function eventItems() {
@@ -85,7 +78,7 @@ describe('admin events page', () => {
     expect(await screen.findByText('Não foi possível carregar os eventos.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
 
-    expect(await screen.findByRole('link', { name: 'Jantar às cegas' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: ADMIN_DRAFT.title })).toBeInTheDocument()
   })
 
   it('says "Área só para a equipe." on a 403, with no list, no filter and no way to create', async () => {
@@ -119,13 +112,13 @@ describe('admin events page', () => {
 
     const items = eventItems()
     expect(items).toHaveLength(3)
-    expect(items[0]).toHaveTextContent('Piquenique no parque')
+    expect(items[0]).toHaveTextContent(PICNIC.title)
     expect(items[0]).toHaveTextContent(/sábado, 24 de outubro.*12:00.*15:00/)
     expect(items[0]).toHaveTextContent('0 pessoas inscritas de 40 vagas.')
-    expect(items[1]).toHaveTextContent('Vinho e cartas')
+    expect(items[1]).toHaveTextContent(WINE.title)
     expect(items[1]).toHaveTextContent('1 pessoa inscrita de 40 vagas.')
-    expect(items[2]).toHaveTextContent('Jantar às cegas')
-    expect(items[2]).toHaveTextContent(/sábado, 10 de outubro.*19:00.*22:00/)
+    expect(items[2]).toHaveTextContent(ADMIN_DRAFT.title)
+    expect(items[2]).toHaveTextContent(DINNER_TIME_TEXT)
     expect(items[2]).toHaveTextContent('12 pessoas inscritas de 40 vagas.')
   })
 
@@ -151,7 +144,7 @@ describe('admin events page', () => {
       [`${LIST}/${ADMIN_DRAFT.id}`]: neverAnswer(),
     })
 
-    await user.click(await screen.findByRole('link', { name: 'Jantar às cegas' }))
+    await user.click(await screen.findByRole('link', { name: ADMIN_DRAFT.title }))
 
     expect(window.location.pathname).toBe(`/admin/eventos/${ADMIN_DRAFT.id}`)
   })
@@ -173,7 +166,7 @@ describe('admin events page', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Carregar mais' }))
 
-    expect(await screen.findByRole('link', { name: 'Jantar às cegas' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: ADMIN_DRAFT.title })).toBeInTheDocument()
     expect(eventItems()).toHaveLength(3)
     expect(screen.queryByRole('button', { name: 'Carregar mais' })).not.toBeInTheDocument()
   })
@@ -187,11 +180,11 @@ describe('admin events page', () => {
     await user.click(await screen.findByRole('button', { name: 'Carregar mais' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar mais. Tente de novo.')
-    expect(screen.getByRole('link', { name: 'Piquenique no parque' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: PICNIC.title })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Carregar mais' }))
 
-    expect(await screen.findByRole('link', { name: 'Vinho e cartas' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: WINE.title })).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
@@ -225,7 +218,7 @@ describe('admin events page', () => {
       await screen.findByRole('list', { name: 'Eventos' })
       expect(fetchMock).toHaveBeenCalledWith(`${LIST}?status=${status}`, expect.anything())
       expect(eventItems()).toHaveLength(1)
-      expect(screen.queryByRole('link', { name: 'Jantar às cegas' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: ADMIN_DRAFT.title })).not.toBeInTheDocument()
     })
 
     it('keeps the filter and its focus while the filtered events load', async () => {
@@ -265,7 +258,7 @@ describe('admin events page', () => {
 
       await user.click(await screen.findByRole('button', { name: 'Carregar mais' }))
 
-      expect(await screen.findByRole('link', { name: 'Jantar às cegas' })).toBeInTheDocument()
+      expect(await screen.findByRole('link', { name: ADMIN_DRAFT.title })).toBeInTheDocument()
       expect(fetchMock).toHaveBeenCalledWith(`${LIST}?status=DRAFT&pageToken=page-2`, expect.anything())
     })
 
@@ -294,7 +287,7 @@ describe('admin events page', () => {
       expect(screen.getByRole('combobox', { name: 'Mostrar' })).toHaveValue('DRAFT')
       await user.click(screen.getByRole('button', { name: 'Tentar de novo' }))
 
-      expect(await screen.findByRole('link', { name: 'Piquenique no parque' })).toBeInTheDocument()
+      expect(await screen.findByRole('link', { name: PICNIC.title })).toBeInTheDocument()
     })
   })
 
@@ -304,7 +297,7 @@ describe('admin events page', () => {
       [`${LIST}/${ADMIN_DRAFT.id}`]: jsonAnswer(ADMIN_DRAFT),
       [`${LIST}/${ADMIN_DRAFT.id}:publish`]: jsonAnswer(ADMIN_PUBLISHED),
     })
-    await user.click(await screen.findByRole('link', { name: 'Jantar às cegas' }))
+    await user.click(await screen.findByRole('link', { name: ADMIN_DRAFT.title }))
     await user.click(await screen.findByRole('button', { name: 'Publicar evento' }))
     await user.click(screen.getByRole('button', { name: 'Sim, publicar' }))
     await screen.findByText('12 pessoas inscritas de 40 vagas.')

@@ -19,7 +19,7 @@ import { elementsWithoutTouchTarget } from '../../test/touchTarget.ts'
 
 vi.mock('../../shared/browser/navigateTo.ts', () => ({ navigateTo: vi.fn<(url: string) => void>() }))
 
-const ANA = jsonAnswer({ displayName: 'Ana Souza' })
+const ANA = jsonAnswer({ displayName: 'Ana Souza', roles: [] })
 const ENTRA_LOGOUT = 'https://duoraapp.ciamlogin.com/tenant/oauth2/v2.0/logout?client_id=web'
 const LOGOUT_FAILED = 'Não foi possível sair. Tente de novo.'
 const SESSION_UNAVAILABLE = 'Não foi possível verificar sua sessão.'
@@ -93,7 +93,7 @@ describe.each([
   })
 
   it('says the visitor is logged in when the user has no name', async () => {
-    renderApp({ '/api/me': jsonAnswer({ displayName: null }) })
+    renderApp({ '/api/me': jsonAnswer({ displayName: null, roles: [] }) })
 
     expect(await screen.findByText('Você entrou')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Sair' })).toBeInTheDocument()

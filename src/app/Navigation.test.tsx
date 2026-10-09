@@ -5,7 +5,7 @@ import { ANONYMOUS_SESSION, jsonAnswer, neverAnswer, stubApi, type FakeRoute } f
 import { stubMatchMedia } from '../test/fakeMatchMedia.ts'
 import { App } from './App.tsx'
 
-const SESSION = { '/api/me': jsonAnswer({ displayName: 'Ana Souza', profileComplete: true }) }
+const SESSION = { '/api/me': jsonAnswer({ displayName: 'Ana Souza', profileComplete: true, roles: [] }) }
 const PAGES = {
   '/api/me/profile': neverAnswer(),
   '/api/me/blocked-accounts': neverAnswer(),

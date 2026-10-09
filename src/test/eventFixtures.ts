@@ -31,7 +31,7 @@ export const PICNIC = {
   currentRound: null,
 } as const
 
-export const SESSION = { '/api/me': jsonAnswer({ displayName: 'Ana Souza', profileComplete: true }) }
+export const SESSION = { '/api/me': jsonAnswer({ displayName: 'Ana Souza', profileComplete: true, roles: [] }) }
 
 /** Antes de todos os eventos acima: 2026-10-08 12:00 em Brasília. */
 export const BEFORE_EVENTS = new Date('2026-10-08T15:00:00Z')

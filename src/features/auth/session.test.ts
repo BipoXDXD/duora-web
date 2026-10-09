@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import type { CurrentUserResponse, LogoutResponse } from '../../shared/api/contract.ts'
 import { ApiError, InvalidResponseError, NetworkError } from '../../shared/api/http.ts'
-import { type CurrentUserWire, fetchSession, type LogoutResponseWire, logOut } from './session.ts'
+import { type CurrentUserWire, fetchSession, KNOWN_ROLES, type LogoutResponseWire, logOut, type Role } from './session.ts'
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -27,7 +27,7 @@ function sentRequest(): { path: unknown; init: RequestInit } {
 
 describe('fetchSession', () => {
   it('asks GET /api/me for the session', async () => {
-    fetchMock.mockResolvedValue(json('{"displayName":"Ana Souza"}'))
+    fetchMock.mockResolvedValue(json('{"displayName":"Ana Souza","roles":[]}'))
 
     await fetchSession()
 
@@ -37,33 +37,59 @@ describe('fetchSession', () => {
   })
 
   it('reports the user with the display name on 200', async () => {
-    fetchMock.mockResolvedValue(json('{"displayName":"Ana Souza"}'))
+    fetchMock.mockResolvedValue(json('{"displayName":"Ana Souza","roles":[]}'))
 
-    await expect(fetchSession()).resolves.toEqual({ kind: 'authenticated', user: { displayName: 'Ana Souza' } })
+    await expect(fetchSession()).resolves.toEqual({
+      kind: 'authenticated',
+      user: { displayName: 'Ana Souza', roles: [] },
+    })
   })
 
   it('reports a user without a name when the API sends a null display name', async () => {
-    fetchMock.mockResolvedValue(json('{"displayName":null}'))
+    fetchMock.mockResolvedValue(json('{"displayName":null,"roles":[]}'))
 
-    await expect(fetchSession()).resolves.toEqual({ kind: 'authenticated', user: { displayName: null } })
+    await expect(fetchSession()).resolves.toEqual({ kind: 'authenticated', user: { displayName: null, roles: [] } })
   })
 
   it.each(['', '   '])('treats a blank display name (%j) as no name', async (displayName) => {
-    fetchMock.mockResolvedValue(json(JSON.stringify({ displayName })))
+    fetchMock.mockResolvedValue(json(JSON.stringify({ displayName, roles: [] })))
 
-    await expect(fetchSession()).resolves.toEqual({ kind: 'authenticated', user: { displayName: null } })
+    await expect(fetchSession()).resolves.toEqual({ kind: 'authenticated', user: { displayName: null, roles: [] } })
   })
 
   it('trims the display name', async () => {
-    fetchMock.mockResolvedValue(json('{"displayName":"  Ana  "}'))
+    fetchMock.mockResolvedValue(json('{"displayName":"  Ana  ","roles":[]}'))
 
-    await expect(fetchSession()).resolves.toEqual({ kind: 'authenticated', user: { displayName: 'Ana' } })
+    await expect(fetchSession()).resolves.toEqual({ kind: 'authenticated', user: { displayName: 'Ana', roles: [] } })
   })
 
-  it('keeps only the display name when the API sends more fields', async () => {
-    fetchMock.mockResolvedValue(json('{"displayName":"Ana","email":"ana@example.com","roles":["admin"]}'))
+  it('keeps only the fields the front uses when the API sends more', async () => {
+    fetchMock.mockResolvedValue(json('{"displayName":"Ana","email":"ana@example.com","roles":[]}'))
 
-    await expect(fetchSession()).resolves.toEqual({ kind: 'authenticated', user: { displayName: 'Ana' } })
+    await expect(fetchSession()).resolves.toEqual({ kind: 'authenticated', user: { displayName: 'Ana', roles: [] } })
+  })
+
+  it('reads the ADMIN role', async () => {
+    fetchMock.mockResolvedValue(json('{"displayName":"Ana","roles":["ADMIN"]}'))
+
+    await expect(fetchSession()).resolves.toEqual({
+      kind: 'authenticated',
+      user: { displayName: 'Ana', roles: ['ADMIN'] },
+    })
+  })
+
+  it.each([
+    ['an unknown role', '["MODERATOR"]', []],
+    ['the known role among unknown ones', '["MODERATOR","ADMIN"]', ['ADMIN']],
+    ['a role in lowercase, which is not the one the API sends', '["admin"]', []],
+    ['the same role twice', '["ADMIN","ADMIN"]', ['ADMIN']],
+  ])('ignores what is not on the allowlist: %s', async (_case, roles, expected) => {
+    fetchMock.mockResolvedValue(json(`{"displayName":"Ana","roles":${roles}}`))
+
+    await expect(fetchSession()).resolves.toEqual({
+      kind: 'authenticated',
+      user: { displayName: 'Ana', roles: expected },
+    })
   })
 
   it('reports an anonymous visitor on 401', async () => {
@@ -79,8 +105,11 @@ describe('fetchSession', () => {
   })
 
   it.each([
-    ['without the display name', '{}'],
-    ['with a display name that is not text', '{"displayName":42}'],
+    ['without the display name', '{"roles":[]}'],
+    ['with a display name that is not text', '{"displayName":42,"roles":[]}'],
+    ['without the roles, which the API always sends', '{"displayName":"Ana"}'],
+    ['with roles that are not a list', '{"displayName":"Ana","roles":"ADMIN"}'],
+    ['with a role that is not text', '{"displayName":"Ana","roles":[1]}'],
     ['that is not JSON', '<html>login</html>'],
   ])('fails on a 200 %s', async (_case, body) => {
     fetchMock.mockResolvedValue(json(body))
@@ -148,7 +177,16 @@ describe('contract with the generated API types', () => {
   // renomear, tornar opcional ou mudar o tipo de `displayName`, `npm run api:types` muda `schema.d.ts` e este
   // teste deixa de compilar, em vez de o parse falhar só em runtime.
   it('reads displayName the way the spec declares it', () => {
-    expectTypeOf<CurrentUserWire>().toEqualTypeOf<Pick<CurrentUserResponse, 'displayName'>>()
+    expectTypeOf<CurrentUserWire['displayName']>().toEqualTypeOf<CurrentUserResponse['displayName']>()
+  })
+
+  it('knows the same roles the spec declares', () => {
+    expectTypeOf<Role>().toEqualTypeOf<CurrentUserResponse['roles'][number]>()
+    expect(new Set(KNOWN_ROLES).size).toBe(KNOWN_ROLES.length)
+  })
+
+  it('accepts whatever the spec says the API sends', () => {
+    expectTypeOf<CurrentUserResponse>().toExtend<CurrentUserWire>()
   })
 
   it('reads logoutUrl the way the spec declares it', () => {

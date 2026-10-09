@@ -51,7 +51,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Lista os eventos, rascunhos incluídos
+         * @description Todos os estados, do início mais distante ao mais antigo, paginados por cursor; o filtro status escolhe um só. Cada item traz o estado guardado e quantas pessoas se inscreveram, nunca quem. A última página vem com nextPageToken null.
+         */
+        get: operations["listAdminEvents"];
         put?: never;
         /**
          * Cria um evento em rascunho
@@ -353,7 +357,7 @@ export interface paths {
         };
         /**
          * Quem está logado
-         * @description O front usa para saber se há sessão: 200 com o nome de exibição e se o perfil está completo, ou 401 sem sessão.
+         * @description O front usa para saber se há sessão: 200 com o nome de exibição, se o perfil está completo e os papéis (vazio para o usuário comum), ou 401 sem sessão.
          */
         get: operations["getCurrentUser"];
         put?: never;
@@ -696,6 +700,8 @@ export interface components {
             displayName: string | null;
             /** @description Se o perfil já tem o necessário para usar o Duora; se não, o front leva ao cadastro */
             profileComplete: boolean;
+            /** @description Papéis do usuário, vazio para o usuário comum. O front só decide o que mostrar; cada rota confere o papel no servidor */
+            roles: "ADMIN"[];
         };
         DecideRequest: {
             /** @description true para continuar em contato com o par da rodada, false para não */
@@ -835,6 +841,12 @@ export interface components {
             startsAt: string;
             /** @description Título do evento */
             title: string;
+        };
+        PageResponseAdminEventResponse: {
+            /** @description Itens da página, pelo início do evento */
+            items: components["schemas"]["AdminEventResponse"][];
+            /** @description Token da próxima página, ou null na última */
+            nextPageToken: string | null;
         };
         PageResponseEventResponse: {
             /** @description Itens da página, pelo início do evento */
@@ -1103,6 +1115,74 @@ export interface operations {
                 };
             };
             /** @description Sessão web sem o token CSRF no header X-XSRF-TOKEN */
+            403: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Erro inesperado */
+            500: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    listAdminEvents: {
+        parameters: {
+            query?: {
+                /** @description Quantos eventos no máximo nesta página */
+                maxPageSize?: number;
+                /** @description O nextPageToken da página anterior; ausente na primeira */
+                pageToken?: string;
+                /** @description Só os eventos neste estado; ausente traz todos */
+                status?: "DRAFT" | "PUBLISHED" | "CANCELLED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Uma página dos eventos */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponseAdminEventResponse"];
+                };
+            };
+            /** @description maxPageSize fora de 1 a 50, status que não é DRAFT, PUBLISHED nem CANCELLED, ou pageToken que a API não gerou */
+            400: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem credencial válida */
+            401: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Sem o papel ADMIN */
             403: {
                 headers: {
                     "X-Request-Id": components["headers"]["RequestId"];

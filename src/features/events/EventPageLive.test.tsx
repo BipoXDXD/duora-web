@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../app/App.tsx'
@@ -107,9 +107,9 @@ function readsOf(fetchMock: ReturnType<typeof stubApi>, path: string): number {
 
 /** A região `role="status"` que anuncia a rodada nova, e quantas vezes o texto dela mudou. */
 function watchAnnouncements() {
-  const panel = screen.getByRole('heading', { name: 'Sua dupla' }).parentElement
-  const region = panel?.querySelector(':scope > [role="status"]')
-  if (!(region instanceof HTMLElement)) {
+  // O anúncio vem logo depois do título; os outros `status` do painel (carregando, conversa) vêm depois dele.
+  const [region] = within(screen.getByRole('region', { name: 'Sua dupla' })).getAllByRole('status')
+  if (region === undefined) {
     throw new Error('a região de status da dupla não está na tela')
   }
   let changes = 0

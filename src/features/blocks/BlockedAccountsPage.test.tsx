@@ -40,10 +40,10 @@ function unblockPath(accountId: string): string {
 }
 
 async function findItem(date: string): Promise<HTMLElement> {
-  const text = await screen.findByText(`Bloqueada em ${date}`)
-  const item = text.closest('li')
-  if (item === null) {
-    throw new Error(`item sem <li>: ${date}`)
+  const items = await screen.findAllByRole('listitem')
+  const item = items.find((candidate) => within(candidate).queryByText(`Bloqueada em ${date}`) !== null)
+  if (item === undefined) {
+    throw new Error(`nenhum item bloqueado em ${date}`)
   }
   return item
 }

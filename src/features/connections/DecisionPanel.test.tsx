@@ -165,8 +165,9 @@ describe('private decision after a round', () => {
 
     await chooseAndConfirm(user, choice)
 
-    const recorded = await within(panel()).findByText('Decisão registrada.')
-    expect(recorded.closest('[role="status"]')).toHaveFocus()
+    const recorded = await within(panel()).findByRole('status')
+    expect(recorded).toHaveTextContent('Decisão registrada.')
+    expect(recorded).toHaveFocus()
     expect(within(panel()).getByText(shownText)).toBeInTheDocument()
     expect(putsTo(fetchMock)[0]?.[1]?.body).toBe(JSON.stringify({ interested }))
     expect(within(panel()).queryByRole('button', { name: choice })).not.toBeInTheDocument()

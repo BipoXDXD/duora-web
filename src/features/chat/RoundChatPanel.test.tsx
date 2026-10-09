@@ -140,7 +140,7 @@ describe('RoundChatPanel', () => {
     it('lets a message with no spaces break anywhere, so it never widens the page', async () => {
       renderChat({ [CHAT]: OPEN, [after(0)]: page([message(1, 'A'.repeat(500))]) })
 
-      const bubble = (await screen.findByText('A'.repeat(500))).closest('p')
+      const bubble = within(await screen.findByRole('listitem')).getByRole('paragraph')
       expect(bubble).toHaveClass('wrap-anywhere')
     })
 

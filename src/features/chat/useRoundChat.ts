@@ -9,6 +9,8 @@ export interface RoundChat {
   readonly log: ChatLog
   /** A última leitura falhou e outra já está marcada. */
   readonly isReconnecting: boolean
+  /** A leitura voltou 401: a sessão terminou e o polling parou até a pessoa voltar à aba. */
+  readonly isSignedOut: boolean
   /** Envia um texto novo; devolve o problema quando a API o recusou por ser inválido, para ele voltar ao rascunho. */
   readonly send: (text: string) => Promise<DraftProblem | null>
   /** Reenvia um texto que falhou, com a mesma chave. */
@@ -17,15 +19,19 @@ export interface RoundChat {
 
 type Reading = 'continue' | 'stop'
 
+const UNAUTHORIZED = 401
+
 /**
  * O chat de uma rodada por polling (ADR 0021 da duora-api): lê se aceita mensagens e depois as mensagens depois
  * do cursor, a cada 2 s e só com a aba visível. Ao voltar à aba, relê as duas coisas desde o cursor. Falha de
- * leitura espera cada vez mais, nunca menos que o `Retry-After`. O cursor é a maior posição que a leitura
+ * leitura espera cada vez mais, nunca menos que o `Retry-After`; um 401 não espera, porque repetir não o muda.
+ * O cursor é a maior posição que a leitura
  * trouxe, e não a de um envio: a mensagem do par gravada logo antes da própria ainda não veio e seria pulada.
  */
 export function useRoundChat(eventId: string, roundNumber: number): RoundChat {
   const [log, dispatch] = useReducer(chatLogReducer, INITIAL_CHAT_LOG)
   const [isReconnecting, setReconnecting] = useState(false)
+  const [isSignedOut, setSignedOut] = useState(false)
   const rethrow = useRethrowInRender()
   /** Relê se o chat aceita mensagens e as mensagens novas já, fora do intervalo. */
   const readAgainRef = useRef<() => void>(() => undefined)
@@ -84,12 +90,18 @@ export function useRoundChat(eventId: string, roundNumber: number): RoundChat {
         const next = await readOnce()
         failures = 0
         setReconnecting(false)
+        setSignedOut(false)
         if (next === 'continue') {
           schedule(POLL_INTERVAL_MS)
         }
       } catch (error) {
         if (!isApiFailure(error)) {
           rethrow(error)
+          return
+        }
+        if (error instanceof ApiError && error.status === UNAUTHORIZED) {
+          setReconnecting(false)
+          setSignedOut(true)
           return
         }
         failures += 1
@@ -162,7 +174,7 @@ export function useRoundChat(eventId: string, roundNumber: number): RoundChat {
     [deliver, rethrow],
   )
 
-  return { log, isReconnecting, send, retry }
+  return { log, isReconnecting, isSignedOut, send, retry }
 }
 
 /**

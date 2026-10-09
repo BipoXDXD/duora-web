@@ -3,7 +3,7 @@ import { FIELD_CONTROL, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_LINK } from '../.
 import { LOGIN_URL } from '../auth/loginUrl.ts'
 import type { ChatMessage } from './chat.ts'
 import { draftProblemOf, MESSAGE_MAX_LENGTH, messageLength, type DraftProblem } from './chatDraft.ts'
-import type { Pending, Received } from './chatLog.ts'
+import type { ChatLog, Pending, Received } from './chatLog.ts'
 import { ReportAction, ReportFlow } from './MessageReport.tsx'
 import { useMessageReports, type MessageReports } from './useMessageReports.ts'
 import { useRoundChat } from './useRoundChat.ts'
@@ -36,7 +36,7 @@ export function RoundChatPanel({ eventId, roundNumber }: RoundChatPanelProps) {
         Conversa com sua dupla
       </h3>
       {log.kind === 'notPaired' && <p className="text-fg">Não há conversa sua nesta rodada.</p>}
-      {log.kind === 'loading' && !chat.isReconnecting && (
+      {isLoading(log) && !chat.isReconnecting && !chat.isSignedOut && (
         <p role="status" className="text-fg-muted">
           Carregando a conversa…
         </p>
@@ -46,6 +46,11 @@ export function RoundChatPanel({ eventId, roundNumber }: RoundChatPanelProps) {
           Sem conexão com a conversa. Tentando de novo…
         </p>
       )}
+      {chat.isSignedOut && (
+        <div role="status">
+          <SignedOutNotice className="items-start" />
+        </div>
+      )}
       {log.kind === 'ready' && (
         <>
           {!log.open && (
@@ -53,7 +58,13 @@ export function RoundChatPanel({ eventId, roundNumber }: RoundChatPanelProps) {
               Esta conversa não recebe mais mensagens. O que foi dito continua aqui para ler.
             </p>
           )}
-          <MessageLog messages={log.messages} outgoing={log.outgoing} onRetry={retry} reports={reports} />
+          <MessageLog
+            isKnownEmpty={log.hasReadMessages && log.messages.length === 0}
+            messages={log.messages}
+            outgoing={log.outgoing}
+            onRetry={retry}
+            reports={reports}
+          />
           <ReportFlow eventId={eventId} roundNumber={roundNumber} reports={reports} />
           {log.open && <Composer fieldRef={fieldRef} onSend={chat.send} />}
         </>
@@ -62,7 +73,14 @@ export function RoundChatPanel({ eventId, roundNumber }: RoundChatPanelProps) {
   )
 }
 
+/** Ainda não há o que mostrar: o chat nem o acesso foram lidos, ou as mensagens ainda não responderam. */
+function isLoading(log: ChatLog): boolean {
+  return log.kind === 'loading' || (log.kind === 'ready' && !log.hasReadMessages)
+}
+
 interface MessageLogProps {
+  /** Uma leitura respondeu que não há mensagens; "ainda não li" não vale. */
+  readonly isKnownEmpty: boolean
   readonly messages: readonly Received[]
   readonly outgoing: readonly Pending[]
   readonly onRetry: (pending: Pending) => void
@@ -73,8 +91,8 @@ interface MessageLogProps {
  * `aria-relevant="additions"`: o leitor de tela anuncia o item novo e não o fim do "Enviando…". A mensagem
  * própria continua no mesmo item depois de gravada, então não é anunciada de novo.
  */
-function MessageLog({ messages, outgoing, onRetry, reports }: MessageLogProps) {
-  const isEmpty = messages.length === 0 && outgoing.length === 0
+function MessageLog({ isKnownEmpty, messages, outgoing, onRetry, reports }: MessageLogProps) {
+  const isEmpty = isKnownEmpty && outgoing.length === 0
   return (
     <>
       {isEmpty && <p className="text-fg-muted">Nenhuma mensagem ainda.</p>}
@@ -165,17 +183,21 @@ function PendingStatus({ pending: { status }, onRetry }: PendingStatusProps) {
         </div>
       )
     case 'signedOut':
-      return (
-        <div className="flex flex-col items-end gap-1">
-          <p className="text-sm font-semibold text-danger">Sua sessão terminou. Entre de novo para enviar.</p>
-          <a href={LOGIN_URL} className={TEXT_LINK}>
-            Entrar de novo
-          </a>
-        </div>
-      )
+      return <SignedOutNotice className="items-end" />
     case 'notSent':
       return <p className="text-sm font-semibold text-danger">Não foi enviada.</p>
   }
+}
+
+function SignedOutNotice({ className }: { readonly className: string }) {
+  return (
+    <div className={`flex flex-col gap-1 ${className}`}>
+      <p className="text-sm font-semibold text-danger">Sua sessão terminou. Entre de novo para enviar.</p>
+      <a href={LOGIN_URL} className={TEXT_LINK}>
+        Entrar de novo
+      </a>
+    </div>
+  )
 }
 
 const PROBLEM_TEXT: Readonly<Record<DraftProblem, string>> = {

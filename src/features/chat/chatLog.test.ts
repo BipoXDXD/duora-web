@@ -13,7 +13,7 @@ function received(seq: number): Received {
 }
 
 function ready(overrides: Partial<Extract<ChatLog, { kind: 'ready' }>> = {}): ChatLog {
-  return { kind: 'ready', open: true, messages: [], outgoing: [], ...overrides }
+  return { kind: 'ready', open: true, hasReadMessages: true, messages: [], outgoing: [], ...overrides }
 }
 
 function seqsOf(log: ChatLog): number[] {
@@ -26,7 +26,9 @@ describe('chatLogReducer', () => {
       ['open', true],
       ['closed', false],
     ] as const)('starts an empty %s chat', (kind, open) => {
-      expect(chatLogReducer(INITIAL_CHAT_LOG, { type: 'accessRead', access: { kind } })).toEqual(ready({ open }))
+      expect(chatLogReducer(INITIAL_CHAT_LOG, { type: 'accessRead', access: { kind } })).toEqual(
+        ready({ open, hasReadMessages: false }),
+      )
     })
 
     it('says there is no chat for someone who did not form a pair', () => {
@@ -46,6 +48,20 @@ describe('chatLogReducer', () => {
   })
 
   describe('pages', () => {
+    it('knows the chat is empty once an empty page came, which is different from not having read yet', () => {
+      const unread = chatLogReducer(INITIAL_CHAT_LOG, { type: 'accessRead', access: { kind: 'open' } })
+
+      const log = chatLogReducer(unread, { type: 'pageReceived', items: [] })
+
+      expect(log).toEqual(ready({ hasReadMessages: true }))
+    })
+
+    it('keeps knowing it after the access is read again', () => {
+      const log = chatLogReducer(ready({ hasReadMessages: true }), { type: 'accessRead', access: { kind: 'open' } })
+
+      expect(log).toEqual(ready({ hasReadMessages: true }))
+    })
+
     it('keeps the messages in the order of their position, whatever order they arrive in', () => {
       const log = chatLogReducer(ready({ messages: [received(2)] }), {
         type: 'pageReceived',

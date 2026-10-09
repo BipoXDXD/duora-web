@@ -8,7 +8,7 @@ import {
   type RefusalReason,
 } from '../../shared/api/http.ts'
 import type { CreateEventRequest } from '../../shared/api/contract.ts'
-import { instantSchema } from '../events/events.ts'
+import { eventPhaseAt, instantSchema, type EventPhase } from '../events/events.ts'
 import { FIRST_ROUND, LAST_ROUND } from '../events/pairing.ts'
 
 export const ADMIN_EVENT_STATUSES = ['DRAFT', 'PUBLISHED', 'CANCELLED'] as const
@@ -46,6 +46,19 @@ export type AdminRound = Readonly<z.output<typeof adminRoundSchema>>
  * O corpo de POST /api/admin/events. Vem da spec: os horários vão como ISO 8601 com o fuso de quem criou.
  */
 export type NewEvent = Readonly<CreateEventRequest>
+
+/** A fase do evento para a equipe: o rascunho vem antes das fases que o público conhece. */
+export type AdminPhase = 'draft' | EventPhase
+
+/** A fase no instante `now`. Rascunho é rascunho enquanto não for publicado, mesmo com o horário vencido. */
+export function adminPhaseAt(event: Pick<AdminEvent, 'status' | 'startsAt' | 'endsAt'>, now: Date): AdminPhase {
+  return event.status === 'DRAFT' ? 'draft' : eventPhaseAt({ ...event, status: event.status }, now)
+}
+
+/** Só o que ainda não acabou pode ser cancelado, rascunho ou publicado, inclusive em andamento. */
+export function canCancelAt(event: Pick<AdminEvent, 'status' | 'endsAt'>, now: Date): boolean {
+  return event.status !== 'CANCELLED' && now < event.endsAt
+}
 
 /**
  * Falhas de qualquer chamada da área da equipe. O front não sabe se quem chama é ADMIN, e a API decide:

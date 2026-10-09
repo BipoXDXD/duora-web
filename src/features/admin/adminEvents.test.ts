@@ -4,6 +4,8 @@ import type {
   AdminRoundResponse,
 } from '../../shared/api/contract.ts'
 import {
+  adminPhaseAt,
+  canCancelAt,
   cancelEvent,
   createEvent,
   fetchAdminEvent,
@@ -352,6 +354,38 @@ describe('fetchAdminRound', () => {
     fetchMock.mockResolvedValue(problem(status))
 
     await expect(fetchAdminRound(EVENT_ID, 2)).rejects.toMatchObject({ name: 'ApiError', status })
+  })
+})
+
+describe('adminPhaseAt', () => {
+  const BEFORE = new Date('2026-10-10T21:59:00Z')
+  const DURING = new Date('2026-10-10T22:30:00Z')
+  const AFTER = new Date('2026-10-11T01:00:00Z')
+
+  it.each([
+    ['DRAFT', BEFORE, 'draft'],
+    ['DRAFT', AFTER, 'draft'],
+    ['PUBLISHED', BEFORE, 'upcoming'],
+    ['PUBLISHED', new Date('2026-10-10T22:00:00Z'), 'inProgress'],
+    ['PUBLISHED', DURING, 'inProgress'],
+    ['PUBLISHED', AFTER, 'ended'],
+    ['CANCELLED', BEFORE, 'cancelled'],
+    ['CANCELLED', AFTER, 'cancelled'],
+  ] as const)('places a %s event at %s in the phase %s', (status, now, phase) => {
+    expect(adminPhaseAt({ ...EVENT, status }, now)).toBe(phase)
+  })
+})
+
+describe('canCancelAt', () => {
+  it.each([
+    ['DRAFT', new Date('2026-10-08T12:00:00Z'), true],
+    ['PUBLISHED', new Date('2026-10-10T22:30:00Z'), true],
+    ['PUBLISHED', new Date('2026-10-11T00:59:00Z'), true],
+    ['PUBLISHED', new Date('2026-10-11T01:00:00Z'), false],
+    ['DRAFT', new Date('2026-10-11T01:00:00Z'), false],
+    ['CANCELLED', new Date('2026-10-08T12:00:00Z'), false],
+  ] as const)('lets a %s event at %s be cancelled: %s', (status, now, can) => {
+    expect(canCancelAt({ ...EVENT, status }, now)).toBe(can)
   })
 })
 
